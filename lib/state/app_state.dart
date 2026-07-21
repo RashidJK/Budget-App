@@ -1,0 +1,621 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
+
+import '../models/category.dart';
+import '../models/expense.dart';
+import '../models/palette.dart';
+import '../models/profile.dart';
+import '../models/scenario.dart';
+import '../services/storage.dart';
+
+const _uuid = Uuid();
+
+/// Owns every persisted collection and notifies the UI when they change.
+class AppState extends ChangeNotifier {
+  AppState(this._storage) {
+    _load();
+  }
+
+  final Storage _storage;
+
+  List<Expense> _expenses = [];
+  List<Scenario> _scenarios = [];
+  List<ExpenseCategory> _categories = [];
+  List<Profile> _profiles = [];
+
+  /// The profile the dashboard and lists are scoped to. Null means all.
+  String? _activeProfileId;
+
+  List<Expense> get expenses => List.unmodifiable(_expenses);
+  List<Scenario> get scenarios => List.unmodifiable(_scenarios);
+  List<ExpenseCategory> get categories => List.unmodifiable(_categories);
+  List<Profile> get profiles => List.unmodifiable(_profiles);
+
+  String? get activeProfileId => _activeProfileId;
+
+  Profile? get activeProfile => profileById(_activeProfileId);
+
+  void _load() {
+    // A first launch has no categories or profiles; without a starter set the
+    // user would face an expense form with an empty category picker.
+    if (_storage.isFirstLaunch) {
+      _categories = List.of(ExpenseCategory.seed);
+      _profiles = List.of(Profile.seed);
+      unawaited(_persistCategories(notify: false));
+      unawaited(_persistProfiles(notify: false));
+    } else {
+      _categories = _storage
+          .readCategories()
+          .map(ExpenseCategory.fromJson)
+          .toList();
+      _profiles = _storage.readProfiles().map(Profile.fromJson).toList();
+
+      // Deleting the last of either would leave the app unusable.
+      if (_categories.isEmpty) _categories = List.of(ExpenseCategory.seed);
+      if (_profiles.isEmpty) _profiles = List.of(Profile.seed);
+    }
+
+    _expenses = _storage.readExpenses().map(Expense.fromJson).toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+
+    _scenarios = _storage.readScenarios().map(Scenario.fromJson).toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+    _activeProfileId = _storage.readActiveProfile();
+  }
+
+  // -------------------------------------------------------------------------
+  // Lookups
+  // -------------------------------------------------------------------------
+
+  /// Resolves a category id, falling back to a neutral placeholder so an
+  /// expense whose category was deleted still renders.
+  ExpenseCategory categoryById(String? id) {
+    for (final category in _categories) {
+      if (category.id == id) return category;
+    }
+    return ExpenseCategory.unknown;
+  }
+
+  Profile? profileById(String? id) {
+    if (id == null) return null;
+    for (final profile in _profiles) {
+      if (profile.id == id) return profile;
+    }
+    return null;
+  }
+
+  /// The profile new expenses default to.
+  String get defaultProfileId =>
+      _activeProfileId ??
+      (_profiles.isEmpty ? Profile.personalId : _profiles.first.id);
+
+  // -------------------------------------------------------------------------
+  // Profiles
+  // -------------------------------------------------------------------------
+
+  Future<void> setActiveProfile(String? id) async {
+    _activeProfileId = id;
+    notifyListeners();
+    await _storage.writeActiveProfile(id);
+  }
+
+  Future<void> addProfile({
+    required String name,
+    required String iconName,
+    int? colorSlot,
+    bool isBusiness = false,
+  }) async {
+    _profiles = [
+      ..._profiles,
+      Profile(
+        id: _uuid.v4(),
+        name: name,
+        iconName: iconName,
+        colorSlot:
+            colorSlot ?? Palette.firstFree(_profiles.map((p) => p.colorSlot)),
+        isBusiness: isBusiness,
+      ),
+    ];
+    await _persistProfiles();
+  }
+
+  Future<void> updateProfile(Profile profile) async {
+    final index = _profiles.indexWhere((item) => item.id == profile.id);
+    if (index == -1) return;
+
+    _profiles = [..._profiles]..[index] = profile;
+    await _persistProfiles();
+  }
+
+  /// Deletes a profile and moves its expenses to [reassignTo].
+  ///
+  /// Expenses are never deleted as a side effect of removing a profile — that
+  /// would destroy records the user didn't ask to lose.
+  Future<void> deleteProfile(String id, {required String reassignTo}) async {
+    if (_profiles.length <= 1) return;
+
+    _profiles = _profiles.where((profile) => profile.id != id).toList();
+    _expenses = _expenses
+        .map(
+          (expense) => expense.profileId == id
+              ? expense.copyWith(profileId: reassignTo)
+              : expense,
+        )
+        .toList();
+
+    if (_activeProfileId == id) {
+      _activeProfileId = null;
+      await _storage.writeActiveProfile(null);
+    }
+
+    await _persistProfiles(notify: false);
+    await _persistExpenses();
+  }
+
+  Future<void> _persistProfiles({bool notify = true}) async {
+    if (notify) notifyListeners();
+    await _storage.writeProfiles(
+      _profiles.map((profile) => profile.toJson()).toList(),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Categories
+  // -------------------------------------------------------------------------
+
+  /// Slots already spoken for, so the picker can show what is free.
+  Set<int> get usedColorSlots => _categories
+      .map((category) => category.colorSlot)
+      .whereType<int>()
+      .toSet();
+
+  Future<void> addCategory({
+    required String name,
+    required String iconName,
+    int? colorSlot,
+    double? monthlyBudget,
+  }) async {
+    _categories = [
+      ..._categories,
+      ExpenseCategory(
+        id: _uuid.v4(),
+        name: name,
+        iconName: iconName,
+        // Past the palette's capacity this stays null and the category renders
+        // neutral, rather than inventing an indistinguishable ninth hue.
+        colorSlot: colorSlot ?? Palette.firstFree(usedColorSlots),
+        monthlyBudget: monthlyBudget,
+        updatedAt: DateTime.now(),
+      ),
+    ];
+    await _persistCategories();
+  }
+
+  Future<void> updateCategory(ExpenseCategory category) async {
+    final index = _categories.indexWhere((item) => item.id == category.id);
+    if (index == -1) return;
+
+    _categories = [..._categories]..[index] = category;
+    await _persistCategories();
+  }
+
+  /// Deletes a category and moves its expenses to [reassignTo].
+  Future<void> deleteCategory(String id, {required String reassignTo}) async {
+    if (_categories.length <= 1) return;
+
+    _categories = _categories.where((category) => category.id != id).toList();
+    _expenses = _expenses
+        .map(
+          (expense) => expense.categoryId == id
+              ? expense.copyWith(categoryId: reassignTo)
+              : expense,
+        )
+        .toList();
+
+    await _persistCategories(notify: false);
+    await _persistExpenses();
+  }
+
+  /// How many expenses would be reassigned if [id] were deleted.
+  int expenseCountForCategory(String id) =>
+      _expenses.where((expense) => expense.categoryId == id).length;
+
+  int expenseCountForProfile(String id) =>
+      _expenses.where((expense) => expense.profileId == id).length;
+
+  Future<void> _persistCategories({bool notify = true}) async {
+    if (notify) notifyListeners();
+    await _storage.writeCategories(
+      _categories.map((category) => category.toJson()).toList(),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Expenses
+  // -------------------------------------------------------------------------
+
+  Future<void> addExpense({
+    required String title,
+    required double amount,
+    required String categoryId,
+    required DateTime date,
+    String? profileId,
+    String note = '',
+    List<String> attachments = const [],
+  }) async {
+    _expenses = [
+      Expense(
+        id: _uuid.v4(),
+        title: title,
+        amount: amount,
+        categoryId: categoryId,
+        profileId: profileId ?? defaultProfileId,
+        date: date,
+        updatedAt: DateTime.now(),
+        note: note,
+        attachments: attachments,
+      ),
+      ..._expenses,
+    ]..sort((a, b) => b.date.compareTo(a.date));
+
+    await _persistExpenses();
+  }
+
+  Future<void> updateExpense(Expense expense) async {
+    final index = _expenses.indexWhere((item) => item.id == expense.id);
+    if (index == -1) return;
+
+    _expenses = [..._expenses]
+      ..[index] = expense
+      ..sort((a, b) => b.date.compareTo(a.date));
+
+    await _persistExpenses();
+  }
+
+  Future<void> deleteExpense(
+    String id, {
+    bool discardAttachments = true,
+  }) async {
+    final matches = _expenses.where((item) => item.id == id);
+    final expense = matches.isEmpty ? null : matches.first;
+
+    _expenses = _expenses.where((item) => item.id != id).toList();
+    await _persistExpenses();
+
+    // Orphaned receipts would otherwise sit in the documents directory for
+    // good. Skipped when the deletion is undoable, so Undo can restore them.
+    if (discardAttachments && expense != null) {
+      for (final path in expense.attachments) {
+        unawaited(AttachmentStore.discard(path));
+      }
+    }
+  }
+
+  /// Re-inserts a deleted expense, preserving its original id and receipts.
+  Future<void> restoreExpense(Expense expense) async {
+    _expenses = [expense, ..._expenses]
+      ..sort((a, b) => b.date.compareTo(a.date));
+    await _persistExpenses();
+  }
+
+  Future<void> _persistExpenses() async {
+    notifyListeners();
+    await _storage.writeExpenses(
+      _expenses.map((expense) => expense.toJson()).toList(),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Queries
+  // -------------------------------------------------------------------------
+
+  /// Expenses in the active profile. Everything on the dashboard reads from
+  /// here, so switching profile rescopes the whole screen.
+  List<Expense> get scopedExpenses {
+    if (_activeProfileId == null) return _expenses;
+    return _expenses
+        .where((expense) => expense.profileId == _activeProfileId)
+        .toList();
+  }
+
+  List<Expense> search(ExpenseFilter filter) =>
+      _expenses.where(filter.matches).toList();
+
+  List<Expense> expensesInMonth(DateTime month) {
+    return scopedExpenses
+        .where(
+          (expense) =>
+              expense.date.year == month.year &&
+              expense.date.month == month.month,
+        )
+        .toList();
+  }
+
+  double totalFor(Iterable<Expense> expenses) =>
+      expenses.fold<double>(0, (sum, expense) => sum + expense.amount);
+
+  double get spentThisMonth => totalFor(expensesInMonth(DateTime.now()));
+
+  double get spentLastMonth {
+    final now = DateTime.now();
+    return totalFor(expensesInMonth(DateTime(now.year, now.month - 1)));
+  }
+
+  /// Totals by category for [month], largest first, excluding empty
+  /// categories so the breakdown only lists things actually spent on.
+  List<CategoryTotal> categoryTotals(DateTime month) {
+    final totals = <String, double>{};
+    for (final expense in expensesInMonth(month)) {
+      totals[expense.categoryId] =
+          (totals[expense.categoryId] ?? 0) + expense.amount;
+    }
+
+    return totals.entries
+        .map(
+          (entry) => CategoryTotal(
+            category: categoryById(entry.key),
+            total: entry.value,
+          ),
+        )
+        .toList()
+      ..sort((a, b) => b.total.compareTo(a.total));
+  }
+
+  /// Daily totals for the last [days] days, oldest first, including days with
+  /// no spending so the chart keeps an even time axis.
+  List<DayTotal> dailyTotals({int days = 14}) {
+    final today = DateTime.now();
+    final start = DateTime(
+      today.year,
+      today.month,
+      today.day,
+    ).subtract(Duration(days: days - 1));
+
+    final buckets = <DateTime, double>{};
+    for (var offset = 0; offset < days; offset++) {
+      buckets[start.add(Duration(days: offset))] = 0;
+    }
+
+    for (final expense in scopedExpenses) {
+      final day = DateTime(
+        expense.date.year,
+        expense.date.month,
+        expense.date.day,
+      );
+      if (buckets.containsKey(day)) {
+        buckets[day] = buckets[day]! + expense.amount;
+      }
+    }
+
+    return buckets.entries
+        .map((entry) => DayTotal(day: entry.key, total: entry.value))
+        .toList()
+      ..sort((a, b) => a.day.compareTo(b.day));
+  }
+
+  /// Total spend per calendar month for the last [months] months, oldest
+  /// first, empty months included so the trend chart keeps an even axis.
+  List<MonthTotal> monthlyTotals({int months = 6}) {
+    final now = DateTime.now();
+    final result = <MonthTotal>[];
+
+    for (var offset = months - 1; offset >= 0; offset--) {
+      final month = DateTime(now.year, now.month - offset);
+      result.add(
+        MonthTotal(month: month, total: totalFor(expensesInMonth(month))),
+      );
+    }
+    return result;
+  }
+
+  /// Budget progress for every category that has a limit, this month.
+  ///
+  /// Sorted by how close to (or past) the limit each is, so the categories
+  /// that need attention sit at the top. Scoped to the active profile like
+  /// everything else on the dashboard.
+  List<BudgetProgress> budgetProgress([DateTime? month]) {
+    final target = month ?? DateTime.now();
+    final spentByCategory = <String, double>{};
+    for (final expense in expensesInMonth(target)) {
+      spentByCategory[expense.categoryId] =
+          (spentByCategory[expense.categoryId] ?? 0) + expense.amount;
+    }
+
+    final result = _categories
+        .where((category) => category.hasBudget)
+        .map(
+          (category) => BudgetProgress(
+            category: category,
+            spent: spentByCategory[category.id] ?? 0,
+            budget: category.monthlyBudget!,
+          ),
+        )
+        .toList()
+      ..sort((a, b) => b.fraction.compareTo(a.fraction));
+
+    return result;
+  }
+
+  bool get hasAnyBudget => _categories.any((category) => category.hasBudget);
+
+  /// Days left in the current month, for "X days to go" on budget cards.
+  int get daysLeftThisMonth {
+    final now = DateTime.now();
+    final lastDay = DateTime(now.year, now.month + 1, 0).day;
+    return lastDay - now.day;
+  }
+
+  /// Highest single expense this month, for the analytics stat tiles.
+  Expense? get biggestExpenseThisMonth {
+    final expenses = expensesInMonth(DateTime.now());
+    if (expenses.isEmpty) return null;
+    return expenses.reduce((a, b) => a.amount >= b.amount ? a : b);
+  }
+
+  /// Mean spend per day so far this month.
+  double get dailyAverageThisMonth {
+    final now = DateTime.now();
+    return spentThisMonth / now.day;
+  }
+
+  /// Spend over the last [days] days including today, for the "this week"
+  /// snapshot. A rolling window rather than a calendar week — "the last seven
+  /// days" is what people mean by "this week's spending".
+  double spentInLastDays(int days) {
+    final today = DateTime.now();
+    final cutoff = DateTime(
+      today.year,
+      today.month,
+      today.day,
+    ).subtract(Duration(days: days - 1));
+
+    return totalFor(
+      scopedExpenses.where((expense) => !expense.date.isBefore(cutoff)),
+    );
+  }
+
+  /// The largest category this month, or null when nothing is spent.
+  CategoryTotal? get topCategoryThisMonth {
+    final totals = categoryTotals(DateTime.now());
+    return totals.isEmpty ? null : totals.first;
+  }
+
+  // -------------------------------------------------------------------------
+  // Scenarios
+  // -------------------------------------------------------------------------
+
+  Scenario? scenarioById(String? id) {
+    if (id == null) return null;
+    for (final scenario in _scenarios) {
+      if (scenario.id == id) return scenario;
+    }
+    return null;
+  }
+
+  Future<Scenario> saveScenario({
+    required String name,
+    required ScenarioKind kind,
+    required Map<String, dynamic> data,
+  }) async {
+    final now = DateTime.now();
+    final scenario = Scenario(
+      id: _uuid.v4(),
+      name: name,
+      kind: kind,
+      data: data,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    _scenarios = [scenario, ..._scenarios];
+    await _persistScenarios();
+    return scenario;
+  }
+
+  Future<void> updateScenario(
+    String id, {
+    String? name,
+    Map<String, dynamic>? data,
+  }) async {
+    final index = _scenarios.indexWhere((scenario) => scenario.id == id);
+    if (index == -1) return;
+
+    _scenarios = [..._scenarios]
+      ..[index] = _scenarios[index].copyWith(
+        name: name,
+        data: data,
+        updatedAt: DateTime.now(),
+      );
+    _scenarios.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+    await _persistScenarios();
+  }
+
+  Future<Scenario?> duplicateScenario(String id) async {
+    final source = scenarioById(id);
+    if (source == null) return null;
+
+    return saveScenario(
+      name: _uniqueName('${source.name} (copy)'),
+      kind: source.kind,
+      data: Map<String, dynamic>.from(source.data),
+    );
+  }
+
+  Future<void> deleteScenario(String id) async {
+    _scenarios = _scenarios.where((scenario) => scenario.id != id).toList();
+    await _persistScenarios();
+  }
+
+  /// Appends a counter until the name is free, so duplicating twice doesn't
+  /// leave two identically-named scenarios the user can't tell apart.
+  String _uniqueName(String preferred) {
+    final taken = _scenarios.map((scenario) => scenario.name).toSet();
+    if (!taken.contains(preferred)) return preferred;
+
+    for (var suffix = 2; suffix < 100; suffix++) {
+      final candidate = '$preferred $suffix';
+      if (!taken.contains(candidate)) return candidate;
+    }
+    return preferred;
+  }
+
+  Future<void> _persistScenarios() async {
+    notifyListeners();
+    await _storage.writeScenarios(
+      _scenarios.map((scenario) => scenario.toJson()).toList(),
+    );
+  }
+}
+
+/// One row of the category breakdown.
+class CategoryTotal {
+  const CategoryTotal({required this.category, required this.total});
+
+  final ExpenseCategory category;
+  final double total;
+}
+
+/// One bar of the daily spending chart.
+class DayTotal {
+  const DayTotal({required this.day, required this.total});
+
+  final DateTime day;
+  final double total;
+}
+
+/// One bar of the monthly trend chart.
+class MonthTotal {
+  const MonthTotal({required this.month, required this.total});
+
+  final DateTime month;
+  final double total;
+}
+
+/// A category's spend against its budget for a month — one goal card on the
+/// home screen.
+class BudgetProgress {
+  const BudgetProgress({
+    required this.category,
+    required this.spent,
+    required this.budget,
+  });
+
+  final ExpenseCategory category;
+  final double spent;
+  final double budget;
+
+  /// Spend as a share of budget, uncapped so "over budget" is visible as a
+  /// value above 1.
+  double get fraction => budget <= 0 ? 0 : spent / budget;
+
+  /// The bar never draws past full, even when [fraction] exceeds 1 — an
+  /// over-budget card shows a full bar plus an explicit "over by" figure.
+  double get barFraction => fraction.clamp(0.0, 1.0);
+
+  double get remaining => budget - spent;
+  bool get isOver => spent > budget;
+}
