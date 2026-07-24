@@ -34,6 +34,17 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
+      // A quick-add button on the Home tab only. It lives on this shell
+      // Scaffold — the one that owns the nav bar — so it floats cleanly above
+      // the floating nav pill. A FAB on the nested dashboard Scaffold would
+      // instead sit against the screen bottom, behind the nav.
+      floatingActionButton: _index == 0
+          ? FloatingActionButton(
+              onPressed: () => AddExpenseSheet.show(context),
+              tooltip: 'Add expense',
+              child: const Icon(Icons.add_rounded),
+            )
+          : null,
       // IndexedStack preserves each tab's scroll position and the planner's
       // half-entered inputs when the user pops between tabs.
       body: IndexedStack(
