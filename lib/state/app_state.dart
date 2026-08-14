@@ -110,6 +110,14 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
+  Expense? expenseById(String? id) {
+    if (id == null) return null;
+    for (final expense in _expenses) {
+      if (expense.id == id) return expense;
+    }
+    return null;
+  }
+
   /// The profile new expenses default to.
   String get defaultProfileId =>
       _activeProfileId ??
@@ -268,6 +276,7 @@ class AppState extends ChangeNotifier {
     String? profileId,
     String note = '',
     List<String> attachments = const [],
+    Map<String, dynamic> metadata = const {},
   }) async {
     _expenses = [
       Expense(
@@ -280,6 +289,7 @@ class AppState extends ChangeNotifier {
         updatedAt: DateTime.now(),
         note: note,
         attachments: attachments,
+        metadata: metadata,
       ),
       ..._expenses,
     ]..sort((a, b) => b.date.compareTo(a.date));

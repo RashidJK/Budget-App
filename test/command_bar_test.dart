@@ -114,6 +114,44 @@ void main() {
     expect(state.activities, isEmpty);
   });
 
+  testWidgets('a fuel capture offers to enrich, and the details save', (
+    tester,
+  ) async {
+    final (app, state) = await _host();
+    await tester.pumpWidget(app);
+
+    await _open(tester, 'Paid 80000 for fuel');
+    await tester.tap(find.text('Add expense'));
+    await tester.pumpAndSettle();
+
+    // Capture-first, enrich-later: the success card nudges for fuel details.
+    expect(find.text('Add fuel details'), findsOneWidget);
+    expect(state.expenses.single.hasMetadata, isFalse);
+
+    await tester.tap(find.text('Add fuel details'));
+    await tester.pumpAndSettle();
+
+    // The metadata form appears with fuel fields.
+    expect(find.text('Fuel details'), findsOneWidget);
+    expect(find.text('Litres'), findsOneWidget);
+
+    // Target the field under the "Litres" label specifically.
+    final litresField = find.descendant(
+      of: find.ancestor(
+        of: find.text('Litres'),
+        matching: find.byType(Column),
+      ).first,
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(litresField, '20');
+    await tester.ensureVisible(find.text('Save details'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save details'));
+    await tester.pumpAndSettle();
+
+    expect(state.expenses.single.metadata['litres'], 20.0);
+  });
+
   testWidgets('an ambiguous command offers one-tap clarification', (
     tester,
   ) async {

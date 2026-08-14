@@ -19,6 +19,7 @@ class Expense implements SyncFields {
     required this.updatedAt,
     this.note = '',
     this.attachments = const [],
+    this.metadata = const {},
     this.deletedAt,
   });
 
@@ -40,6 +41,7 @@ class Expense implements SyncFields {
       attachments:
           (json['attachments'] as List?)?.whereType<String>().toList() ??
           const [],
+      metadata: Map<String, dynamic>.from(json['metadata'] as Map? ?? const {}),
       deletedAt: DateTime.tryParse(json['deletedAt'] as String? ?? ''),
     );
   }
@@ -72,7 +74,14 @@ class Expense implements SyncFields {
   /// visible on another.
   final List<String> attachments;
 
+  /// Category-specific enrichment (litres, odometer, restaurant, …). Optional
+  /// and added whenever the user gets to it — never required at capture time
+  /// (spec §18, §19). See `CategoryFields` for the per-category schema.
+  final Map<String, dynamic> metadata;
+
   bool get hasAttachments => attachments.isNotEmpty;
+
+  bool get hasMetadata => metadata.values.any((v) => v != null && v != '');
 
   /// Text the search box matches against.
   String get searchable => '$title $note'.toLowerCase();
@@ -88,6 +97,7 @@ class Expense implements SyncFields {
     'deletedAt': deletedAt?.toIso8601String(),
     'note': note,
     'attachments': attachments,
+    'metadata': metadata,
   };
 
   /// Every mutation stamps [updatedAt], so a caller cannot accidentally write
@@ -100,6 +110,7 @@ class Expense implements SyncFields {
     DateTime? date,
     String? note,
     List<String>? attachments,
+    Map<String, dynamic>? metadata,
     DateTime? updatedAt,
   }) {
     return Expense(
@@ -112,6 +123,7 @@ class Expense implements SyncFields {
       updatedAt: updatedAt ?? DateTime.now(),
       note: note ?? this.note,
       attachments: attachments ?? this.attachments,
+      metadata: metadata ?? this.metadata,
       deletedAt: deletedAt,
     );
   }
@@ -129,6 +141,7 @@ class Expense implements SyncFields {
       updatedAt: now,
       note: note,
       attachments: attachments,
+      metadata: metadata,
       deletedAt: now,
     );
   }
@@ -145,6 +158,7 @@ class Expense implements SyncFields {
       updatedAt: DateTime.now(),
       note: note,
       attachments: attachments,
+      metadata: metadata,
     );
   }
 }

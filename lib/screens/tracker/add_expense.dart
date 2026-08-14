@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/category_fields.dart';
 import '../../models/expense.dart';
 import '../../services/format.dart';
 import '../../services/storage.dart';
@@ -11,6 +12,7 @@ import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/inputs.dart';
 import '../manage/category_editor.dart';
+import 'metadata_sheet.dart';
 
 /// Bottom sheet for recording or editing an expense.
 ///
@@ -44,6 +46,10 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
   late DateTime _date;
   late List<String> _attachments;
 
+  /// One controller per category-metadata field, created lazily as categories
+  /// with schemas are shown.
+  final Map<String, TextEditingController> _metadata = {};
+
   double _parsedAmount = 0;
   bool _showNote = false;
 
@@ -71,6 +77,20 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
     _parsedAmount = existing?.amount ?? 0;
     _attachments = List.of(existing?.attachments ?? const []);
     _showNote = (existing?.note ?? '').isNotEmpty;
+
+    // Pre-fill any category metadata the expense already carries.
+    (existing?.metadata ?? const {}).forEach((key, value) {
+      _metadata[key] = TextEditingController(
+        text: value == null ? '' : _metaString(value),
+      );
+    });
+  }
+
+  String _metaString(Object value) {
+    if (value is double && value == value.roundToDouble()) {
+      return value.toInt().toString();
+    }
+    return '$value';
   }
 
   @override
@@ -84,7 +104,23 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
     _title.dispose();
     _amount.dispose();
     _note.dispose();
+    for (final controller in _metadata.values) {
+      controller.dispose();
+    }
     super.dispose();
+  }
+
+  /// Collects the metadata fields for the current category into a map.
+  Map<String, dynamic> _collectMetadata() {
+    final result = <String, dynamic>{};
+    for (final field in CategoryFields.forCategory(_categoryId)) {
+      final controller = _metadata[field.key];
+      final raw = controller?.text.trim() ?? '';
+      if (raw.isEmpty) continue;
+      result[field.key] =
+          field.isNumeric ? (double.tryParse(raw) ?? raw) : raw;
+    }
+    return result;
   }
 
   bool get _canSave => _parsedAmount > 0 && _title.text.trim().isNotEmpty;
@@ -94,6 +130,7 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
     final existing = widget.existing;
     _saved = true;
 
+    final metadata = _collectMetadata();
     if (existing == null) {
       await state.addExpense(
         title: _title.text.trim(),
@@ -103,6 +140,7 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
         date: _date,
         note: _note.text.trim(),
         attachments: _attachments,
+        metadata: metadata,
       );
     } else {
       await state.updateExpense(
@@ -114,6 +152,7 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
           date: _date,
           note: _note.text.trim(),
           attachments: _attachments,
+          metadata: metadata,
         ),
       );
     }
@@ -302,6 +341,20 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
+            // Category-specific details (litres, odometer, …) — optional, and
+            // only shown for categories that have a schema (spec §18).
+            if (CategoryFields.has(_categoryId)) ...[
+              const SizedBox(height: 20),
+              Text(
+                '${context.read<AppState>().categoryById(_categoryId).name} details',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: context.muted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              MetadataFields(categoryId: _categoryId, controllers: _metadata),
+            ],
             const SizedBox(height: 20),
             FilledButton(
               onPressed: _canSave ? _save : null,
