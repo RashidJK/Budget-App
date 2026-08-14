@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../command/command_bar.dart';
 import '../theme.dart';
 import 'analytics/analytics_screen.dart';
 import 'planner/planner_home.dart';
@@ -50,10 +51,7 @@ class _HomeShellState extends State<HomeShell> {
       body: IndexedStack(
         index: _index,
         children: [
-          DashboardScreen(
-            onSeeAnalytics: () => _select(2),
-            onSeePlanner: () => _select(3),
-          ),
+          DashboardScreen(onSeePlanner: () => _select(3)),
           const ExpenseListScreen(),
           const AnalyticsScreen(),
           const PlannerHomeScreen(),
@@ -62,7 +60,8 @@ class _HomeShellState extends State<HomeShell> {
       bottomNavigationBar: _BudgetNavBar(
         index: _index,
         onSelect: _select,
-        onAdd: () => AddExpenseSheet.show(context),
+        // The centre + is the universal command bar — capture first (spec §4).
+        onAdd: () => CommandBar.show(context),
       ),
     );
   }

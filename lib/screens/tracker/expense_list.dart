@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/activity.dart';
 import '../../models/expense.dart';
 import '../../services/format.dart';
 import '../../state/app_state.dart';
@@ -43,7 +44,16 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final matches = state.search(_filter);
-    final groups = _groupByDay(matches);
+    // History interleaves expenses with income / transfers / loans (spec §33).
+    // Filtering is expense-oriented, so activities appear only in the default
+    // (unfiltered) view.
+    final entries = <_Entry>[for (final e in matches) _Entry.expense(e)];
+    if (!_filter.isActive) {
+      entries.addAll([
+        for (final a in state.scopedActivities) _Entry.activity(a),
+      ]);
+    }
+    final groups = _groupByDay(entries);
     final total = state.totalFor(matches);
 
     return Scaffold(
@@ -122,11 +132,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                     itemCount: groups.length,
                     itemBuilder: (context, index) {
                       final group = groups[index];
-                      return _DayGroup(
-                        day: group.day,
-                        expenses: group.expenses,
-                        total: state.totalFor(group.expenses),
-                      );
+                      return _DayGroup(day: group.day, entries: group.entries);
                     },
                   ),
           ),
@@ -164,47 +170,56 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     );
   }
 
-  /// Buckets expenses into calendar days, preserving the newest-first order.
-  List<_DayBucket> _groupByDay(List<Expense> expenses) {
-    final buckets = <DateTime, List<Expense>>{};
+  /// Buckets entries into calendar days, newest first, expenses and
+  /// activities interleaved.
+  List<_DayBucket> _groupByDay(List<_Entry> entries) {
+    final buckets = <DateTime, List<_Entry>>{};
 
-    for (final expense in expenses) {
-      final day = DateTime(
-        expense.date.year,
-        expense.date.month,
-        expense.date.day,
-      );
-      buckets.putIfAbsent(day, () => []).add(expense);
+    for (final entry in entries) {
+      final date = entry.date;
+      final day = DateTime(date.year, date.month, date.day);
+      buckets.putIfAbsent(day, () => []).add(entry);
     }
 
     final days = buckets.keys.toList()..sort((a, b) => b.compareTo(a));
     return [
-      for (final day in days) _DayBucket(day: day, expenses: buckets[day]!),
+      for (final day in days) _DayBucket(day: day, entries: buckets[day]!),
     ];
   }
 }
 
+/// One history line — an expense or a non-expense activity.
+class _Entry {
+  const _Entry.expense(this.expense) : activity = null;
+  const _Entry.activity(this.activity) : expense = null;
+
+  final Expense? expense;
+  final Activity? activity;
+
+  DateTime get date => expense?.date ?? activity!.date;
+}
+
 class _DayBucket {
-  const _DayBucket({required this.day, required this.expenses});
+  const _DayBucket({required this.day, required this.entries});
 
   final DateTime day;
-  final List<Expense> expenses;
+  final List<_Entry> entries;
 }
 
 class _DayGroup extends StatelessWidget {
-  const _DayGroup({
-    required this.day,
-    required this.expenses,
-    required this.total,
-  });
+  const _DayGroup({required this.day, required this.entries});
 
   final DateTime day;
-  final List<Expense> expenses;
-  final double total;
+  final List<_Entry> entries;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // Day header shows net expense spend only — mixing in income would make
+    // "spent today" meaningless.
+    final expenseTotal = entries
+        .where((e) => e.expense != null)
+        .fold<double>(0, (sum, e) => sum + e.expense!.amount);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -220,21 +235,25 @@ class _DayGroup extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              Text(
-                Money.format(total),
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: context.muted,
+              if (expenseTotal > 0)
+                Text(
+                  Money.format(expenseTotal),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: context.muted,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
         Card(
           child: Column(
             children: [
-              for (var index = 0; index < expenses.length; index++) ...[
+              for (var index = 0; index < entries.length; index++) ...[
                 if (index > 0) Divider(indent: 60, color: context.hairline),
-                ExpenseRow(expense: expenses[index]),
+                if (entries[index].expense != null)
+                  ExpenseRow(expense: entries[index].expense!)
+                else
+                  ActivityRow(activity: entries[index].activity!),
               ],
             ],
           ),
@@ -371,5 +390,134 @@ class ExpenseRow extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// A single non-expense activity line — income, transfer, loan or repayment.
+///
+/// Signs and colours make the direction unmistakable (spec §33): inflows are
+/// green with a leading `+`, outflows and loans out are neutral with `−`, and
+/// transfers are neutral (money that only moved, not spent).
+class ActivityRow extends StatelessWidget {
+  const ActivityRow({super.key, required this.activity});
+
+  final Activity activity;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final (icon, color) = _iconFor(context, activity.type);
+    final amount = Money.format(activity.amount);
+    final signed = activity.type.isInflow
+        ? '+$amount'
+        : activity.type == ActivityType.transfer
+        ? amount
+        : '−$amount';
+
+    return Dismissible(
+      key: ValueKey('activity-${activity.id}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: context.warn.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Icon(Icons.delete_outline_rounded, color: context.warn),
+      ),
+      onDismissed: (_) {
+        final state = context.read<AppState>();
+        final messenger = ScaffoldMessenger.of(context);
+        state.deleteActivity(activity.id);
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Deleted "${activity.description}"'),
+            action: SnackBarAction(
+              label: 'Undo',
+              onPressed: () => state.restoreActivity(activity.id),
+            ),
+          ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: context.isDark ? 0.24 : 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, size: 19, color: color),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    activity.description.isEmpty
+                        ? activity.type.label
+                        : activity.description,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _subtitle(),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: context.muted,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              signed,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: activity.type.isInflow ? context.good : null,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _subtitle() {
+    if (activity.type == ActivityType.transfer) {
+      return '${activity.sourceAccount ?? 'From'} → '
+          '${activity.destinationAccount ?? 'To'}';
+    }
+    return activity.type.label;
+  }
+
+  (IconData, Color) _iconFor(BuildContext context, ActivityType type) {
+    switch (type) {
+      case ActivityType.income:
+        return (Icons.south_west_rounded, context.good);
+      case ActivityType.transfer:
+        return (Icons.swap_horiz_rounded, context.scheme.primary);
+      case ActivityType.loanOut:
+        return (Icons.call_made_rounded, context.warn);
+      case ActivityType.loanIn:
+        return (Icons.call_received_rounded, context.good);
+      case ActivityType.loanRepayment:
+        return (Icons.undo_rounded, context.muted);
+      case ActivityType.receivableRepayment:
+        return (Icons.redo_rounded, context.good);
+      case ActivityType.expense:
+        return (Icons.remove_circle_outline_rounded, context.muted);
+    }
   }
 }

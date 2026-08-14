@@ -18,6 +18,9 @@ class Storage {
   static const _categoriesKey = 'budget.categories.v1';
   static const _profilesKey = 'budget.profiles.v1';
   static const _activeProfileKey = 'budget.activeProfile.v1';
+  static const _activitiesKey = 'budget.activities.v1';
+  static const _peopleKey = 'budget.people.v1';
+  static const _merchantCategoryKey = 'budget.merchantCategory.v1';
 
   static Future<Storage> open() async =>
       Storage(await SharedPreferences.getInstance());
@@ -28,6 +31,18 @@ class Storage {
 
   Future<void> writeExpenses(List<Map<String, dynamic>> expenses) =>
       _writeList(_expensesKey, expenses);
+
+  /// Non-expense financial activities (income, transfers, loans, repayments).
+  List<Map<String, dynamic>> readActivities() => _readList(_activitiesKey);
+
+  Future<void> writeActivities(List<Map<String, dynamic>> activities) =>
+      _writeList(_activitiesKey, activities);
+
+  /// People involved in loans.
+  List<Map<String, dynamic>> readPeople() => _readList(_peopleKey);
+
+  Future<void> writePeople(List<Map<String, dynamic>> people) =>
+      _writeList(_peopleKey, people);
 
   List<Map<String, dynamic>> readScenarios() => _readList(_scenariosKey);
 
@@ -54,6 +69,22 @@ class Storage {
       await _prefs.setString(_activeProfileKey, id);
     }
   }
+
+  /// Learned merchant → category associations (spec §5, §37 rule 2).
+  Map<String, String> readMerchantCategories() {
+    final raw = _prefs.getString(_merchantCategoryKey);
+    if (raw == null || raw.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return {};
+      return decoded.map((key, value) => MapEntry('$key', '$value'));
+    } on FormatException {
+      return {};
+    }
+  }
+
+  Future<void> writeMerchantCategories(Map<String, String> map) =>
+      _prefs.setString(_merchantCategoryKey, jsonEncode(map));
 
   /// True when nothing has ever been written — the signal to seed defaults.
   bool get isFirstLaunch => !_prefs.containsKey(_categoriesKey);

@@ -3,12 +3,16 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
+import '../command/command_parser.dart';
+import '../models/activity.dart';
 import '../models/category.dart';
 import '../models/expense.dart';
 import '../models/palette.dart';
+import '../models/person.dart';
 import '../models/profile.dart';
 import '../models/scenario.dart';
 import '../services/storage.dart';
+import '../sync/merge.dart';
 
 const _uuid = Uuid();
 
@@ -24,6 +28,11 @@ class AppState extends ChangeNotifier {
   List<Scenario> _scenarios = [];
   List<ExpenseCategory> _categories = [];
   List<Profile> _profiles = [];
+  List<Activity> _activities = [];
+  List<Person> _people = [];
+
+  /// Learned merchant → category id, so a merchant seen before auto-categorises.
+  Map<String, String> _merchantCategories = {};
 
   /// The profile the dashboard and lists are scoped to. Null means all.
   String? _activeProfileId;
@@ -32,6 +41,16 @@ class AppState extends ChangeNotifier {
   List<Scenario> get scenarios => List.unmodifiable(_scenarios);
   List<ExpenseCategory> get categories => List.unmodifiable(_categories);
   List<Profile> get profiles => List.unmodifiable(_profiles);
+
+  /// Live (non-deleted) non-expense activities, newest first.
+  List<Activity> get activities => List.unmodifiable(
+    _activities.where((a) => !a.isDeleted).toList()
+      ..sort((a, b) => b.date.compareTo(a.date)),
+  );
+
+  List<Person> get people => List.unmodifiable(
+    _people.where((p) => !p.isDeleted).toList(),
+  );
 
   String? get activeProfileId => _activeProfileId;
 
@@ -62,6 +81,10 @@ class AppState extends ChangeNotifier {
 
     _scenarios = _storage.readScenarios().map(Scenario.fromJson).toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+    _activities = _storage.readActivities().map(Activity.fromJson).toList();
+    _people = _storage.readPeople().map(Person.fromJson).toList();
+    _merchantCategories = _storage.readMerchantCategories();
 
     _activeProfileId = _storage.readActiveProfile();
   }
@@ -569,6 +592,272 @@ class AppState extends ChangeNotifier {
       _scenarios.map((scenario) => scenario.toJson()).toList(),
     );
   }
+
+  // -------------------------------------------------------------------------
+  // Command parsing context
+  // -------------------------------------------------------------------------
+
+  /// A snapshot of everything the parser needs to resolve context — known
+  /// people and their balances, categories, profile aliases (spec §37 rule 2).
+  ParseContext parseContext() {
+    final loanNet = <String, double>{};
+    for (final person in people) {
+      loanNet[person.matchKey] = balanceWith(person.id);
+    }
+
+    return ParseContext(
+      people: people.map((p) => (id: p.id, name: p.name)).toList(),
+      loanNetByPersonKey: loanNet,
+      knownCategoryIds: _categories.map((c) => c.id).toSet(),
+      profileMatches: {
+        for (final profile in _profiles) profile.name.toLowerCase(): profile.id,
+      },
+      merchantCategories: Map.of(_merchantCategories),
+      defaultProfileId: defaultProfileId,
+    );
+  }
+
+  /// Remembers that [merchant] was filed under [categoryId], so the next
+  /// capture mentioning it is categorised automatically (spec §5).
+  Future<void> learnMerchant(String merchant, String categoryId) async {
+    final key = merchant.trim().toLowerCase();
+    if (key.isEmpty || _merchantCategories[key] == categoryId) return;
+    _merchantCategories = {..._merchantCategories, key: categoryId};
+    await _storage.writeMerchantCategories(_merchantCategories);
+  }
+
+  // -------------------------------------------------------------------------
+  // Capture (spec §29–§32): persist a parsed command as the right record
+  // -------------------------------------------------------------------------
+
+  /// Records a parsed activity, routing an expense into the existing expense
+  /// pipeline (so it shows on the dashboard, budgets and analytics unchanged)
+  /// and everything else into the activity ledger. Returns a handle the UI can
+  /// use to Undo (spec §32).
+  Future<CaptureResult> capture(
+    ParsedActivity parsed, {
+    ActivitySource source = ActivitySource.command,
+    double? confidence,
+  }) async {
+    // A parsed field the app was unsure of leaves the record "needs review"
+    // rather than blocking the save (spec §19, §20).
+    final status = (confidence != null && confidence < 0.75)
+        ? ActivityStatus.needsReview
+        : ActivityStatus.recorded;
+
+    if (parsed.type == ActivityType.expense) {
+      final id = _uuid.v4();
+      final expense = Expense(
+        id: id,
+        title: parsed.description.isNotEmpty
+            ? parsed.description
+            : (parsed.merchant ?? 'Expense'),
+        amount: parsed.amount,
+        categoryId: parsed.categoryId ?? 'other',
+        profileId: parsed.profileId ?? defaultProfileId,
+        date: parsed.date,
+        updatedAt: DateTime.now(),
+        note: parsed.merchant != null && parsed.description != parsed.merchant
+            ? parsed.merchant!
+            : '',
+      );
+      _expenses = [expense, ..._expenses]
+        ..sort((a, b) => b.date.compareTo(a.date));
+      await _persistExpenses();
+      // Learn the merchant→category association for next time.
+      if (parsed.merchant != null && parsed.categoryId != null) {
+        await learnMerchant(parsed.merchant!, parsed.categoryId!);
+      }
+      return CaptureResult(isExpense: true, id: id);
+    }
+
+    String? personId;
+    if (parsed.personName != null && parsed.personName!.trim().isNotEmpty) {
+      personId = (await resolvePerson(parsed.personName!)).id;
+    }
+
+    final activity = Activity(
+      id: _uuid.v4(),
+      type: parsed.type,
+      amount: parsed.amount,
+      date: parsed.date,
+      updatedAt: DateTime.now(),
+      description: parsed.description,
+      categoryId: parsed.categoryId,
+      profileId: parsed.profileId ?? defaultProfileId,
+      paymentMethod: parsed.paymentMethod,
+      sourceAccount: parsed.sourceAccount,
+      destinationAccount: parsed.destinationAccount,
+      merchant: parsed.merchant,
+      personId: personId,
+      status: status,
+      confidence: confidence,
+      source: source,
+    );
+    await addActivity(activity);
+    return CaptureResult(isExpense: false, id: activity.id);
+  }
+
+  /// Reverses a [capture], for the Undo action.
+  Future<void> undoCapture(CaptureResult result) async {
+    if (result.isExpense) {
+      await deleteExpense(result.id, discardAttachments: false);
+    } else {
+      await deleteActivity(result.id);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Activities (income, transfers, loans, repayments)
+  // -------------------------------------------------------------------------
+
+  Future<Activity> addActivity(Activity activity) async {
+    _activities = [activity, ..._activities];
+    await _persistActivities();
+    return activity;
+  }
+
+  Future<void> updateActivity(Activity activity) async {
+    final index = _activities.indexWhere((item) => item.id == activity.id);
+    if (index == -1) return;
+    _activities = [..._activities]..[index] = activity;
+    await _persistActivities();
+  }
+
+  /// Soft-deletes via a tombstone so the delete can replicate, but keeps Undo
+  /// cheap — restoring is a second update, not a re-insert.
+  Future<void> deleteActivity(String id) async {
+    final index = _activities.indexWhere((item) => item.id == id);
+    if (index == -1) return;
+    _activities = [..._activities]..[index] = _activities[index].tombstone();
+    await _persistActivities();
+  }
+
+  Future<void> restoreActivity(String id) async {
+    final index = _activities.indexWhere((item) => item.id == id);
+    if (index == -1) return;
+    _activities = [..._activities]..[index] = _activities[index].copyWith(
+      updatedAt: DateTime.now(),
+    );
+    await _persistActivities();
+  }
+
+  Future<void> _persistActivities() async {
+    notifyListeners();
+    await _storage.writeActivities(
+      _activities.map((activity) => activity.toJson()).toList(),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // People & loan balances
+  // -------------------------------------------------------------------------
+
+  Person? personById(String? id) {
+    if (id == null) return null;
+    for (final person in _people) {
+      if (person.id == id && !person.isDeleted) return person;
+    }
+    return null;
+  }
+
+  /// Finds a person by name (case-insensitive), creating one if none matches,
+  /// so a command like "I lent John 5000" always resolves to a stable id.
+  Future<Person> resolvePerson(String name) async {
+    final key = name.trim().toLowerCase();
+    for (final person in _people) {
+      if (!person.isDeleted && person.matchKey == key) return person;
+    }
+
+    final person = Person(
+      id: _uuid.v4(),
+      name: name.trim(),
+      updatedAt: DateTime.now(),
+    );
+    _people = [..._people, person];
+    await _persistPeople();
+    return person;
+  }
+
+  /// The net standing with a person: positive = they owe the user, negative =
+  /// the user owes them. Derived purely from loan activities so it can never
+  /// drift from the ledger (spec §9, §10).
+  double balanceWith(String personId) {
+    return _activities
+        .where((a) => !a.isDeleted && a.personId == personId)
+        .fold<double>(0, (sum, a) => sum + a.receivableDelta);
+  }
+
+  LoanBalance? loanBalanceFor(String personId) {
+    final person = personById(personId);
+    if (person == null) return null;
+    return LoanBalance(person: person, net: balanceWith(personId));
+  }
+
+  /// Everyone with an unsettled balance, largest magnitude first.
+  List<LoanBalance> get outstandingBalances {
+    final result = <LoanBalance>[];
+    for (final person in people) {
+      final net = balanceWith(person.id);
+      if (net.abs() >= 0.5) {
+        result.add(LoanBalance(person: person, net: net));
+      }
+    }
+    result.sort((a, b) => b.magnitude.compareTo(a.magnitude));
+    return result;
+  }
+
+  double get totalOwedToUser => outstandingBalances
+      .where((b) => b.theyOweUser)
+      .fold<double>(0, (sum, b) => sum + b.net);
+
+  double get totalOwedByUser => outstandingBalances
+      .where((b) => b.weOweThem)
+      .fold<double>(0, (sum, b) => sum + b.magnitude);
+
+  Future<void> _persistPeople() async {
+    notifyListeners();
+    await _storage.writePeople(
+      _people.map((person) => person.toJson()).toList(),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Combined history & activity-type accounting (spec §33, §34)
+  // -------------------------------------------------------------------------
+
+  /// Income recorded this month. Transfers and loans are excluded by
+  /// construction — they aren't income (spec §34).
+  double get incomeThisMonth {
+    final now = DateTime.now();
+    return activities
+        .where(
+          (a) =>
+              a.type == ActivityType.income &&
+              a.date.year == now.year &&
+              a.date.month == now.month &&
+              (_activeProfileId == null || a.profileId == _activeProfileId),
+        )
+        .fold<double>(0, (sum, a) => sum + a.amount);
+  }
+
+  /// Activities in the active profile, for history. Expenses are handled
+  /// separately by the existing expense list; this is the non-expense stream.
+  List<Activity> get scopedActivities {
+    if (_activeProfileId == null) return activities;
+    return activities
+        .where((a) => a.profileId == _activeProfileId)
+        .toList();
+  }
+}
+
+/// A handle to a just-captured record, so the command bar can Undo it.
+class CaptureResult {
+  const CaptureResult({required this.isExpense, required this.id});
+
+  /// True when the capture created an [Expense]; false for an [Activity].
+  final bool isExpense;
+  final String id;
 }
 
 /// One row of the category breakdown.

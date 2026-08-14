@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../command/command_bar.dart';
 import '../../models/palette.dart';
+import '../../models/person.dart';
 import '../../services/format.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/stat.dart';
 import '../manage/manage_screen.dart';
 import '../planner/planner_home.dart';
-import 'add_expense.dart';
 import 'expense_list.dart';
 
 /// The tracker's overview.
@@ -19,12 +20,9 @@ import 'expense_list.dart';
 /// target, this shows progress toward a monthly budget: the honest analogue
 /// for money going out rather than in.
 class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key, this.onSeeAnalytics, this.onSeePlanner});
+  const DashboardScreen({super.key, this.onSeePlanner});
 
-  /// Jump to the Analytics tab, wired by the nav shell.
-  final VoidCallback? onSeeAnalytics;
-
-  /// Jump to the Planner tab.
+  /// Jump to the Planner tab, wired by the nav shell.
   final VoidCallback? onSeePlanner;
 
   @override
@@ -43,14 +41,18 @@ class DashboardScreen extends StatelessWidget {
             _HeroCard(
               spent: state.spentThisMonth,
               previous: state.spentLastMonth,
-              onAdd: () => AddExpenseSheet.show(context),
+              // The card focuses on capture; Analytics and Planner live in the
+              // nav and aren't duplicated here (spec §25).
+              onAdd: () => CommandBar.show(context),
+              onIncome: () =>
+                  CommandBar.show(context, initialText: 'Received '),
+              onTransfer: () =>
+                  CommandBar.show(context, initialText: 'Transfer '),
               onHistory: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => const ExpenseListScreen(),
                 ),
               ),
-              onAnalytics: onSeeAnalytics,
-              onPlanner: onSeePlanner,
             ),
             // Horizontal snapshot cards — a quick sideways-scrolling read of
             // recent spending, shown only once there is data to summarise.
@@ -75,10 +77,116 @@ class DashboardScreen extends StatelessWidget {
                 onManage: () =>
                     ManageScreen.open(context),
               ),
+            if (state.outstandingBalances.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              _BalancesSection(balances: state.outstandingBalances),
+            ],
             const SizedBox(height: 24),
             _PlannerSection(onSeeAll: onSeePlanner),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Outstanding loan balances — receivables and liabilities (spec §34).
+///
+/// Loans aren't spending or earning, so they don't belong in the budget or
+/// spending figures; they get their own home here, framed as "owed to you" and
+/// "you owe" rather than folded into any total.
+class _BalancesSection extends StatelessWidget {
+  const _BalancesSection({required this.balances});
+
+  final List<LoanBalance> balances;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Money owed',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 14),
+        for (final balance in balances)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _BalanceRow(balance: balance),
+          ),
+      ],
+    );
+  }
+}
+
+class _BalanceRow extends StatelessWidget {
+  const _BalanceRow({required this.balance});
+
+  final LoanBalance balance;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final theyOwe = balance.theyOweUser;
+    final color = theyOwe ? context.good : context.warn;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: context.isDark ? const Color(0xFF232322) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: context.hairline),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: context.isDark ? 0.24 : 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              theyOwe ? Icons.call_received_rounded : Icons.call_made_rounded,
+              size: 20,
+              color: color,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  balance.person.name,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  theyOwe ? 'Owes you' : 'You owe',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: context.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            Money.format(balance.magnitude),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -261,17 +369,17 @@ class _HeroCard extends StatelessWidget {
     required this.spent,
     required this.previous,
     required this.onAdd,
+    required this.onIncome,
+    required this.onTransfer,
     required this.onHistory,
-    this.onAnalytics,
-    this.onPlanner,
   });
 
   final double spent;
   final double previous;
   final VoidCallback onAdd;
+  final VoidCallback onIncome;
+  final VoidCallback onTransfer;
   final VoidCallback onHistory;
-  final VoidCallback? onAnalytics;
-  final VoidCallback? onPlanner;
 
   @override
   Widget build(BuildContext context) {
@@ -374,14 +482,14 @@ class _HeroCard extends StatelessWidget {
                 onTap: onAdd,
               ),
               _HeroAction(
-                icon: Icons.pie_chart_outline_rounded,
-                label: 'Analytics',
-                onTap: onAnalytics,
+                icon: Icons.south_west_rounded,
+                label: 'Income',
+                onTap: onIncome,
               ),
               _HeroAction(
-                icon: Icons.calculate_outlined,
-                label: 'Planner',
-                onTap: onPlanner,
+                icon: Icons.swap_horiz_rounded,
+                label: 'Transfer',
+                onTap: onTransfer,
               ),
               _HeroAction(
                 icon: Icons.receipt_long_outlined,
