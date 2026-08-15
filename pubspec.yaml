@@ -41,6 +41,7 @@ dependencies:
   uuid: ^4.6.0
   image_picker: ^1.2.3
   path_provider: ^2.1.6
+  google_mlkit_text_recognition: ^0.16.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -51,6 +52,16 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+# App icon generation. Drop a square 1024x1024 PNG at assets/icon/icon.png,
+# then run: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  image_path: "assets/icon/icon.png"
+  ios: true
+  android: true
+  # iOS icons must be opaque — flatten any transparency onto white.
+  remove_alpha_ios: true
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

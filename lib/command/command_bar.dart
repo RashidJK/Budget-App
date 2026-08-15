@@ -27,12 +27,12 @@ import 'receipt_scanner.dart';
 class CommandBar {
   const CommandBar._();
 
-  /// Presents the command bar. [scanner] is injectable so tests and a future
-  /// real OCR provider can replace the mock. [initialText] pre-fills the field
-  /// (used to deep-link a command in, and by tests).
+  /// Presents the command bar. [scanner] is injectable so tests can replace the
+  /// OCR; when omitted it uses [defaultReceiptScanner] (ML Kit in production,
+  /// the mock in tests). [initialText] pre-fills the field.
   static Future<void> show(
     BuildContext context, {
-    ReceiptScanner scanner = const MockReceiptScanner(),
+    ReceiptScanner? scanner,
     String? initialText,
   }) {
     return showModalBottomSheet<void>(
@@ -41,7 +41,10 @@ class CommandBar {
       backgroundColor: Colors.transparent,
       // Dim the current screen but keep it visible behind (spec §4).
       barrierColor: Colors.black.withValues(alpha: 0.45),
-      builder: (_) => _CommandSheet(scanner: scanner, initialText: initialText),
+      builder: (_) => _CommandSheet(
+        scanner: scanner ?? defaultReceiptScanner,
+        initialText: initialText,
+      ),
     );
   }
 }
