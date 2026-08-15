@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/activity.dart';
+import '../../models/category_fields.dart';
 import '../../models/expense.dart';
 import '../../services/format.dart';
 import '../../state/app_state.dart';
@@ -9,6 +10,7 @@ import '../../theme.dart';
 import '../../widgets/inputs.dart';
 import 'add_expense.dart';
 import 'filter_sheet.dart';
+import 'metadata_sheet.dart';
 
 /// Every recorded expense, newest first, grouped by day, with search and
 /// filtering.
@@ -321,6 +323,13 @@ class ExpenseRow extends StatelessWidget {
     // The profile is only worth naming when more than one exists.
     final showProfile = profile != null && state.profiles.length > 1;
 
+    // The enrich-later signal: this category can carry extra detail (litres,
+    // odometer, …) but none has been added yet (spec §19). Offered inline so
+    // the loop closes anytime, not just right after capture.
+    final canEnrich = !dense &&
+        CategoryFields.has(expense.categoryId) &&
+        !expense.hasMetadata;
+
     return InkWell(
       onTap: () => AddExpenseSheet.show(context, existing: expense),
       borderRadius: BorderRadius.circular(16),
@@ -365,6 +374,11 @@ class ExpenseRow extends StatelessWidget {
                           color: context.muted,
                         ),
                       ],
+                      // A filled tune glyph marks an expense already enriched.
+                      if (expense.hasMetadata) ...[
+                        const SizedBox(width: 6),
+                        Icon(Icons.tune_rounded, size: 13, color: context.muted),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 2),
@@ -376,6 +390,31 @@ class ExpenseRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  // A quiet, optional affordance — enrichment is never a nag.
+                  if (canEnrich) ...[
+                    const SizedBox(height: 5),
+                    GestureDetector(
+                      onTap: () => MetadataSheet.show(context, expense.id),
+                      behavior: HitTestBehavior.opaque,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.add_rounded,
+                            size: 13,
+                            color: context.muted,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            CategoryFields.promptFor(category.name),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: context.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
