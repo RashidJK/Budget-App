@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 
 import '../command/command_bar.dart';
@@ -85,26 +87,44 @@ class _BudgetNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surface = context.isDark ? const Color(0xFF232322) : Colors.white;
+    final dark = context.isDark;
+    // Translucent fill over the blur — opaque enough that the icons stay
+    // readable over any content that scrolls behind, frosted enough to read as
+    // glass.
+    final fill = dark
+        ? const Color(0xFF232322).withValues(alpha: 0.62)
+        : Colors.white.withValues(alpha: 0.7);
 
     return SafeArea(
       top: false,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        height: 66,
-        decoration: BoxDecoration(
-          color: surface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: context.hairline),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: context.isDark ? 0.3 : 0.08),
-              blurRadius: 20,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Row(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: DecoratedBox(
+          // The shadow sits behind the clipped glass.
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: dark ? 0.3 : 0.08),
+                blurRadius: 20,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+              child: Container(
+                height: 66,
+                decoration: BoxDecoration(
+                  color: fill,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: dark ? 0.14 : 0.6),
+                  ),
+                ),
+                child: Row(
           children: [
             _NavItem(
               icon: Icons.grid_view_outlined,
@@ -135,7 +155,11 @@ class _BudgetNavBar extends StatelessWidget {
               selected: index == 3,
               onTap: () => onSelect(3),
             ),
-          ],
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
