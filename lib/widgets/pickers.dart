@@ -23,8 +23,10 @@ class IconPicker extends StatelessWidget {
       height: 116,
       child: GridView.builder(
         padding: EdgeInsets.zero,
+        // Two rows, not four: at four the tiles fell to ~23px, half the ~48px
+        // minimum tap target. Two rows in the same height give ~54px tiles.
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 4,
+          crossAxisCount: 2,
           mainAxisSpacing: 8,
           crossAxisSpacing: 8,
         ),
@@ -127,25 +129,36 @@ class _Swatch extends StatelessWidget {
       message: isTaken ? '$label (already used)' : label,
       child: GestureDetector(
         onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected ? context.scheme.onSurface : Colors.transparent,
-              width: 2.5,
+        // The swatch stays 40px, but the tap area is padded out to the ~48px
+        // minimum so the target isn't pixel-precise.
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: Center(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isSelected
+                      ? context.scheme.onSurface
+                      : Colors.transparent,
+                  width: 2.5,
+                ),
+              ),
+              child: isTaken
+                  ? Icon(
+                      Icons.circle,
+                      size: 7,
+                      color: Colors.white.withValues(alpha: 0.85),
+                    )
+                  : null,
             ),
           ),
-          child: isTaken
-              ? Icon(
-                  Icons.circle,
-                  size: 7,
-                  color: Colors.white.withValues(alpha: 0.85),
-                )
-              : null,
         ),
       ),
     );

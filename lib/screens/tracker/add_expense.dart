@@ -117,8 +117,7 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
       final controller = _metadata[field.key];
       final raw = controller?.text.trim() ?? '';
       if (raw.isEmpty) continue;
-      result[field.key] =
-          field.isNumeric ? (double.tryParse(raw) ?? raw) : raw;
+      result[field.key] = field.isNumeric ? (double.tryParse(raw) ?? raw) : raw;
     }
     return result;
   }
@@ -474,21 +473,34 @@ class _ReceiptThumb extends StatelessWidget {
           ),
         ),
         Positioned(
-          top: -6,
-          right: -6,
-          child: GestureDetector(
-            onTap: onRemove,
-            child: Container(
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                color: context.scheme.surface,
-                shape: BoxShape.circle,
-                border: Border.all(color: context.hairline),
-              ),
-              child: Icon(
-                Icons.close_rounded,
-                size: 14,
-                color: context.scheme.onSurface,
+          top: -10,
+          right: -10,
+          child: Semantics(
+            button: true,
+            label: 'Remove receipt',
+            child: GestureDetector(
+              onTap: onRemove,
+              // A padded, opaque hit area lifts the target from ~20px to 44px
+              // while the visible badge stays small.
+              behavior: HitTestBehavior.opaque,
+              child: SizedBox(
+                width: 44,
+                height: 44,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: context.scheme.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: context.hairline),
+                    ),
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 16,
+                      color: context.scheme.onSurface,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),

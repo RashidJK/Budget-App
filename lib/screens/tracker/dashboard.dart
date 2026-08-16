@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:provider/provider.dart';
 
 import '../../command/command_bar.dart';
@@ -66,12 +67,14 @@ class DashboardScreen extends StatelessWidget {
               const SizedBox(height: 20),
             ],
             if (budgets.isNotEmpty)
-              _BudgetSection(budgets: budgets, daysLeft: state.daysLeftThisMonth)
+              _BudgetSection(
+                budgets: budgets,
+                daysLeft: state.daysLeftThisMonth,
+              )
             else
               _BudgetEmpty(
                 hasExpenses: state.spentThisMonth > 0,
-                onManage: () =>
-                    ManageScreen.open(context),
+                onManage: () => ManageScreen.open(context),
               ),
             if (state.outstandingBalances.isNotEmpty) ...[
               const SizedBox(height: 24),
@@ -237,10 +240,7 @@ class _PlannerSection extends StatelessWidget {
             itemBuilder: (context, index) => _PlannerCard(
               tool: tools[index],
               // Each card takes a distinct validated hue, cycling the palette.
-              accent: Palette.color(
-                index % Palette.length,
-                theme.brightness,
-              ),
+              accent: Palette.color(index % Palette.length, theme.brightness),
             ),
           ),
         ),
@@ -259,52 +259,56 @@ class _PlannerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return GestureDetector(
-      onTap: () => openPlannerTool(context, tool),
-      child: Container(
-        width: 158,
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: context.card,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: context.hairline),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: context.isDark ? 0.24 : 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(tool.icon, size: 20, color: accent),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              tool.title,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                height: 1.2,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const Spacer(),
-            Row(
-              children: [
-                Text(
-                  'Open',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: accent,
-                    fontWeight: FontWeight.w600,
-                  ),
+    return Material(
+      color: context.card,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: () => openPlannerTool(context, tool),
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          width: 158,
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: context.hairline),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: context.isDark ? 0.24 : 0.12),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                Icon(Icons.arrow_forward_rounded, size: 14, color: accent),
-              ],
-            ),
-          ],
+                child: Icon(tool.icon, size: 20, color: accent),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                tool.title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  height: 1.2,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const Spacer(),
+              Row(
+                children: [
+                  Text(
+                    'Open',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: accent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Icon(Icons.arrow_forward_rounded, size: 14, color: accent),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -478,11 +482,7 @@ class _HeroCard extends StatelessWidget {
           const SizedBox(height: 22),
           Row(
             children: [
-              _HeroAction(
-                icon: Icons.add_rounded,
-                label: 'Add',
-                onTap: onAdd,
-              ),
+              _HeroAction(icon: Icons.add_rounded, label: 'Add', onTap: onAdd),
               _HeroAction(
                 icon: Icons.south_west_rounded,
                 label: 'Income',
@@ -520,31 +520,43 @@ class _HeroAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tap = onTap;
     return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Column(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
+      // Transparent Material so the ink splash is visible on the dark hero.
+      child: Material(
+        color: Colors.transparent,
+        child: InkResponse(
+          onTap: tap == null
+              ? null
+              : () {
+                  HapticFeedback.lightImpact();
+                  tap();
+                },
+          radius: 44,
+          splashColor: Colors.white.withValues(alpha: 0.18),
+          highlightColor: Colors.white.withValues(alpha: 0.06),
+          child: Column(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: Colors.white, size: 22),
               ),
-              child: Icon(icon, color: Colors.white, size: 22),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.75),
-                fontSize: 11.5,
-                fontWeight: FontWeight.w500,
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -808,9 +820,9 @@ class _ProfileChip extends StatelessWidget {
             const SizedBox(width: 7),
             Text(
               label,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: context.scheme.onSurface,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(color: context.scheme.onSurface),
             ),
           ],
         ),
@@ -915,11 +927,7 @@ class _BudgetCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: context.muted,
-              ),
+              Icon(Icons.chevron_right_rounded, size: 20, color: context.muted),
             ],
           ),
           const SizedBox(height: 14),

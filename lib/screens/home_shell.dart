@@ -1,6 +1,7 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 
 import '../command/command_bar.dart';
 import '../theme.dart';
@@ -125,36 +126,36 @@ class _BudgetNavBar extends StatelessWidget {
                   ),
                 ),
                 child: Row(
-          children: [
-            _NavItem(
-              icon: Icons.grid_view_outlined,
-              activeIcon: Icons.grid_view_rounded,
-              label: 'Home',
-              selected: index == 0,
-              onTap: () => onSelect(0),
-            ),
-            _NavItem(
-              icon: Icons.receipt_long_outlined,
-              activeIcon: Icons.receipt_long_rounded,
-              label: 'Expenses',
-              selected: index == 1,
-              onTap: () => onSelect(1),
-            ),
-            _AddButton(onTap: onAdd),
-            _NavItem(
-              icon: Icons.pie_chart_outline_rounded,
-              activeIcon: Icons.pie_chart_rounded,
-              label: 'Analytics',
-              selected: index == 2,
-              onTap: () => onSelect(2),
-            ),
-            _NavItem(
-              icon: Icons.calculate_outlined,
-              activeIcon: Icons.calculate_rounded,
-              label: 'Planner',
-              selected: index == 3,
-              onTap: () => onSelect(3),
-            ),
+                  children: [
+                    _NavItem(
+                      icon: Icons.grid_view_outlined,
+                      activeIcon: Icons.grid_view_rounded,
+                      label: 'Home',
+                      selected: index == 0,
+                      onTap: () => onSelect(0),
+                    ),
+                    _NavItem(
+                      icon: Icons.receipt_long_outlined,
+                      activeIcon: Icons.receipt_long_rounded,
+                      label: 'Expenses',
+                      selected: index == 1,
+                      onTap: () => onSelect(1),
+                    ),
+                    _AddButton(onTap: onAdd),
+                    _NavItem(
+                      icon: Icons.pie_chart_outline_rounded,
+                      activeIcon: Icons.pie_chart_rounded,
+                      label: 'Analytics',
+                      selected: index == 2,
+                      onTap: () => onSelect(2),
+                    ),
+                    _NavItem(
+                      icon: Icons.calculate_outlined,
+                      activeIcon: Icons.calculate_rounded,
+                      label: 'Planner',
+                      selected: index == 3,
+                      onTap: () => onSelect(3),
+                    ),
                   ],
                 ),
               ),
@@ -194,7 +195,10 @@ class _NavItem extends StatelessWidget {
           selected: selected,
           label: label,
           child: InkWell(
-            onTap: onTap,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onTap();
+            },
             borderRadius: BorderRadius.circular(16),
             child: ExcludeSemantics(
               child: Column(
@@ -236,26 +240,38 @@ class _AddButton extends StatelessWidget {
           child: Semantics(
             button: true,
             label: 'Add or capture',
-            child: GestureDetector(
-              onTap: onTap,
-              child: Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: context.scheme.primary,
+            child: Container(
+              // Shadow sits on an outer box so the Material below can clip the
+              // ripple to the rounded shape.
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: context.scheme.primary.withValues(alpha: 0.4),
+                    blurRadius: 14,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: context.scheme.primary,
+                borderRadius: BorderRadius.circular(18),
+                child: InkWell(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    onTap();
+                  },
                   borderRadius: BorderRadius.circular(18),
-                  boxShadow: [
-                    BoxShadow(
-                      color: context.scheme.primary.withValues(alpha: 0.4),
-                      blurRadius: 14,
-                      offset: const Offset(0, 5),
+                  splashColor: Colors.white.withValues(alpha: 0.2),
+                  child: const SizedBox(
+                    width: 52,
+                    height: 52,
+                    child: Icon(
+                      Icons.add_rounded,
+                      color: Colors.white,
+                      size: 28,
                     ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.add_rounded,
-                  color: Colors.white,
-                  size: 28,
+                  ),
                 ),
               ),
             ),

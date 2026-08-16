@@ -199,6 +199,9 @@ class _CommandSheetState extends State<_CommandSheet> {
       confidence: confidence ?? _parsed?.confidence,
     );
     if (!mounted) return;
+    // A light tap confirms the capture landed without the user re-reading the
+    // screen.
+    HapticFeedback.lightImpact();
     setState(() {
       _captured = result;
       _capturedSummary = _summaryFor(activity);
@@ -252,10 +255,7 @@ class _CommandSheetState extends State<_CommandSheet> {
       if (_parsed == null)
         _quickActionIslands()
       else
-        _Glass(
-          padding: const EdgeInsets.all(16),
-          child: _preview(_parsed!),
-        ),
+        _Glass(padding: const EdgeInsets.all(16), child: _preview(_parsed!)),
       const SizedBox(height: 10),
       // The input bar island + the scan island beside it.
       Row(
@@ -292,7 +292,9 @@ class _CommandSheetState extends State<_CommandSheet> {
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
                         focusedBorder: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 14,
+                        ),
                         hintText: _pasteMode
                             ? 'Paste a transaction message'
                             : _hints[_hintIndex],
@@ -369,9 +371,9 @@ class _CommandSheetState extends State<_CommandSheet> {
             const SizedBox(width: 7),
             Text(
               label,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w500),
             ),
           ],
         ),
@@ -444,9 +446,9 @@ class _CommandSheetState extends State<_CommandSheet> {
         return Text(
           "I couldn't read that yet. Try an amount and what it was for, "
           'like "5000 lunch".',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: context.muted,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: context.muted),
         );
     }
   }
@@ -615,22 +617,22 @@ class _CommandSheetState extends State<_CommandSheet> {
           style: theme.textTheme.bodySmall?.copyWith(color: context.muted),
         ),
         const SizedBox(height: 8),
-          for (final (label, value) in rows)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(label, style: theme.textTheme.bodyMedium),
-                  Text(
-                    value,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+        for (final (label, value) in rows)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(label, style: theme.textTheme.bodyMedium),
+                Text(
+                  value,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
+          ),
       ],
     );
   }
@@ -802,7 +804,8 @@ class _CommandSheetState extends State<_CommandSheet> {
           value: Money.format(state.totalFor(inMonth)),
         );
       case QueryTopic.biggestExpenses:
-        final sorted = [...inMonth]..sort((a, b) => b.amount.compareTo(a.amount));
+        final sorted = [...inMonth]
+          ..sort((a, b) => b.amount.compareTo(a.amount));
         final top = sorted.take(3).toList();
         return _Answer(
           label: 'Biggest ${_timeframeLabel(query)}',
@@ -859,8 +862,18 @@ class _CommandSheetState extends State<_CommandSheet> {
         return 'last month';
       case Timeframe.specificMonth:
         const months = [
-          'January', 'February', 'March', 'April', 'May', 'June', 'July',
-          'August', 'September', 'October', 'November', 'December',
+          'January',
+          'February',
+          'March',
+          'April',
+          'May',
+          'June',
+          'July',
+          'August',
+          'September',
+          'October',
+          'November',
+          'December',
         ];
         return 'in ${months[(query.month ?? 1) - 1]}';
       default:
@@ -1054,11 +1067,7 @@ class _GlassButton extends StatelessWidget {
       radius: 26,
       padding: EdgeInsets.zero,
       onTap: onTap,
-      child: SizedBox(
-        width: 52,
-        height: 52,
-        child: Center(child: child),
-      ),
+      child: SizedBox(width: 52, height: 52, child: Center(child: child)),
     );
   }
 }

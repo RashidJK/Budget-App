@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:provider/provider.dart';
 
 import '../../models/activity.dart';
@@ -9,6 +10,7 @@ import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/inputs.dart';
 import 'add_expense.dart';
+import 'edit_activity.dart';
 import 'filter_sheet.dart';
 import 'metadata_sheet.dart';
 
@@ -294,6 +296,7 @@ class ExpenseRow extends StatelessWidget {
         child: Icon(Icons.delete_outline_rounded, color: context.warn),
       ),
       onDismissed: (_) {
+        HapticFeedback.mediumImpact();
         final state = context.read<AppState>();
         final messenger = ScaffoldMessenger.of(context);
 
@@ -327,7 +330,8 @@ class ExpenseRow extends StatelessWidget {
     // The enrich-later signal: this category can carry extra detail (litres,
     // odometer, …) but none has been added yet (spec §19). Offered inline so
     // the loop closes anytime, not just right after capture.
-    final canEnrich = !dense &&
+    final canEnrich =
+        !dense &&
         CategoryFields.has(expense.categoryId) &&
         !expense.hasMetadata;
 
@@ -378,7 +382,11 @@ class ExpenseRow extends StatelessWidget {
                       // A filled tune glyph marks an expense already enriched.
                       if (expense.hasMetadata) ...[
                         const SizedBox(width: 6),
-                        Icon(Icons.tune_rounded, size: 13, color: context.muted),
+                        Icon(
+                          Icons.tune_rounded,
+                          size: 13,
+                          color: context.muted,
+                        ),
                       ],
                     ],
                   ),
@@ -468,6 +476,7 @@ class ActivityRow extends StatelessWidget {
         child: Icon(Icons.delete_outline_rounded, color: context.warn),
       ),
       onDismissed: (_) {
+        HapticFeedback.mediumImpact();
         final state = context.read<AppState>();
         final messenger = ScaffoldMessenger.of(context);
         state.deleteActivity(activity.id);
@@ -486,56 +495,60 @@ class ActivityRow extends StatelessWidget {
           ),
         );
       },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: context.isDark ? 0.24 : 0.12),
-                borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () => ActivityEditSheet.show(context, activity),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: context.isDark ? 0.24 : 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, size: 19, color: color),
               ),
-              child: Icon(icon, size: 19, color: color),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    activity.description.isEmpty
-                        ? activity.type.label
-                        : activity.description,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      activity.description.isEmpty
+                          ? activity.type.label
+                          : activity.description,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _subtitle(),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: context.muted,
+                    const SizedBox(height: 2),
+                    Text(
+                      _subtitle(),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: context.muted,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              signed,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: activity.type.isInflow ? context.good : null,
-                fontFeatures: const [FontFeature.tabularFigures()],
+              const SizedBox(width: 12),
+              Text(
+                signed,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: activity.type.isInflow ? context.good : null,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
