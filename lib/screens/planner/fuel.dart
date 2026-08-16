@@ -40,10 +40,7 @@ class _FuelScreenState extends State<FuelScreen> {
     _customDays = scenario?.number('customDays', 20) ?? 20;
 
     final stored = scenario?.text('frequency');
-    _frequency = Frequency.values.firstWhere(
-      (frequency) => frequency.name == stored,
-      orElse: () => Frequency.everyDay,
-    );
+    _frequency = Frequency.fromName(stored);
 
     _distance = TextEditingController(text: Money.number(_parsedDistance));
     _efficiency = TextEditingController(text: Money.number(_parsedEfficiency));

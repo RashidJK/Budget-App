@@ -26,10 +26,7 @@ class _SubscriptionEntry {
     return _SubscriptionEntry(
       name: json['name'] as String? ?? '',
       amount: (json['amount'] as num?)?.toDouble() ?? 0,
-      cycle: BillingCycle.values.firstWhere(
-        (cycle) => cycle.name == storedCycle,
-        orElse: () => BillingCycle.monthly,
-      ),
+      cycle: BillingCycle.fromName(storedCycle),
       startDate:
           DateTime.tryParse(json['startDate'] as String? ?? '') ??
           DateTime.now(),

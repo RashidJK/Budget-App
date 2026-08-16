@@ -242,4 +242,67 @@ void main() {
       expect(result.activity!.type, ActivityType.receivableRepayment);
     });
   });
+
+  group('delete and restore (Undo)', () {
+    test('restoring a deleted activity clears the tombstone', () async {
+      final state = await _freshState();
+      final now = DateTime.now();
+      final activity = await state.addActivity(
+        Activity(
+          id: 'a1',
+          type: ActivityType.income,
+          amount: 100000,
+          date: now,
+          updatedAt: now,
+        ),
+      );
+      expect(state.activities, hasLength(1));
+
+      await state.deleteActivity(activity.id);
+      expect(state.activities, isEmpty);
+
+      await state.restoreActivity(activity.id);
+      expect(state.activities, hasLength(1));
+      // Regression: copyWith carried deletedAt through, so Undo left it deleted.
+      expect(state.activities.single.deletedAt, isNull);
+    });
+
+    test('undo of a deleted loan restores the person balance', () async {
+      final state = await _freshState();
+      await state.capture(
+        _parsed(ActivityType.loanOut, amount: 100000, personName: 'John'),
+      );
+      final john = state.people.single;
+      expect(state.balanceWith(john.id), 100000);
+
+      final activity = state.activities.single;
+      await state.deleteActivity(activity.id);
+      expect(state.balanceWith(john.id), 0);
+
+      await state.restoreActivity(activity.id);
+      expect(state.balanceWith(john.id), 100000);
+    });
+
+    test('a restored activity survives a reload', () async {
+      SharedPreferences.setMockInitialValues({});
+      final storage = await Storage.open();
+      final state = AppState(storage);
+      final now = DateTime.now();
+      final activity = await state.addActivity(
+        Activity(
+          id: 'a1',
+          type: ActivityType.income,
+          amount: 5000,
+          date: now,
+          updatedAt: now,
+        ),
+      );
+      await state.deleteActivity(activity.id);
+      await state.restoreActivity(activity.id);
+
+      // A fresh state reading the same storage should see the live record.
+      final reloaded = AppState(storage);
+      expect(reloaded.activities, hasLength(1));
+    });
+  });
 }

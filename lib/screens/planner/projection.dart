@@ -42,10 +42,7 @@ class _ProjectionScreenState extends State<ProjectionScreen> {
     _inflation = scenario?.number('inflation') ?? 0;
 
     final stored = scenario?.text('frequency');
-    _frequency = Frequency.values.firstWhere(
-      (frequency) => frequency.name == stored,
-      orElse: () => Frequency.everyDay,
-    );
+    _frequency = Frequency.fromName(stored);
   }
 
   @override

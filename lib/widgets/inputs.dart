@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../planner/engine.dart';
-import '../services/format.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 
@@ -603,6 +602,3 @@ String frequencyPhrase(Frequency frequency, double customDays) {
       '${customDays.round()} ${customDays.round() == 1 ? 'day' : 'days'} a month',
   };
 }
-
-/// Shared helper so amount hints read consistently across screens.
-String amountHint(double amount) => Money.format(amount);

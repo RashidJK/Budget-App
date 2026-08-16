@@ -33,6 +33,11 @@ enum Frequency {
 
   const Frequency(this.label);
   final String label;
+
+  /// Resolves a stored [name] back to its value, defaulting to [everyDay] for
+  /// unknown/legacy strings — matches the convention on activity.dart's enums.
+  static Frequency fromName(String? name) =>
+      values.firstWhere((f) => f.name == name, orElse: () => everyDay);
 }
 
 /// The number of times a cost occurs per week / month / year for a given
@@ -217,6 +222,10 @@ enum BillingCycle {
 
   /// Number of times this cycle bills in a year.
   final double chargesPerYear;
+
+  /// Resolves a stored [name] back to its value, defaulting to [monthly].
+  static BillingCycle fromName(String? name) =>
+      values.firstWhere((c) => c.name == name, orElse: () => monthly);
 }
 
 /// Spreads a subscription charge across the standard time buckets.

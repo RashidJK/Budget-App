@@ -397,37 +397,6 @@ class AppState extends ChangeNotifier {
       ..sort((a, b) => b.total.compareTo(a.total));
   }
 
-  /// Daily totals for the last [days] days, oldest first, including days with
-  /// no spending so the chart keeps an even time axis.
-  List<DayTotal> dailyTotals({int days = 14}) {
-    final today = DateTime.now();
-    final start = DateTime(
-      today.year,
-      today.month,
-      today.day,
-    ).subtract(Duration(days: days - 1));
-
-    final buckets = <DateTime, double>{};
-    for (var offset = 0; offset < days; offset++) {
-      buckets[start.add(Duration(days: offset))] = 0;
-    }
-
-    for (final expense in scopedExpenses) {
-      final day = DateTime(
-        expense.date.year,
-        expense.date.month,
-        expense.date.day,
-      );
-      if (buckets.containsKey(day)) {
-        buckets[day] = buckets[day]! + expense.amount;
-      }
-    }
-
-    return buckets.entries
-        .map((entry) => DayTotal(day: entry.key, total: entry.value))
-        .toList()
-      ..sort((a, b) => a.day.compareTo(b.day));
-  }
 
   /// Total spend per calendar month for the last [months] months, oldest
   /// first, empty months included so the trend chart keeps an even axis.
@@ -493,6 +462,21 @@ class AppState extends ChangeNotifier {
     final now = DateTime.now();
     return spentThisMonth / now.day;
   }
+
+  /// Spend recorded today — the tightest window on the snapshot row.
+  double get spentToday => spentInLastDays(1);
+
+  /// Projected month-end spend if the current daily pace holds. A forward read
+  /// to sit beside the actuals; always ≥ [spentThisMonth] since the remaining
+  /// days can only add to the total.
+  double get projectedThisMonth {
+    final now = DateTime.now();
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    return dailyAverageThisMonth * daysInMonth;
+  }
+
+  /// Number of expenses logged this month, for the "entries" snapshot.
+  int get expenseCountThisMonth => expensesInMonth(DateTime.now()).length;
 
   /// Spend over the last [days] days including today, for the "this week"
   /// snapshot. A rolling window rather than a calendar week — "the last seven
@@ -746,9 +730,9 @@ class AppState extends ChangeNotifier {
   Future<void> restoreActivity(String id) async {
     final index = _activities.indexWhere((item) => item.id == id);
     if (index == -1) return;
-    _activities = [..._activities]..[index] = _activities[index].copyWith(
-      updatedAt: DateTime.now(),
-    );
+    // copyWith carries deletedAt through, so a copyWith(updatedAt:) would leave
+    // the record tombstoned; revive() clears it so Undo actually restores.
+    _activities = [..._activities]..[index] = _activities[index].revive();
     await _persistActivities();
   }
 
@@ -796,12 +780,6 @@ class AppState extends ChangeNotifier {
     return _activities
         .where((a) => !a.isDeleted && a.personId == personId)
         .fold<double>(0, (sum, a) => sum + a.receivableDelta);
-  }
-
-  LoanBalance? loanBalanceFor(String personId) {
-    final person = personById(personId);
-    if (person == null) return null;
-    return LoanBalance(person: person, net: balanceWith(personId));
   }
 
   /// Everyone with an unsettled balance, largest magnitude first.
@@ -875,14 +853,6 @@ class CategoryTotal {
   const CategoryTotal({required this.category, required this.total});
 
   final ExpenseCategory category;
-  final double total;
-}
-
-/// One bar of the daily spending chart.
-class DayTotal {
-  const DayTotal({required this.day, required this.total});
-
-  final DateTime day;
   final double total;
 }
 

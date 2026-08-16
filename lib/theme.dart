@@ -161,6 +161,10 @@ extension AppColors on BuildContext {
 
   bool get isDark => Theme.of(this).brightness == Brightness.dark;
 
+  /// Raised card / surface fill, matching the themed [Card]. Kept here beside
+  /// the other surface tokens so the ten-odd hand-rolled cards share one value.
+  Color get card => isDark ? const Color(0xFF232322) : Colors.white;
+
   /// Border/hairline colour matching the card outline.
   Color get hairline =>
       isDark ? const Color(0xFF33332F) : const Color(0xFFE7E7E2);

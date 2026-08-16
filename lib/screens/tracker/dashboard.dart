@@ -58,11 +58,7 @@ class DashboardScreen extends StatelessWidget {
             // recent spending, shown only once there is data to summarise.
             if (state.spentThisMonth > 0) ...[
               const SizedBox(height: 20),
-              _SnapshotRow(
-                thisWeek: state.spentInLastDays(7),
-                dailyAverage: state.dailyAverageThisMonth,
-                topCategory: state.topCategoryThisMonth,
-              ),
+              _SnapshotRow(snapshots: _snapshotsFor(context, state)),
             ],
             const SizedBox(height: 24),
             if (state.profiles.length > 1) ...[
@@ -138,7 +134,7 @@ class _BalanceRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: context.isDark ? const Color(0xFF232322) : Colors.white,
+        color: context.card,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: context.hairline),
       ),
@@ -269,7 +265,7 @@ class _PlannerCard extends StatelessWidget {
         width: 158,
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
-          color: context.isDark ? const Color(0xFF232322) : Colors.white,
+          color: context.card,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: context.hairline),
         ),
@@ -453,13 +449,19 @@ class _HeroCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          AnimatedMoney(
-            value: spent,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 38,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -1,
+          // Scale a large balance down rather than letting it ellipsize — this
+          // is the app's headline figure, so a partial number would mislead.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: AnimatedMoney(
+              value: spent,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 38,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -1,
+              ),
             ),
           ),
           const SizedBox(height: 4),
@@ -549,55 +551,123 @@ class _HeroAction extends StatelessWidget {
   }
 }
 
+/// One card's worth of the snapshot row — a single at-a-glance figure.
+class _Snapshot {
+  const _Snapshot({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.accent,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color accent;
+}
+
+/// The snapshot cards shown under the hero, left to right.
+///
+/// The first block is always present once there's any spend; the rest appear
+/// only when they have something to say (a top category, income logged, a
+/// prior month to compare against), so the row never shows an empty or
+/// meaningless card.
+List<_Snapshot> _snapshotsFor(BuildContext context, AppState state) {
+  final top = state.topCategoryThisMonth;
+  final biggest = state.biggestExpenseThisMonth;
+  final income = state.incomeThisMonth;
+  final lastMonth = state.spentLastMonth;
+
+  return [
+    _Snapshot(
+      icon: Icons.today_rounded,
+      label: 'Today',
+      value: Money.compact(state.spentToday),
+      accent: context.scheme.primary,
+    ),
+    _Snapshot(
+      icon: Icons.calendar_view_week_rounded,
+      label: 'This week',
+      value: Money.compact(state.spentInLastDays(7)),
+      accent: const Color(0xFF6366F1),
+    ),
+    _Snapshot(
+      icon: Icons.trending_up_rounded,
+      label: 'Daily average',
+      value: Money.compact(state.dailyAverageThisMonth),
+      accent: context.good,
+    ),
+    _Snapshot(
+      icon: Icons.timeline_rounded,
+      label: 'Projected',
+      value: Money.compact(state.projectedThisMonth),
+      accent: const Color(0xFFEDA100),
+    ),
+    _Snapshot(
+      icon: Icons.receipt_long_rounded,
+      label: 'Entries',
+      value: '${state.expenseCountThisMonth}',
+      accent: const Color(0xFF9333EA),
+    ),
+    if (top != null)
+      _Snapshot(
+        icon: top.category.icon,
+        label: 'Top: ${top.category.name}',
+        value: Money.compact(top.total),
+        accent: top.category.of(context),
+      ),
+    if (biggest != null)
+      _Snapshot(
+        icon: Icons.local_fire_department_rounded,
+        label: 'Biggest',
+        value: Money.compact(biggest.amount),
+        accent: context.warn,
+      ),
+    if (income > 0)
+      _Snapshot(
+        icon: Icons.south_west_rounded,
+        label: 'Income',
+        value: Money.compact(income),
+        accent: const Color(0xFF14B8A6),
+      ),
+    if (lastMonth > 0)
+      _Snapshot(
+        icon: Icons.history_rounded,
+        label: 'Last month',
+        value: Money.compact(lastMonth),
+        accent: context.muted,
+      ),
+  ];
+}
+
 /// A sideways-scrolling row of quick-read snapshot cards.
 ///
-/// Three 150px cards overflow a phone's width, so the last one peeks off the
+/// The cards overflow a phone's width on purpose, so the last one peeks off the
 /// right edge — the cue that the row scrolls. It sits inside the parent list's
 /// horizontal padding, so no extra padding of its own.
 class _SnapshotRow extends StatelessWidget {
-  const _SnapshotRow({
-    required this.thisWeek,
-    required this.dailyAverage,
-    required this.topCategory,
-  });
+  const _SnapshotRow({required this.snapshots});
 
-  final double thisWeek;
-  final double dailyAverage;
-  final CategoryTotal? topCategory;
+  final List<_Snapshot> snapshots;
 
   @override
   Widget build(BuildContext context) {
-    final top = topCategory;
-
     return SizedBox(
       height: 118,
-      child: ListView(
+      child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: EdgeInsets.zero,
-        children: [
-          _SnapshotCard(
-            icon: Icons.calendar_view_week_rounded,
-            label: 'This week',
-            value: Money.compact(thisWeek),
-            accent: context.scheme.primary,
-          ),
-          const SizedBox(width: 12),
-          _SnapshotCard(
-            icon: Icons.trending_up_rounded,
-            label: 'Daily average',
-            value: Money.compact(dailyAverage),
-            accent: const Color(0xFF1BAF7A),
-          ),
-          if (top != null) ...[
-            const SizedBox(width: 12),
-            _SnapshotCard(
-              icon: top.category.icon,
-              label: 'Top: ${top.category.name}',
-              value: Money.compact(top.total),
-              accent: top.category.of(context),
-            ),
-          ],
-        ],
+        itemCount: snapshots.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final snapshot = snapshots[index];
+          return _SnapshotCard(
+            icon: snapshot.icon,
+            label: snapshot.label,
+            value: snapshot.value,
+            accent: snapshot.accent,
+          );
+        },
       ),
     );
   }
@@ -624,7 +694,7 @@ class _SnapshotCard extends StatelessWidget {
       width: 150,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: context.isDark ? const Color(0xFF232322) : Colors.white,
+        color: context.card,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: context.hairline),
       ),
@@ -774,7 +844,11 @@ class _BudgetSection extends StatelessWidget {
             ),
             const Spacer(),
             Text(
-              '$daysLeft days to go',
+              switch (daysLeft) {
+                0 => 'Last day',
+                1 => '1 day to go',
+                _ => '$daysLeft days to go',
+              },
               style: theme.textTheme.bodySmall?.copyWith(color: context.muted),
             ),
           ],
@@ -813,7 +887,7 @@ class _BudgetCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: context.isDark ? const Color(0xFF232322) : Colors.white,
+        color: context.card,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: context.hairline),
       ),
@@ -856,6 +930,7 @@ class _BudgetCard extends StatelessWidget {
                 Money.format(progress.spent),
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
               Text(
@@ -924,7 +999,7 @@ class _BudgetEmpty extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: context.isDark ? const Color(0xFF232322) : Colors.white,
+        color: context.card,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: context.hairline),
       ),

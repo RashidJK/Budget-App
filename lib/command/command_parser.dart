@@ -1063,8 +1063,10 @@ class CommandParser {
   }
 
   List<double> _allAmounts(String lower) {
+    // The `(?![a-z])` guard mirrors _amountRegex: without it a trailing word
+    // donates its leading k/m as a multiplier ("3000 monthly" → 3,000,000,000).
     final regex = RegExp(
-      r'(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(k|m)?',
+      r'(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(k|m)?(?![a-z])',
       caseSensitive: false,
     );
     final result = <double>[];

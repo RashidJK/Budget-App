@@ -35,7 +35,11 @@ class AnimatedMoney extends StatelessWidget {
       builder: (context, animated, _) {
         return Text(
           compact ? Money.compact(animated) : Money.format(animated),
-          style: style,
+          // Tabular (fixed-width) digits so the count-up doesn't wobble as
+          // digit widths change frame to frame, and columns of figures align.
+          style: (style ?? const TextStyle()).copyWith(
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         );
@@ -78,7 +82,7 @@ class StatTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: context.isDark ? const Color(0xFF232322) : Colors.white,
+        color: context.card,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: context.hairline),
       ),

@@ -48,6 +48,18 @@ Water  1,000
       const text = 'CAFE\nTotal 1,234.50';
       expect(_parser.parse(text, now: _now)!.total, closeTo(1234.50, 0.001));
     });
+
+    test("the 'net' keyword does not fire inside 'internet'", () {
+      const text = '''
+DUKA LA SIMU
+Internet 5,000
+Rice 40,000
+Cash 50,000
+''';
+      // With no real total line, 'net' must not match 'Internet 5,000';
+      // the grand total falls back to the largest amount instead.
+      expect(_parser.parse(text, now: _now)!.total, 50000);
+    });
   });
 
   group('merchant extraction', () {
@@ -97,6 +109,13 @@ Total 40,000
 
     test('falls back to now when no date is present', () {
       const text = 'SHOP\nTotal 5,000';
+      expect(_parser.parse(text, now: _now)!.date, _now);
+    });
+
+    test('rejects an impossible date rather than rolling it over', () {
+      // DateTime(2026, 2, 31) would silently become 3 March; the parser must
+      // reject it and fall back to now instead of filing the wrong month.
+      const text = 'SHOP\n31/02/2026\nTotal 5,000';
       expect(_parser.parse(text, now: _now)!.date, _now);
     });
   });

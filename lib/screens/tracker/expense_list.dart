@@ -251,7 +251,8 @@ class _DayGroup extends StatelessWidget {
           child: Column(
             children: [
               for (var index = 0; index < entries.length; index++) ...[
-                if (index > 0) Divider(indent: 60, color: context.hairline),
+                if (index > 0)
+                  Divider(indent: 66, endIndent: 16, color: context.hairline),
                 if (entries[index].expense != null)
                   ExpenseRow(expense: entries[index].expense!)
                 else
@@ -423,6 +424,7 @@ class ExpenseRow extends StatelessWidget {
               Money.format(expense.amount),
               style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w700,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
           ],
@@ -469,9 +471,14 @@ class ActivityRow extends StatelessWidget {
         final state = context.read<AppState>();
         final messenger = ScaffoldMessenger.of(context);
         state.deleteActivity(activity.id);
+        // Transfers/income routinely have no description, so name what the row
+        // actually showed rather than rendering an empty 'Deleted ""'.
+        final label = activity.description.isEmpty
+            ? activity.type.label
+            : activity.description;
         messenger.showSnackBar(
           SnackBar(
-            content: Text('Deleted "${activity.description}"'),
+            content: Text('Deleted "$label"'),
             action: SnackBarAction(
               label: 'Undo',
               onPressed: () => state.restoreActivity(activity.id),
@@ -525,6 +532,7 @@ class ActivityRow extends StatelessWidget {
               style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w700,
                 color: activity.type.isInflow ? context.good : null,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
           ],

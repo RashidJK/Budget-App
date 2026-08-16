@@ -49,10 +49,7 @@ class _Side {
     return _Side(
       label: json['label'] as String? ?? fallbackLabel,
       amount: (json['amount'] as num?)?.toDouble() ?? fallbackAmount,
-      frequency: Frequency.values.firstWhere(
-        (frequency) => frequency.name == storedFrequency,
-        orElse: () => Frequency.everyDay,
-      ),
+      frequency: Frequency.fromName(storedFrequency),
       customDays: (json['customDays'] as num?)?.toDouble() ?? 15,
     );
   }

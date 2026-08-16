@@ -347,4 +347,30 @@ class Activity implements SyncFields {
       deletedAt: now,
     );
   }
+
+  /// Clears the tombstone, for Undo. [copyWith] can't do this — it carries
+  /// [deletedAt] through unchanged — so the revived twin is built directly,
+  /// with a fresh [updatedAt] so it wins over the tombstone during merge.
+  Activity revive() {
+    return Activity(
+      id: id,
+      type: type,
+      amount: amount,
+      date: date,
+      updatedAt: DateTime.now(),
+      description: description,
+      categoryId: categoryId,
+      profileId: profileId,
+      paymentMethod: paymentMethod,
+      sourceAccount: sourceAccount,
+      destinationAccount: destinationAccount,
+      merchant: merchant,
+      personId: personId,
+      status: status,
+      confidence: confidence,
+      source: source,
+      note: note,
+      metadata: metadata,
+    );
+  }
 }

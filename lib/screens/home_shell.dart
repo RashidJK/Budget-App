@@ -186,23 +186,34 @@ class _NavItem extends StatelessWidget {
     final color = selected ? context.scheme.primary : context.muted;
 
     return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(selected ? activeIcon : icon, size: 23, color: color),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                color: color,
+      child: MergeSemantics(
+        // Screen readers otherwise get only the label; announce the tab role
+        // and which one is currently selected.
+        child: Semantics(
+          button: true,
+          selected: selected,
+          label: label,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: ExcludeSemantics(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(selected ? activeIcon : icon, size: 23, color: color),
+                  const SizedBox(height: 3),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      color: color,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -219,23 +230,35 @@ class _AddButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Center(
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: context.scheme.primary,
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: context.scheme.primary.withValues(alpha: 0.4),
-                  blurRadius: 14,
-                  offset: const Offset(0, 5),
+        child: MergeSemantics(
+          // The app's primary capture action is icon-only; give it a name so
+          // it isn't announced as a bare "button".
+          child: Semantics(
+            button: true,
+            label: 'Add or capture',
+            child: GestureDetector(
+              onTap: onTap,
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: context.scheme.primary,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: context.scheme.primary.withValues(alpha: 0.4),
+                      blurRadius: 14,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
                 ),
-              ],
+                child: const Icon(
+                  Icons.add_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
             ),
-            child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
           ),
         ),
       ),

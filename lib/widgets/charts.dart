@@ -14,130 +14,9 @@ import '../theme.dart';
 /// least 8px across, and gridlines are a solid hairline one step off the
 /// surface. The data is the only thing allowed to be loud.
 class _Marks {
-  static const double barWidth = 18;
   static const double lineWidth = 2;
   static const double markerRadius = 4.5;
   static const Radius barCap = Radius.circular(4);
-}
-
-/// Daily spending over the last fortnight.
-///
-/// A single series, so there is no legend — the card title says what is
-/// plotted. The peak is reported as text in the card header rather than as a
-/// pinned tooltip: fl_chart draws tooltips in an overlay that ignores the
-/// card's bounds, so a pinned one on a tall bar rides up over the title.
-/// Per-value labels stay off; the axis and the touch tooltip carry the rest.
-class DailySpendChart extends StatelessWidget {
-  const DailySpendChart({super.key, required this.days});
-
-  final List<DayTotal> days;
-
-  @override
-  Widget build(BuildContext context) {
-    if (days.isEmpty) return const SizedBox.shrink();
-
-    final maxValue = days
-        .map((day) => day.total)
-        .fold<double>(0, (a, b) => a > b ? a : b);
-    final headroom = maxValue <= 0 ? 1000.0 : maxValue * 1.25;
-    final color = context.scheme.primary;
-
-    return SizedBox(
-      height: 180,
-      child: BarChart(
-        BarChartData(
-          maxY: headroom,
-          alignment: BarChartAlignment.spaceAround,
-          barTouchData: BarTouchData(
-            touchTooltipData: BarTouchTooltipData(
-              getTooltipColor: (_) => context.isDark
-                  ? const Color(0xFF33332F)
-                  : const Color(0xFF1A1A19),
-              tooltipBorderRadius: BorderRadius.circular(10),
-              getTooltipItem: (group, _, rod, _) {
-                final day = days[group.x];
-                return BarTooltipItem(
-                  '${Dates.short(day.day)}\n',
-                  TextStyle(
-                    color: Colors.white.withValues(alpha: 0.75),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  children: [
-                    TextSpan(
-                      text: Money.format(day.total),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            horizontalInterval: headroom / 3,
-            getDrawingHorizontalLine: (_) =>
-                FlLine(color: context.hairline, strokeWidth: 1),
-          ),
-          borderData: FlBorderData(show: false),
-          titlesData: FlTitlesData(
-            topTitles: const AxisTitles(),
-            rightTitles: const AxisTitles(),
-            leftTitles: const AxisTitles(),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 26,
-                getTitlesWidget: (value, _) {
-                  final index = value.toInt();
-                  if (index < 0 || index >= days.length) {
-                    return const SizedBox.shrink();
-                  }
-                  // Label every third day, counted back from the most recent
-                  // one. Anchoring at the end keeps today labelled and the
-                  // gaps even; counting forward and then forcing the last
-                  // label can leave two ticks adjacent, and they overprint.
-                  if ((days.length - 1 - index) % 3 != 0) {
-                    return const SizedBox.shrink();
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text(
-                      Dates.short(days[index].day),
-                      style: TextStyle(color: context.muted, fontSize: 10),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          barGroups: [
-            for (var index = 0; index < days.length; index++)
-              BarChartGroupData(
-                x: index,
-                barRods: [
-                  BarChartRodData(
-                    toY: days[index].total,
-                    width: _Marks.barWidth,
-                    color: days[index].total > 0
-                        ? color
-                        : color.withValues(alpha: 0.16),
-                    borderRadius: const BorderRadius.vertical(
-                      top: _Marks.barCap,
-                    ),
-                  ),
-                ],
-              ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 /// Spend per month over the last several months.
@@ -396,7 +275,7 @@ class ProjectionChart extends StatelessWidget {
     if (points.length < 2) return const SizedBox.shrink();
 
     final maxValue = points.last.cumulative;
-    final surface = context.isDark ? const Color(0xFF232322) : Colors.white;
+    final surface = context.card;
 
     return SizedBox(
       height: 200,

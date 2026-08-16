@@ -135,7 +135,7 @@ class _CountTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: context.isDark ? const Color(0xFF232322) : Colors.white,
+        color: context.card,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: context.hairline),
       ),
@@ -203,7 +203,7 @@ class _BiggestExpenseCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: context.isDark ? const Color(0xFF232322) : Colors.white,
+        color: context.card,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: context.hairline),
       ),

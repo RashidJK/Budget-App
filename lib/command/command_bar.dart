@@ -306,15 +306,19 @@ class _CommandSheetState extends State<_CommandSheet> {
             ),
           ),
           const SizedBox(width: 10),
-          _GlassButton(
-            onTap: _scanning ? null : _scan,
-            child: _scanning
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.camera_alt_rounded, size: 22),
+          Semantics(
+            button: true,
+            label: _scanning ? 'Scanning receipt' : 'Scan a receipt',
+            child: _GlassButton(
+              onTap: _scanning ? null : _scan,
+              child: _scanning
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.camera_alt_rounded, size: 22),
+            ),
           ),
         ],
       ),
@@ -382,13 +386,17 @@ class _CommandSheetState extends State<_CommandSheet> {
     onTap: () => setState(() => _loanExpanded = true),
   );
 
-  Widget _backChip() => _Glass(
-    radius: 18,
-    padding: EdgeInsets.zero,
-    onTap: () => setState(() => _loanExpanded = false),
-    child: const Padding(
-      padding: EdgeInsets.all(9),
-      child: Icon(Icons.close_rounded, size: 16),
+  Widget _backChip() => Semantics(
+    button: true,
+    label: 'Back',
+    child: _Glass(
+      radius: 18,
+      padding: EdgeInsets.zero,
+      onTap: () => setState(() => _loanExpanded = false),
+      child: const Padding(
+        padding: EdgeInsets.all(9),
+        child: Icon(Icons.close_rounded, size: 16),
+      ),
     ),
   );
 

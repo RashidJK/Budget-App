@@ -43,10 +43,7 @@ class _DailyHabitScreenState extends State<DailyHabitScreen> {
 
   Frequency _frequencyFrom(Scenario? scenario) {
     final stored = scenario?.text('frequency');
-    return Frequency.values.firstWhere(
-      (frequency) => frequency.name == stored,
-      orElse: () => Frequency.everyDay,
-    );
+    return Frequency.fromName(stored);
   }
 
   @override

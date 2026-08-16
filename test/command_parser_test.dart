@@ -306,6 +306,16 @@ void main() {
       expect(result.plan!.newAmount, 3000);
     });
 
+    test('a trailing word after the amount is not read as a k/m multiplier', () {
+      final result = _parser()
+          .parse('What if I reduce lunch from 5000 to 3000 monthly?');
+      expect(result.kind, CommandKind.plan);
+      expect(result.plan!.topic, PlanTopic.reduce);
+      expect(result.plan!.dailyAmount, 5000);
+      // Regression: 'monthly' donated its 'm', reading 3000 as 3,000,000,000.
+      expect(result.plan!.newAmount, 3000);
+    });
+
     test('"How much will fuel cost if I drive 60km a day?"', () {
       final result = _parser().parse('How much will fuel cost if I drive 60km a day?');
       expect(result.kind, CommandKind.plan);

@@ -115,11 +115,12 @@ class ReceiptTextParser {
   /// largest monetary value on the receipt, which is almost always the total.
   double? _extractTotal(List<String> lines) {
     for (final keyword in _totalKeywords) {
+      // Match on word boundaries, so "net" doesn't fire inside "internet" and
+      // "total" doesn't fire inside "subtotal" / "total items".
+      final pattern = RegExp('\\b${RegExp.escape(keyword)}\\b');
       for (final line in lines) {
         final lower = line.toLowerCase();
-        if (!lower.contains(keyword)) continue;
-        // Skip "subtotal" when hunting the "total" line.
-        if (keyword == 'total' && lower.contains('subtotal')) continue;
+        if (!pattern.hasMatch(lower)) continue;
         final onLine = _amountsIn(line);
         if (onLine.isNotEmpty) return onLine.reduce((a, b) => a > b ? a : b);
       }
@@ -171,7 +172,11 @@ class ReceiptTextParser {
         month = swap;
       }
       if (month < 1 || month > 12 || day < 1 || day > 31) continue;
-      return DateTime(year, month, day);
+      // DateTime silently rolls impossible dates over (31 Feb → 3 Mar), which
+      // would file the expense in the wrong month; reject those and fall back.
+      final candidate = DateTime(year, month, day);
+      if (candidate.day != day || candidate.month != month) continue;
+      return candidate;
     }
     return null;
   }
