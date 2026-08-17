@@ -814,19 +814,27 @@ class AppState extends ChangeNotifier {
   // Combined history & activity-type accounting (spec §33, §34)
   // -------------------------------------------------------------------------
 
-  /// Income recorded this month. Transfers and loans are excluded by
+  /// Income recorded in [month]. Transfers and loans are excluded by
   /// construction — they aren't income (spec §34).
-  double get incomeThisMonth {
-    final now = DateTime.now();
+  double incomeInMonth(DateTime month) {
     return activities
         .where(
           (a) =>
               a.type == ActivityType.income &&
-              a.date.year == now.year &&
-              a.date.month == now.month &&
+              a.date.year == month.year &&
+              a.date.month == month.month &&
               (_activeProfileId == null || a.profileId == _activeProfileId),
         )
         .fold<double>(0, (sum, a) => sum + a.amount);
+  }
+
+  /// Income recorded this month.
+  double get incomeThisMonth => incomeInMonth(DateTime.now());
+
+  /// Income recorded last month, for the hero card's month-on-month trend.
+  double get incomeLastMonth {
+    final now = DateTime.now();
+    return incomeInMonth(DateTime(now.year, now.month - 1));
   }
 
   /// Activities in the active profile, for history. Expenses are handled

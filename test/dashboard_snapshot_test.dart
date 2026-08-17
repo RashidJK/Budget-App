@@ -174,9 +174,11 @@ void main() {
         date: DateTime.now(),
       );
 
-      // Before any income: only the hero card's Income quick-action.
+      // The word "Income" is ambiguous (hero toggle + hero quick-action), so
+      // the card is identified by its own figure. Before any income there is
+      // no income card, so its compact value is absent.
       await _pumpDashboard(tester, state);
-      expect(find.text('Income'), findsOneWidget);
+      expect(find.text('TSh 120K'), findsNothing);
 
       final now = DateTime.now();
       await state.addActivity(
@@ -190,8 +192,8 @@ void main() {
       );
       await tester.pumpAndSettle(const Duration(milliseconds: 600));
 
-      // Now the snapshot card joins the hero action → two matches.
-      expect(find.text('Income'), findsNWidgets(2));
+      // The income snapshot card now shows its figure.
+      expect(find.text('TSh 120K'), findsOneWidget);
     });
 
     testWidgets('the row is absent before any spend', (tester) async {
@@ -201,6 +203,51 @@ void main() {
 
       expect(find.text('Today'), findsNothing);
       expect(find.text('Daily average'), findsNothing);
+    });
+  });
+
+  group('hero toggle', () {
+    testWidgets('switches the headline figure between Spent, Income and Net', (
+      tester,
+    ) async {
+      final state = await _freshState();
+      final now = DateTime.now();
+      await state.addExpense(
+        title: 'Rent',
+        amount: 40000,
+        categoryId: 'housing',
+        date: now,
+      );
+      await state.addActivity(
+        Activity(
+          id: 'inc-1',
+          type: ActivityType.income,
+          amount: 100000,
+          date: now,
+          updatedAt: now,
+        ),
+      );
+
+      await _pumpDashboard(tester, state);
+
+      // The snapshot cards echo the same figures, so target the hero's number
+      // by its distinctive 38px size.
+      Finder heroFigure(String text) => find.byWidgetPredicate(
+        (w) => w is Text && w.data == text && w.style?.fontSize == 38,
+      );
+
+      // Defaults to Spent.
+      expect(heroFigure('TSh 40,000'), findsOneWidget);
+
+      // The first "Income" match is the toggle segment (above the actions).
+      await tester.tap(find.text('Income').first);
+      await tester.pumpAndSettle(const Duration(milliseconds: 600));
+      expect(heroFigure('TSh 100,000'), findsOneWidget);
+
+      // Net = income − spent = 60,000.
+      await tester.tap(find.text('Net'));
+      await tester.pumpAndSettle(const Duration(milliseconds: 600));
+      expect(heroFigure('TSh 60,000'), findsOneWidget);
     });
   });
 }

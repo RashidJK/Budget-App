@@ -41,7 +41,9 @@ class DashboardScreen extends StatelessWidget {
             const SizedBox(height: 16),
             _HeroCard(
               spent: state.spentThisMonth,
-              previous: state.spentLastMonth,
+              spentPrevious: state.spentLastMonth,
+              income: state.incomeThisMonth,
+              incomePrevious: state.incomeLastMonth,
               // The card focuses on capture; Analytics and Planner live in the
               // nav and aren't duplicated here (spec §25).
               onAdd: () => CommandBar.show(context),
@@ -363,11 +365,24 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-/// The dark headline card: month-to-date spend, trend, and quick actions.
-class _HeroCard extends StatelessWidget {
+/// Which figure the hero card is showing.
+enum _HeroMetric {
+  spent('Spent'),
+  income('Income'),
+  net('Net');
+
+  const _HeroMetric(this.label);
+  final String label;
+}
+
+/// The dark headline card: a month-to-date figure the user can toggle between
+/// Spent, Income and Net, its month-on-month trend, and the quick actions.
+class _HeroCard extends StatefulWidget {
   const _HeroCard({
     required this.spent,
-    required this.previous,
+    required this.spentPrevious,
+    required this.income,
+    required this.incomePrevious,
     required this.onAdd,
     required this.onIncome,
     required this.onTransfer,
@@ -375,19 +390,45 @@ class _HeroCard extends StatelessWidget {
   });
 
   final double spent;
-  final double previous;
+  final double spentPrevious;
+  final double income;
+  final double incomePrevious;
   final VoidCallback onAdd;
   final VoidCallback onIncome;
   final VoidCallback onTransfer;
   final VoidCallback onHistory;
 
   @override
+  State<_HeroCard> createState() => _HeroCardState();
+}
+
+class _HeroCardState extends State<_HeroCard> {
+  _HeroMetric _metric = _HeroMetric.spent;
+
+  double get _value => switch (_metric) {
+    _HeroMetric.spent => widget.spent,
+    _HeroMetric.income => widget.income,
+    _HeroMetric.net => widget.income - widget.spent,
+  };
+
+  double get _previous => switch (_metric) {
+    _HeroMetric.spent => widget.spentPrevious,
+    _HeroMetric.income => widget.incomePrevious,
+    _HeroMetric.net => widget.incomePrevious - widget.spentPrevious,
+  };
+
+  @override
   Widget build(BuildContext context) {
-    final difference = spent - previous;
-    final hasComparison = previous > 0;
+    final value = _value;
+    final previous = _previous;
+    final difference = value - previous;
+    final hasComparison = previous.abs() > 0;
     final up = difference > 0;
-    // Fraction of last month's spend, the "+112%" style chip in the reference.
-    final pct = previous > 0 ? (difference.abs() / previous) : 0.0;
+    // For spending, a rise is bad; for income and net, a rise is good — so the
+    // trend chip's colour flips with the metric.
+    final good = _metric == _HeroMetric.spent ? !up : up;
+    final trendColor = good ? AppTheme.goodDark : AppTheme.warnDark;
+    final pct = previous.abs() > 0 ? (difference.abs() / previous.abs()) : 0.0;
 
     return Container(
       padding: const EdgeInsets.all(22),
@@ -409,13 +450,12 @@ class _HeroCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(
-                'Spent this month',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
+              _MetricToggle(
+                selected: _metric,
+                onChanged: (m) {
+                  HapticFeedback.selectionClick();
+                  setState(() => _metric = m);
+                },
               ),
               const Spacer(),
               if (hasComparison)
@@ -425,8 +465,7 @@ class _HeroCard extends StatelessWidget {
                     vertical: 5,
                   ),
                   decoration: BoxDecoration(
-                    color: (up ? AppTheme.warnDark : AppTheme.goodDark)
-                        .withValues(alpha: 0.18),
+                    color: trendColor.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -436,13 +475,13 @@ class _HeroCard extends StatelessWidget {
                             ? Icons.arrow_upward_rounded
                             : Icons.arrow_downward_rounded,
                         size: 13,
-                        color: up ? AppTheme.warnDark : AppTheme.goodDark,
+                        color: trendColor,
                       ),
                       const SizedBox(width: 3),
                       Text(
                         Money.percent(pct),
                         style: TextStyle(
-                          color: up ? AppTheme.warnDark : AppTheme.goodDark,
+                          color: trendColor,
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                         ),
@@ -452,14 +491,14 @@ class _HeroCard extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 10),
-          // Scale a large balance down rather than letting it ellipsize — this
-          // is the app's headline figure, so a partial number would mislead.
+          const SizedBox(height: 12),
+          // Scale a large figure down rather than letting it ellipsize — this
+          // is the app's headline number, so a partial one would mislead.
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
             child: AnimatedMoney(
-              value: spent,
+              value: value,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 38,
@@ -482,24 +521,83 @@ class _HeroCard extends StatelessWidget {
           const SizedBox(height: 22),
           Row(
             children: [
-              _HeroAction(icon: Icons.add_rounded, label: 'Add', onTap: onAdd),
+              _HeroAction(
+                icon: Icons.add_rounded,
+                label: 'Add',
+                onTap: widget.onAdd,
+              ),
               _HeroAction(
                 icon: Icons.south_west_rounded,
                 label: 'Income',
-                onTap: onIncome,
+                onTap: widget.onIncome,
               ),
               _HeroAction(
                 icon: Icons.swap_horiz_rounded,
                 label: 'Transfer',
-                onTap: onTransfer,
+                onTap: widget.onTransfer,
               ),
               _HeroAction(
                 icon: Icons.receipt_long_outlined,
                 label: 'History',
-                onTap: onHistory,
+                onTap: widget.onHistory,
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The Spent / Income / Net pill switcher at the top of the hero card.
+class _MetricToggle extends StatelessWidget {
+  const _MetricToggle({required this.selected, required this.onChanged});
+
+  final _HeroMetric selected;
+  final ValueChanged<_HeroMetric> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final metric in _HeroMetric.values)
+            GestureDetector(
+              onTap: () => onChanged(metric),
+              behavior: HitTestBehavior.opaque,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 13,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: metric == selected
+                      ? Colors.white.withValues(alpha: 0.16)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Text(
+                  metric.label,
+                  style: TextStyle(
+                    color: Colors.white.withValues(
+                      alpha: metric == selected ? 0.95 : 0.5,
+                    ),
+                    fontSize: 12.5,
+                    fontWeight: metric == selected
+                        ? FontWeight.w700
+                        : FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
