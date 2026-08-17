@@ -120,9 +120,108 @@ struct BudgetWidget: Widget {
     }
 }
 
+// MARK: - Quick Add widget
+
+// Tapping a tile opens the app on a "budget://" deep link that the Flutter
+// side (HomeShell) routes to the matching capture flow.
+struct QuickAction {
+    let url: String
+    let symbol: String
+    let label: String
+    let tint: Color
+}
+
+private let quickActions = [
+    QuickAction(url: "budget://add", symbol: "plus", label: "Add", tint: .blue),
+    QuickAction(url: "budget://income", symbol: "arrow.down.left", label: "Income", tint: .green),
+    QuickAction(url: "budget://transfer", symbol: "arrow.left.arrow.right", label: "Transfer", tint: .purple),
+    QuickAction(url: "budget://scan", symbol: "camera", label: "Scan", tint: .orange),
+]
+
+struct QuickAddEntry: TimelineEntry {
+    let date: Date
+}
+
+struct QuickAddProvider: TimelineProvider {
+    func placeholder(in context: Context) -> QuickAddEntry { QuickAddEntry(date: Date()) }
+
+    func getSnapshot(in context: Context, completion: @escaping (QuickAddEntry) -> Void) {
+        completion(QuickAddEntry(date: Date()))
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<QuickAddEntry>) -> Void) {
+        // Static content — never needs a scheduled refresh.
+        completion(Timeline(entries: [QuickAddEntry(date: Date())], policy: .never))
+    }
+}
+
+struct QuickAddEntryView: View {
+    var entry: QuickAddProvider.Entry
+    @Environment(\.widgetFamily) var family
+
+    var body: some View {
+        content
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(10)
+            .widgetBackground(Color(.systemBackground))
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if family == .systemSmall {
+            // A single tap area for the whole widget (works on all versions).
+            tile(quickActions[0], big: true)
+                .widgetURL(URL(string: quickActions[0].url))
+        } else {
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    linkTile(quickActions[0])
+                    linkTile(quickActions[1])
+                }
+                HStack(spacing: 8) {
+                    linkTile(quickActions[2])
+                    linkTile(quickActions[3])
+                }
+            }
+        }
+    }
+
+    private func linkTile(_ action: QuickAction) -> some View {
+        Link(destination: URL(string: action.url)!) { tile(action, big: false) }
+    }
+
+    private func tile(_ action: QuickAction, big: Bool) -> some View {
+        VStack(spacing: big ? 8 : 4) {
+            Image(systemName: action.symbol)
+                .font(.system(size: big ? 28 : 18, weight: .bold))
+                .foregroundColor(action.tint)
+            Text(action.label)
+                .font(.system(size: big ? 15 : 12, weight: .semibold))
+                .foregroundColor(.primary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(action.tint.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+struct QuickAddWidget: Widget {
+    let kind: String = "QuickAddWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: QuickAddProvider()) { entry in
+            QuickAddEntryView(entry: entry)
+        }
+        .configurationDisplayName("Quick Add")
+        .description("Add an expense, income or transfer in one tap.")
+        .supportedFamilies([.systemSmall, .systemMedium])
+    }
+}
+
 @main
 struct BudgetWidgetBundle: WidgetBundle {
     var body: some Widget {
         BudgetWidget()
+        QuickAddWidget()
     }
 }

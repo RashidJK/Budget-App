@@ -1,7 +1,10 @@
+import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
+import 'package:home_widget/home_widget.dart';
 
 import '../command/command_bar.dart';
 import '../theme.dart';
@@ -31,8 +34,56 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+  StreamSubscription<Uri?>? _widgetClicks;
 
   void _select(int index) => setState(() => _index = index);
+
+  @override
+  void initState() {
+    super.initState();
+    // The Quick Add home-screen widget opens the app on a "budget://" link;
+    // route it to the matching capture flow. iOS-only, so tests and other
+    // platforms skip the platform channels entirely.
+    if (Platform.isIOS) {
+      _listenForWidgetLaunch();
+    }
+  }
+
+  Future<void> _listenForWidgetLaunch() async {
+    try {
+      final launch = await HomeWidget.initiallyLaunchedFromHomeWidget();
+      if (launch != null && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _handleWidgetUri(launch),
+        );
+      }
+    } catch (_) {
+      // No widget launch / plugin unavailable — nothing to route.
+    }
+    _widgetClicks = HomeWidget.widgetClicked.listen((uri) {
+      if (uri != null) _handleWidgetUri(uri);
+    });
+  }
+
+  void _handleWidgetUri(Uri uri) {
+    if (!mounted) return;
+    switch (uri.host) {
+      case 'add':
+        AddExpenseSheet.show(context);
+      case 'income':
+        CommandBar.show(context, initialText: 'Received ');
+      case 'transfer':
+        CommandBar.show(context, initialText: 'Transfer ');
+      case 'scan':
+        CommandBar.show(context);
+    }
+  }
+
+  @override
+  void dispose() {
+    _widgetClicks?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

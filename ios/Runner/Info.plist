@@ -22,10 +22,29 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.kadingo.budget</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>budget</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Take a photo of a receipt to attach it to an expense.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Attach a photo of a receipt to an expense.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -66,14 +85,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Attach a photo of a receipt to an expense.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>Take a photo of a receipt to attach it to an expense.</string>
-	<!-- The app makes no network calls and uses no custom cryptography, so it
-	     is exempt from U.S. export-compliance rules. Declaring it here skips the
-	     encryption question on every TestFlight/App Store upload. -->
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
 </dict>
 </plist>
