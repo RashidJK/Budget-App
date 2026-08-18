@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../../services/format.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import '../../widgets/app_background.dart';
+import '../../widgets/badge_icon.dart';
 import '../../widgets/charts.dart';
 import '../../widgets/inputs.dart';
 import '../../widgets/stat.dart';
@@ -29,7 +31,9 @@ class AnalyticsScreen extends StatelessWidget {
         : average.fold<double>(0, (sum, m) => sum + m.total) / average.length;
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
         title: const Text('Analytics'),
         actions: [
           if (state.profiles.length > 1)
@@ -38,59 +42,61 @@ class AnalyticsScreen extends StatelessWidget {
               child: Center(
                 child: Text(
                   state.activeProfile?.name ?? 'All profiles',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: context.muted,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: context.muted),
                 ),
               ),
             ),
         ],
       ),
-      body: state.expenses.isEmpty
-          ? const EmptyState(
-              icon: Icons.insights_rounded,
-              title: 'Nothing to analyse yet',
-              message:
-                  'Once you have recorded a few expenses, your trends and '
-                  'breakdown show up here.',
-            )
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
-              children: [
-                SectionCard(
-                  title: 'Monthly trend',
-                  trailing: Text(
-                    'Avg ${Money.compact(averageMonthly)}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: context.muted,
+      body: AppBackground(
+        child: state.expenses.isEmpty
+            ? const EmptyState(
+                icon: Icons.insights_rounded,
+                title: 'Nothing to analyse yet',
+                message:
+                    'Once you have recorded a few expenses, your trends and '
+                    'breakdown show up here.',
+              )
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
+                children: [
+                  SectionCard(
+                    title: 'Monthly trend',
+                    trailing: Text(
+                      'Avg ${Money.compact(averageMonthly)}',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: context.muted),
                     ),
-                  ),
-                  child: MonthlyTrendChart(months: months),
-                ),
-                const SizedBox(height: 16),
-                _StatRow(
-                  daily: state.dailyAverageThisMonth,
-                  transactions: txnCount,
-                ),
-                const SizedBox(height: 16),
-                if (biggest != null) ...[
-                  _BiggestExpenseCard(
-                    title: biggest.title,
-                    amount: biggest.amount,
-                    categoryName: state.categoryById(biggest.categoryId).name,
-                    color: state.categoryById(biggest.categoryId).of(context),
-                    icon: state.categoryById(biggest.categoryId).icon,
-                    date: biggest.date,
+                    child: MonthlyTrendChart(months: months),
                   ),
                   const SizedBox(height: 16),
-                ],
-                if (categories.isNotEmpty)
-                  SectionCard(
-                    title: 'This month by category',
-                    child: CategoryBreakdown(totals: categories, maxRows: 8),
+                  _StatRow(
+                    daily: state.dailyAverageThisMonth,
+                    transactions: txnCount,
                   ),
-              ],
-            ),
+                  const SizedBox(height: 16),
+                  if (biggest != null) ...[
+                    _BiggestExpenseCard(
+                      title: biggest.title,
+                      amount: biggest.amount,
+                      categoryName: state.categoryById(biggest.categoryId).name,
+                      color: state.categoryById(biggest.categoryId).of(context),
+                      icon: state.categoryById(biggest.categoryId).icon,
+                      date: biggest.date,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  if (categories.isNotEmpty)
+                    SectionCard(
+                      title: 'This month by category',
+                      child: CategoryBreakdown(totals: categories, maxRows: 8),
+                    ),
+                ],
+              ),
+      ),
     );
   }
 }
@@ -111,10 +117,7 @@ class _StatRow extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: _CountTile(
-            label: 'Transactions',
-            value: transactions,
-          ),
+          child: _CountTile(label: 'Transactions', value: transactions),
         ),
       ],
     );
@@ -134,11 +137,7 @@ class _CountTile extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.card,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: context.hairline),
-      ),
+      decoration: context.cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -202,22 +201,10 @@ class _BiggestExpenseCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: context.card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: context.hairline),
-      ),
+      decoration: context.cardDecoration(),
       child: Row(
         children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: context.isDark ? 0.24 : 0.12),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, size: 22, color: color),
-          ),
+          BadgeIcon(icon: icon, accent: color, size: BadgeSize.lg),
           const SizedBox(width: 14),
           Expanded(
             child: Column(

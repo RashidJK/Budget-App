@@ -8,6 +8,9 @@ import '../../models/person.dart';
 import '../../services/format.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import '../../widgets/app_background.dart';
+import '../../widgets/badge_icon.dart';
+import '../../widgets/section_header.dart';
 import '../../widgets/stat.dart';
 import '../manage/manage_screen.dart';
 import '../planner/planner_home.dart';
@@ -32,17 +35,17 @@ class DashboardScreen extends StatelessWidget {
     final budgets = state.budgetProgress();
 
     return Scaffold(
-      // A whisper-subtle black↔white-ish wash sits behind the whole dashboard,
-      // so cards read as raised off a gradient rather than a flat fill.
-      body: DecoratedBox(
-        decoration: BoxDecoration(gradient: context.surfaceGradient),
+      backgroundColor: Colors.transparent,
+      // The graded wash carried by every tab, so the whole app reads as one
+      // continuous lit canvas.
+      body: AppBackground(
         child: SafeArea(
           bottom: false,
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
             children: [
               _TopBar(),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
               _HeroCard(
                 spent: state.spentThisMonth,
                 spentPrevious: state.spentLastMonth,
@@ -64,14 +67,16 @@ class DashboardScreen extends StatelessWidget {
               // Horizontal snapshot cards — a quick sideways-scrolling read of
               // recent spending, shown only once there is data to summarise.
               if (state.spentThisMonth > 0) ...[
-                const SizedBox(height: 20),
+                const SizedBox(height: 28),
+                const SectionHeader(title: 'This month'),
+                const SizedBox(height: 14),
                 _SnapshotRow(snapshots: _snapshotsFor(context, state)),
               ],
-              const SizedBox(height: 24),
               if (state.profiles.length > 1) ...[
+                const SizedBox(height: 28),
                 const _ProfileStrip(),
-                const SizedBox(height: 20),
               ],
+              const SizedBox(height: 28),
               if (budgets.isNotEmpty)
                 _BudgetSection(
                   budgets: budgets,
@@ -83,10 +88,10 @@ class DashboardScreen extends StatelessWidget {
                   onManage: () => ManageScreen.open(context),
                 ),
               if (state.outstandingBalances.isNotEmpty) ...[
-                const SizedBox(height: 24),
+                const SizedBox(height: 28),
                 _BalancesSection(balances: state.outstandingBalances),
               ],
-              const SizedBox(height: 24),
+              const SizedBox(height: 28),
               _PlannerSection(onSeeAll: onSeePlanner),
             ],
           ),
@@ -108,21 +113,14 @@ class _BalancesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Money owed',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+        const SectionHeader(title: 'Money owed'),
         const SizedBox(height: 14),
         for (final balance in balances)
           Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: 12),
             child: _BalanceRow(balance: balance),
           ),
       ],
@@ -143,25 +141,14 @@ class _BalanceRow extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.card,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: context.hairline),
-      ),
+      decoration: context.cardDecoration(),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: context.isDark ? 0.24 : 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              theyOwe ? Icons.call_received_rounded : Icons.call_made_rounded,
-              size: 20,
-              color: color,
-            ),
+          BadgeIcon(
+            icon: theyOwe
+                ? Icons.call_received_rounded
+                : Icons.call_made_rounded,
+            accent: color,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -190,6 +177,7 @@ class _BalanceRow extends StatelessWidget {
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
               color: color,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         ],
@@ -214,28 +202,7 @@ class _PlannerSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(
-              'Plan ahead',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const Spacer(),
-            if (onSeeAll != null)
-              GestureDetector(
-                onTap: onSeeAll,
-                child: Text(
-                  'See all',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: context.scheme.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-          ],
-        ),
+        SectionHeader(title: 'Plan ahead', onAction: onSeeAll),
         const SizedBox(height: 14),
         SizedBox(
           height: 140,
@@ -266,55 +233,53 @@ class _PlannerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Material(
-      color: context.card,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: () => openPlannerTool(context, tool),
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          width: 158,
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: context.hairline),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: context.isDark ? 0.24 : 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(tool.icon, size: 20, color: accent),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                tool.title,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  height: 1.2,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const Spacer(),
-              Row(
-                children: [
-                  Text(
-                    'Open',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: accent,
-                      fontWeight: FontWeight.w600,
-                    ),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: context.cardShadow,
+      ),
+      child: Material(
+        color: context.card,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: () => openPlannerTool(context, tool),
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            width: 158,
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: context.hairline),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                BadgeIcon(icon: tool.icon, accent: accent),
+                const SizedBox(height: 12),
+                Text(
+                  tool.title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    height: 1.2,
                   ),
-                  Icon(Icons.arrow_forward_rounded, size: 14, color: accent),
-                ],
-              ),
-            ],
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const Spacer(),
+                Row(
+                  children: [
+                    Text(
+                      'Open',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: accent,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Icon(Icons.arrow_forward_rounded, size: 14, color: accent),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -443,11 +408,26 @@ class _HeroCardState extends State<_HeroCard> {
         // and a faint brand-green undertone at the base.
         gradient: AppTheme.heroGradient,
         borderRadius: BorderRadius.circular(26),
+        // A hairline top rim-light so the card reads as lit and lifts off the
+        // near-black wash instead of pasting onto it.
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        // Layered shadow: a tight contact, a wide ambient, and a whisper of
+        // brand under-glow echoing the FAB.
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
+            color: Colors.black.withValues(alpha: 0.22),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.16),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+          ),
+          BoxShadow(
+            color: AppTheme.brandGreen.withValues(alpha: 0.10),
+            blurRadius: 34,
+            offset: const Offset(0, 16),
           ),
         ],
       ),
@@ -505,12 +485,10 @@ class _HeroCardState extends State<_HeroCard> {
             alignment: Alignment.centerLeft,
             child: AnimatedMoney(
               value: value,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 38,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -1,
-              ),
+              // The single heaviest token in the app — the one headline figure.
+              style: Theme.of(
+                context,
+              ).textTheme.displayLarge?.copyWith(color: Colors.white),
             ),
           ),
           const SizedBox(height: 4),
@@ -543,7 +521,7 @@ class _HeroCardState extends State<_HeroCard> {
                 onTap: widget.onTransfer,
               ),
               _HeroAction(
-                icon: Icons.receipt_long_outlined,
+                icon: Icons.history_rounded,
                 label: 'History',
                 onTap: widget.onHistory,
               ),
@@ -693,6 +671,9 @@ List<_Snapshot> _snapshotsFor(BuildContext context, AppState state) {
   final biggest = state.biggestExpenseThisMonth;
   final income = state.incomeThisMonth;
   final lastMonth = state.spentLastMonth;
+  // Every badge tint is drawn from the validated palette or a semantic token,
+  // so nothing escapes the contrast-checked system.
+  final brightness = Theme.of(context).brightness;
 
   return [
     _Snapshot(
@@ -705,25 +686,26 @@ List<_Snapshot> _snapshotsFor(BuildContext context, AppState state) {
       icon: Icons.calendar_view_week_rounded,
       label: 'This week',
       value: Money.compact(state.spentInLastDays(7)),
-      accent: const Color(0xFF6366F1),
+      accent: Palette.color(6, brightness), // violet
     ),
     _Snapshot(
       icon: Icons.trending_up_rounded,
       label: 'Daily average',
+      // A daily average is neutral — green stays reserved for good/positive.
       value: Money.compact(state.dailyAverageThisMonth),
-      accent: context.good,
+      accent: Palette.color(4, brightness), // teal
     ),
     _Snapshot(
       icon: Icons.timeline_rounded,
       label: 'Projected',
       value: Money.compact(state.projectedThisMonth),
-      accent: const Color(0xFFEDA100),
+      accent: context.caution,
     ),
     _Snapshot(
       icon: Icons.receipt_long_rounded,
       label: 'Entries',
       value: '${state.expenseCountThisMonth}',
-      accent: const Color(0xFF9333EA),
+      accent: Palette.color(2, brightness), // pink
     ),
     if (top != null)
       _Snapshot(
@@ -743,8 +725,9 @@ List<_Snapshot> _snapshotsFor(BuildContext context, AppState state) {
       _Snapshot(
         icon: Icons.south_west_rounded,
         label: 'Income',
+        // Income is money in — green reads correctly as positive here.
         value: Money.compact(income),
-        accent: const Color(0xFF14B8A6),
+        accent: context.good,
       ),
     if (lastMonth > 0)
       _Snapshot(
@@ -769,7 +752,7 @@ class _SnapshotRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 118,
+      height: 126,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: EdgeInsets.zero,
@@ -808,30 +791,20 @@ class _SnapshotCard extends StatelessWidget {
 
     return Container(
       width: 150,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: context.card,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: context.hairline),
-      ),
+      padding: const EdgeInsets.all(16),
+      decoration: context.cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: context.isDark ? 0.24 : 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, size: 18, color: accent),
-          ),
+          BadgeIcon(icon: icon, accent: accent, size: BadgeSize.sm),
           const SizedBox(height: 10),
+          // The figure leads; the word is the caption beneath it.
           Text(
             value,
-            style: theme.textTheme.titleMedium?.copyWith(
+            style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w700,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -945,29 +918,16 @@ class _BudgetSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(
-              'Your budgets',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const Spacer(),
-            Text(
-              switch (daysLeft) {
-                0 => 'Last day',
-                1 => '1 day to go',
-                _ => '$daysLeft days to go',
-              },
-              style: theme.textTheme.bodySmall?.copyWith(color: context.muted),
-            ),
-          ],
+        SectionHeader(
+          title: 'Your budgets',
+          meta: switch (daysLeft) {
+            0 => 'Last day',
+            1 => '1 day to go',
+            _ => '$daysLeft days to go',
+          },
         ),
         const SizedBox(height: 14),
         for (final budget in budgets)
@@ -997,29 +957,17 @@ class _BudgetCard extends StatelessWidget {
     final barColor = progress.isOver
         ? context.warn
         : progress.fraction >= 0.85
-        ? const Color(0xFFEDA100)
+        ? context.caution
         : color;
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: context.hairline),
-      ),
+      decoration: context.cardDecoration(),
       child: Column(
         children: [
           Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: context.isDark ? 0.24 : 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(category.icon, size: 20, color: color),
-              ),
+              BadgeIcon(icon: category.icon, accent: color),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -1063,15 +1011,20 @@ class _BudgetCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           ClipRRect(
-            borderRadius: BorderRadius.circular(6),
+            // Half the bar height, so the caps are true pills.
+            borderRadius: BorderRadius.circular(5),
             child: TweenAnimationBuilder<double>(
               tween: Tween(begin: 0, end: progress.barFraction),
               duration: const Duration(milliseconds: 500),
               curve: Curves.easeOutCubic,
               builder: (context, value, _) => LinearProgressIndicator(
                 value: value,
-                minHeight: 9,
-                backgroundColor: context.hairline,
+                minHeight: 10,
+                // A faint tinted rail previews the fill's hue, instead of an
+                // empty grey gutter.
+                backgroundColor: barColor.withValues(
+                  alpha: context.isDark ? 0.16 : 0.10,
+                ),
                 valueColor: AlwaysStoppedAnimation(barColor),
               ),
             ),
@@ -1110,25 +1063,14 @@ class _BudgetEmpty extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: context.card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: context.hairline),
-      ),
+      decoration: context.cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: context.scheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(
-              Icons.flag_outlined,
-              color: context.scheme.primary,
-              size: 22,
-            ),
+          BadgeIcon(
+            icon: Icons.flag_rounded,
+            accent: context.scheme.primary,
+            size: BadgeSize.lg,
           ),
           const SizedBox(height: 14),
           Text(

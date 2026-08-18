@@ -23,6 +23,11 @@ class AppTheme {
   static const Color warnLight = Color(0xFFB42318);
   static const Color warnDark = Color(0xFFF07A72);
 
+  /// Caution — nearing a limit, a forward projection. Amber, theme-aware like
+  /// [good]/[warn] rather than a raw literal scattered through the widgets.
+  static const Color cautionLight = Color(0xFFEDA100);
+  static const Color cautionDark = Color(0xFFC98500);
+
   /// The brand mark's gradient — a light spring green settling into teal, taken
   /// from the app logo. Used on the signature accent surfaces (the capture
   /// button, the FAB) to tie the app to its mark. Kept off the [ColorScheme]
@@ -150,8 +155,10 @@ class AppTheme {
   static Color _card(ColorScheme scheme, bool isDark) =>
       isDark ? const Color(0xFF232322) : Colors.white;
 
+  // Light hairline is softened (#ECECE6, was #E7E7E2) so the light-mode card
+  // shadow does the lifting without a competing outline-plus-shadow edge.
   static Color _border(ColorScheme scheme, bool isDark) =>
-      isDark ? const Color(0xFF33332F) : const Color(0xFFE7E7E2);
+      isDark ? const Color(0xFF33332F) : const Color(0xFFECECE6);
 
   static OutlineInputBorder _inputBorder(ColorScheme scheme, bool isDark) =>
       OutlineInputBorder(
@@ -160,6 +167,15 @@ class AppTheme {
       );
 
   static TextTheme _textTheme(TextTheme base) => base.copyWith(
+    // The single heaviest, tightest token — the one headline figure (the hero
+    // balance) sits on this so it out-weighs the surrounding w700 rather than
+    // flattening into it.
+    displayLarge: base.displayLarge?.copyWith(
+      fontSize: 40,
+      fontWeight: FontWeight.w800,
+      letterSpacing: -1.5,
+      height: 1.0,
+    ),
     displaySmall: base.displaySmall?.copyWith(
       fontWeight: FontWeight.w700,
       letterSpacing: -1,
@@ -172,7 +188,13 @@ class AppTheme {
       fontWeight: FontWeight.w700,
       letterSpacing: -0.5,
     ),
-    titleMedium: base.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+    // Section titles pick up the same engineered negative tracking the app bar
+    // already uses, so headers across tabs read in one voice.
+    titleLarge: base.titleLarge?.copyWith(letterSpacing: -0.3),
+    titleMedium: base.titleMedium?.copyWith(
+      fontWeight: FontWeight.w600,
+      letterSpacing: -0.2,
+    ),
     labelLarge: base.labelLarge?.copyWith(fontWeight: FontWeight.w600),
   );
 }
@@ -198,17 +220,50 @@ extension AppColors on BuildContext {
 
   Color get warn => isDark ? AppTheme.warnDark : AppTheme.warnLight;
 
-  /// A whisper-subtle page wash behind large surfaces — white → warm grey in
-  /// light, near-black → black in dark. The "black to white-ish" gradient.
+  /// Caution — nearing a budget limit, a forward projection.
+  Color get caution => isDark ? AppTheme.cautionDark : AppTheme.cautionLight;
+
+  /// A whisper-subtle page wash behind large surfaces — a three-stop graded
+  /// canvas so switching tabs feels like moving within one lit space. Near-black
+  /// → black in dark, white → warm grey in light ("black to white-ish").
   LinearGradient get surfaceGradient => isDark
       ? const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF1C1C1B), Color(0xFF131312)],
+          colors: [Color(0xFF1D1D1C), Color(0xFF161615), Color(0xFF131312)],
+          stops: [0.0, 0.5, 1.0],
         )
       : const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFFFFFFFF), Color(0xFFF1F1EC)],
+          colors: [Color(0xFFFFFFFF), Color(0xFFF7F7F3), Color(0xFFF1F1EC)],
+          stops: [0.0, 0.5, 1.0],
         );
+
+  /// Light-mode-only soft card float — a wide ambient shadow plus a tight
+  /// contact shadow, so cards lift a few millimetres off the wash. Dark mode
+  /// stays flat: shadows on near-black read as mud, the fill lift carries it.
+  List<BoxShadow> get cardShadow => isDark
+      ? const []
+      : const [
+          BoxShadow(
+            color: Color(0x0D1A1A19), // #1A1A19 @ 0.05
+            blurRadius: 18,
+            offset: Offset(0, 6),
+          ),
+          BoxShadow(
+            color: Color(0x081A1A19), // #1A1A19 @ 0.03
+            blurRadius: 4,
+            offset: Offset(0, 1),
+          ),
+        ];
+
+  /// The one canonical content-card decoration — fill, hairline, radius and the
+  /// theme-aware float — so every hand-rolled card stays identical.
+  BoxDecoration cardDecoration({double radius = 20}) => BoxDecoration(
+    color: card,
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(color: hairline),
+    boxShadow: cardShadow,
+  );
 }

@@ -8,6 +8,8 @@ import '../../models/expense.dart';
 import '../../services/format.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import '../../widgets/app_background.dart';
+import '../../widgets/badge_icon.dart';
 import '../../widgets/inputs.dart';
 import 'add_expense.dart';
 import 'edit_activity.dart';
@@ -61,7 +63,9 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     final total = state.totalFor(matches);
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
         title: const Text('Expenses'),
         actions: [
           IconButton(
@@ -80,67 +84,74 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
         onPressed: () => AddExpenseSheet.show(context),
         child: const Icon(Icons.add_rounded),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-            child: TextField(
-              controller: _search,
-              decoration: InputDecoration(
-                hintText: 'Search titles and notes',
-                isDense: true,
-                prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                suffixIcon: _filter.query.isEmpty
-                    ? null
-                    : IconButton(
-                        icon: const Icon(Icons.close_rounded, size: 18),
-                        onPressed: () {
-                          _search.clear();
-                          setState(() => _filter = _filter.copyWith(query: ''));
-                        },
-                      ),
-              ),
-              onChanged: (value) =>
-                  setState(() => _filter = _filter.copyWith(query: value)),
-            ),
-          ),
-          // A running total for the current filter is the whole point of
-          // filtering — "how much did I spend on fuel in March" is one query.
-          if (_filter.isActive)
+      body: AppBackground(
+        child: Column(
+          children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-              child: Row(
-                children: [
-                  Text(
-                    '${matches.length} '
-                    '${matches.length == 1 ? 'expense' : 'expenses'}',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: context.muted),
-                  ),
-                  const Spacer(),
-                  Text(
-                    Money.format(total),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: TextField(
+                controller: _search,
+                decoration: InputDecoration(
+                  hintText: 'Search titles and notes',
+                  isDense: true,
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  suffixIcon: _filter.query.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          onPressed: () {
+                            _search.clear();
+                            setState(
+                              () => _filter = _filter.copyWith(query: ''),
+                            );
+                          },
+                        ),
+                ),
+                onChanged: (value) =>
+                    setState(() => _filter = _filter.copyWith(query: value)),
               ),
             ),
-          Expanded(
-            child: groups.isEmpty
-                ? _empty(context, state)
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                    itemCount: groups.length,
-                    itemBuilder: (context, index) {
-                      final group = groups[index];
-                      return _DayGroup(day: group.day, entries: group.entries);
-                    },
-                  ),
-          ),
-        ],
+            // A running total for the current filter is the whole point of
+            // filtering — "how much did I spend on fuel in March" is one query.
+            if (_filter.isActive)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                child: Row(
+                  children: [
+                    Text(
+                      '${matches.length} '
+                      '${matches.length == 1 ? 'expense' : 'expenses'}',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: context.muted),
+                    ),
+                    const Spacer(),
+                    Text(
+                      Money.format(total),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            Expanded(
+              child: groups.isEmpty
+                  ? _empty(context, state)
+                  : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                      itemCount: groups.length,
+                      itemBuilder: (context, index) {
+                        final group = groups[index];
+                        return _DayGroup(
+                          day: group.day,
+                          entries: group.entries,
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -229,13 +240,17 @@ class _DayGroup extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(4, 20, 4, 10),
+          // Aligned to the card edge (was inset 4), with a firmer gap above so
+          // each new day separates cleanly.
+          padding: const EdgeInsets.fromLTRB(2, 24, 2, 10),
           child: Row(
             children: [
+              // The date is the ruler you scan against, so it leads in bold ink;
+              // the running total sits quiet on the right.
               Text(
                 Dates.relative(day),
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: context.muted,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const Spacer(),
@@ -244,6 +259,7 @@ class _DayGroup extends StatelessWidget {
                   Money.format(expenseTotal),
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: context.muted,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
             ],
@@ -345,15 +361,7 @@ class ExpenseRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: context.isDark ? 0.24 : 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(category.icon, size: 19, color: color),
-            ),
+            BadgeIcon(icon: category.icon, accent: color),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -502,15 +510,7 @@ class ActivityRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: context.isDark ? 0.24 : 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, size: 19, color: color),
-              ),
+              BadgeIcon(icon: icon, accent: color),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

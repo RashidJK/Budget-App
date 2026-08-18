@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/scenario.dart';
 import '../../theme.dart';
+import '../../widgets/app_background.dart';
 import '../scenarios/scenario_list.dart';
 import 'business.dart';
 import 'daily_habit.dart';
@@ -106,7 +107,9 @@ class PlannerHomeScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
         title: const Text('Planner'),
         actions: [
           // Saved scenarios live with the Planner now, reached from here rather
@@ -123,25 +126,27 @@ class PlannerHomeScreen extends StatelessWidget {
           const SizedBox(width: 4),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-        children: [
-          Text(
-            'Work out what something will cost before you spend it. Nothing '
-            'here touches your tracked expenses — change any number and the '
-            'results update as you type.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: context.muted,
-              height: 1.5,
+      body: AppBackground(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          children: [
+            Text(
+              'Work out what something will cost before you spend it. Nothing '
+              'here touches your tracked expenses — change any number and the '
+              'results update as you type.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: context.muted,
+                height: 1.5,
+              ),
             ),
-          ),
-          const SizedBox(height: 20),
-          for (final tool in PlannerTool.all)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _ToolCard(tool: tool),
-            ),
-        ],
+            const SizedBox(height: 20),
+            for (final tool in PlannerTool.all)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _ToolCard(tool: tool),
+              ),
+          ],
+        ),
       ),
     );
   }

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../planner/engine.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
+import 'badge_icon.dart';
 
 /// Allows digits and at most one decimal point.
 ///
@@ -463,7 +464,8 @@ class SectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Card(
+    return Container(
+      decoration: context.cardDecoration(),
       child: Padding(
         padding: padding,
         child: Column(
@@ -473,7 +475,12 @@ class SectionCard extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: Text(title!, style: theme.textTheme.titleMedium),
+                    child: Text(
+                      title!,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                   ?trailing,
                 ],
@@ -513,16 +520,20 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: context.scheme.primary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, size: 30, color: context.scheme.primary),
+            // The app's signature squircle at a larger size — a blank state
+            // still looks like the product, not a generic fallback circle.
+            BadgeIcon(
+              icon: icon,
+              accent: context.scheme.primary,
+              size: BadgeSize.lg,
             ),
             const SizedBox(height: 18),
-            Text(title, style: theme.textTheme.titleMedium),
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
               message,

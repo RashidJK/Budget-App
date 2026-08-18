@@ -44,6 +44,22 @@ class IconChoice {
     IconChoice('pet', Icons.pets_rounded),
     IconChoice('bank', Icons.account_balance_rounded),
     IconChoice('receipt', Icons.receipt_long_rounded),
+    // Everyday personal buckets — each new const glyph adds only itself to the
+    // font subset, so tree-shaking stays on.
+    IconChoice('coffee', Icons.local_cafe_rounded),
+    IconChoice('groceries', Icons.local_grocery_store_rounded),
+    IconChoice('health', Icons.medical_services_rounded),
+    IconChoice('games', Icons.sports_esports_rounded),
+    IconChoice('clothing', Icons.checkroom_rounded),
+    IconChoice('spa', Icons.spa_rounded),
+    IconChoice('kids', Icons.child_care_rounded),
+    IconChoice('savings', Icons.savings_rounded),
+    IconChoice('insurance', Icons.health_and_safety_rounded),
+    IconChoice('taxi', Icons.local_taxi_rounded),
+    IconChoice('parking', Icons.local_parking_rounded),
+    IconChoice('apartment', Icons.apartment_rounded),
+    IconChoice('salary', Icons.payments_rounded),
+    IconChoice('card', Icons.credit_card_rounded),
     IconChoice('more', Icons.more_horiz_rounded),
   ];
 

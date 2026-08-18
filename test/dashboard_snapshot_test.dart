@@ -231,9 +231,9 @@ void main() {
       await _pumpDashboard(tester, state);
 
       // The snapshot cards echo the same figures, so target the hero's number
-      // by its distinctive 38px size.
+      // by its distinctive display-token size (40px).
       Finder heroFigure(String text) => find.byWidgetPredicate(
-        (w) => w is Text && w.data == text && w.style?.fontSize == 38,
+        (w) => w is Text && w.data == text && w.style?.fontSize == 40,
       );
 
       // Defaults to Spent.
