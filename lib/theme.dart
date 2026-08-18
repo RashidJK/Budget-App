@@ -23,6 +23,28 @@ class AppTheme {
   static const Color warnLight = Color(0xFFB42318);
   static const Color warnDark = Color(0xFFF07A72);
 
+  /// The brand mark's gradient — a light spring green settling into teal, taken
+  /// from the app logo. Used on the signature accent surfaces (the capture
+  /// button, the FAB) to tie the app to its mark. Kept off the [ColorScheme]
+  /// primary on purpose: the chart palette reserves green for "good", so the
+  /// seed stays blue and green reads as brand, not data.
+  static const LinearGradient brandGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF97E29E), Color(0xFF3CA98B)],
+  );
+
+  /// A solid mid-tone of [brandGradient], for spots a gradient can't paint.
+  static const Color brandGreen = Color(0xFF4FBE93);
+
+  /// The hero card's dark fill as a gradient, for a little depth. A faint green
+  /// undertone at the base nods to the brand without lifting off near-black.
+  static const LinearGradient heroGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF23262D), Color(0xFF121611)],
+  );
+
   static ThemeData light() => _build(Brightness.light);
   static ThemeData dark() => _build(Brightness.dark);
 
@@ -175,4 +197,18 @@ extension AppColors on BuildContext {
   Color get good => isDark ? AppTheme.goodDark : AppTheme.goodLight;
 
   Color get warn => isDark ? AppTheme.warnDark : AppTheme.warnLight;
+
+  /// A whisper-subtle page wash behind large surfaces — white → warm grey in
+  /// light, near-black → black in dark. The "black to white-ish" gradient.
+  LinearGradient get surfaceGradient => isDark
+      ? const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF1C1C1B), Color(0xFF131312)],
+        )
+      : const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFFFFFFF), Color(0xFFF1F1EC)],
+        );
 }

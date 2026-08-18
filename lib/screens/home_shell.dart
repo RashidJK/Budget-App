@@ -97,6 +97,8 @@ class _HomeShellState extends State<HomeShell> {
           ? FloatingActionButton(
               onPressed: () => AddExpenseSheet.show(context),
               tooltip: 'Add expense',
+              backgroundColor: AppTheme.brandGreen,
+              foregroundColor: Colors.white,
               child: const Icon(Icons.add_rounded),
             )
           : null,
@@ -293,34 +295,40 @@ class _AddButton extends StatelessWidget {
             label: 'Add or capture',
             child: Container(
               // Shadow sits on an outer box so the Material below can clip the
-              // ripple to the rounded shape.
+              // ripple to the rounded shape. A green glow ties it to the brand.
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   BoxShadow(
-                    color: context.scheme.primary.withValues(alpha: 0.4),
+                    color: AppTheme.brandGreen.withValues(alpha: 0.45),
                     blurRadius: 14,
                     offset: const Offset(0, 5),
                   ),
                 ],
               ),
               child: Material(
-                color: context.scheme.primary,
+                color: Colors.transparent,
                 borderRadius: BorderRadius.circular(18),
-                child: InkWell(
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    onTap();
-                  },
-                  borderRadius: BorderRadius.circular(18),
-                  splashColor: Colors.white.withValues(alpha: 0.2),
-                  child: const SizedBox(
-                    width: 52,
-                    height: 52,
-                    child: Icon(
-                      Icons.add_rounded,
-                      color: Colors.white,
-                      size: 28,
+                child: Ink(
+                  decoration: const BoxDecoration(
+                    gradient: AppTheme.brandGradient,
+                    borderRadius: BorderRadius.all(Radius.circular(18)),
+                  ),
+                  child: InkWell(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      onTap();
+                    },
+                    borderRadius: BorderRadius.circular(18),
+                    splashColor: Colors.white.withValues(alpha: 0.25),
+                    child: const SizedBox(
+                      width: 52,
+                      height: 52,
+                      child: Icon(
+                        Icons.add_rounded,
+                        color: Colors.white,
+                        size: 28,
+                      ),
                     ),
                   ),
                 ),

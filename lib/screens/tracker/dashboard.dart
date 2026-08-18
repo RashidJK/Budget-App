@@ -32,59 +32,64 @@ class DashboardScreen extends StatelessWidget {
     final budgets = state.budgetProgress();
 
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-          children: [
-            _TopBar(),
-            const SizedBox(height: 16),
-            _HeroCard(
-              spent: state.spentThisMonth,
-              spentPrevious: state.spentLastMonth,
-              income: state.incomeThisMonth,
-              incomePrevious: state.incomeLastMonth,
-              // The card focuses on capture; Analytics and Planner live in the
-              // nav and aren't duplicated here (spec §25).
-              onAdd: () => CommandBar.show(context),
-              onIncome: () =>
-                  CommandBar.show(context, initialText: 'Received '),
-              onTransfer: () =>
-                  CommandBar.show(context, initialText: 'Transfer '),
-              onHistory: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const ExpenseListScreen(),
+      // A whisper-subtle black↔white-ish wash sits behind the whole dashboard,
+      // so cards read as raised off a gradient rather than a flat fill.
+      body: DecoratedBox(
+        decoration: BoxDecoration(gradient: context.surfaceGradient),
+        child: SafeArea(
+          bottom: false,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+            children: [
+              _TopBar(),
+              const SizedBox(height: 16),
+              _HeroCard(
+                spent: state.spentThisMonth,
+                spentPrevious: state.spentLastMonth,
+                income: state.incomeThisMonth,
+                incomePrevious: state.incomeLastMonth,
+                // The card focuses on capture; Analytics and Planner live in the
+                // nav and aren't duplicated here (spec §25).
+                onAdd: () => CommandBar.show(context),
+                onIncome: () =>
+                    CommandBar.show(context, initialText: 'Received '),
+                onTransfer: () =>
+                    CommandBar.show(context, initialText: 'Transfer '),
+                onHistory: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ExpenseListScreen(),
+                  ),
                 ),
               ),
-            ),
-            // Horizontal snapshot cards — a quick sideways-scrolling read of
-            // recent spending, shown only once there is data to summarise.
-            if (state.spentThisMonth > 0) ...[
-              const SizedBox(height: 20),
-              _SnapshotRow(snapshots: _snapshotsFor(context, state)),
-            ],
-            const SizedBox(height: 24),
-            if (state.profiles.length > 1) ...[
-              const _ProfileStrip(),
-              const SizedBox(height: 20),
-            ],
-            if (budgets.isNotEmpty)
-              _BudgetSection(
-                budgets: budgets,
-                daysLeft: state.daysLeftThisMonth,
-              )
-            else
-              _BudgetEmpty(
-                hasExpenses: state.spentThisMonth > 0,
-                onManage: () => ManageScreen.open(context),
-              ),
-            if (state.outstandingBalances.isNotEmpty) ...[
+              // Horizontal snapshot cards — a quick sideways-scrolling read of
+              // recent spending, shown only once there is data to summarise.
+              if (state.spentThisMonth > 0) ...[
+                const SizedBox(height: 20),
+                _SnapshotRow(snapshots: _snapshotsFor(context, state)),
+              ],
               const SizedBox(height: 24),
-              _BalancesSection(balances: state.outstandingBalances),
+              if (state.profiles.length > 1) ...[
+                const _ProfileStrip(),
+                const SizedBox(height: 20),
+              ],
+              if (budgets.isNotEmpty)
+                _BudgetSection(
+                  budgets: budgets,
+                  daysLeft: state.daysLeftThisMonth,
+                )
+              else
+                _BudgetEmpty(
+                  hasExpenses: state.spentThisMonth > 0,
+                  onManage: () => ManageScreen.open(context),
+                ),
+              if (state.outstandingBalances.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                _BalancesSection(balances: state.outstandingBalances),
+              ],
+              const SizedBox(height: 24),
+              _PlannerSection(onSeeAll: onSeePlanner),
             ],
-            const SizedBox(height: 24),
-            _PlannerSection(onSeeAll: onSeePlanner),
-          ],
+          ),
         ),
       ),
     );
@@ -433,9 +438,10 @@ class _HeroCardState extends State<_HeroCard> {
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        // A near-black card in both themes — the hero is meant to anchor the
-        // screen, so it keeps its dark identity rather than flipping.
-        color: const Color(0xFF17181C),
+        // A near-black card in both themes — the hero anchors the screen, so it
+        // keeps its dark identity rather than flipping. The gradient adds depth
+        // and a faint brand-green undertone at the base.
+        gradient: AppTheme.heroGradient,
         borderRadius: BorderRadius.circular(26),
         boxShadow: [
           BoxShadow(
