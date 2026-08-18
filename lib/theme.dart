@@ -63,7 +63,11 @@ class AppTheme {
       surface: surface,
     );
 
-    final base = ThemeData(colorScheme: scheme, useMaterial3: true);
+    final base = ThemeData(
+      colorScheme: scheme,
+      useMaterial3: true,
+      fontFamily: 'Inter',
+    );
 
     return base.copyWith(
       scaffoldBackgroundColor: surface,

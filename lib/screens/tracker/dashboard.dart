@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
+import '../../models/phosphor.dart';
 import 'package:provider/provider.dart';
 
 import '../../command/command_bar.dart';
@@ -39,62 +40,88 @@ class DashboardScreen extends StatelessWidget {
       // The graded wash carried by every tab, so the whole app reads as one
       // continuous lit canvas.
       body: AppBackground(
-        child: SafeArea(
-          bottom: false,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-            children: [
-              _TopBar(),
-              const SizedBox(height: 18),
-              _HeroCard(
-                spent: state.spentThisMonth,
-                spentPrevious: state.spentLastMonth,
-                income: state.incomeThisMonth,
-                incomePrevious: state.incomeLastMonth,
-                // The card focuses on capture; Analytics and Planner live in the
-                // nav and aren't duplicated here (spec §25).
-                onAdd: () => CommandBar.show(context),
-                onIncome: () =>
-                    CommandBar.show(context, initialText: 'Received '),
-                onTransfer: () =>
-                    CommandBar.show(context, initialText: 'Transfer '),
-                onHistory: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const ExpenseListScreen(),
+        child: Stack(
+          children: [
+            // A single soft brand bloom — light spilling from where the hero
+            // sits, so the canvas reads as lit rather than flat.
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: const Alignment(-0.15, -0.85),
+                      radius: 1.1,
+                      colors: [
+                        (context.isDark
+                                ? const Color(0xFF3CA98B)
+                                : AppTheme.brandGreen)
+                            .withValues(alpha: context.isDark ? 0.13 : 0.07),
+                        Colors.transparent,
+                      ],
+                      stops: const [0.0, 0.55],
+                    ),
                   ),
                 ),
               ),
-              // Horizontal snapshot cards — a quick sideways-scrolling read of
-              // recent spending, shown only once there is data to summarise.
-              if (state.spentThisMonth > 0) ...[
-                const SizedBox(height: 28),
-                const SectionHeader(title: 'This month'),
-                const SizedBox(height: 14),
-                _SnapshotRow(snapshots: _snapshotsFor(context, state)),
-              ],
-              if (state.profiles.length > 1) ...[
-                const SizedBox(height: 28),
-                const _ProfileStrip(),
-              ],
-              const SizedBox(height: 28),
-              if (budgets.isNotEmpty)
-                _BudgetSection(
-                  budgets: budgets,
-                  daysLeft: state.daysLeftThisMonth,
-                )
-              else
-                _BudgetEmpty(
-                  hasExpenses: state.spentThisMonth > 0,
-                  onManage: () => ManageScreen.open(context),
-                ),
-              if (state.outstandingBalances.isNotEmpty) ...[
-                const SizedBox(height: 28),
-                _BalancesSection(balances: state.outstandingBalances),
-              ],
-              const SizedBox(height: 28),
-              _PlannerSection(onSeeAll: onSeePlanner),
-            ],
-          ),
+            ),
+            SafeArea(
+              bottom: false,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+                children: [
+                  _TopBar(),
+                  const SizedBox(height: 18),
+                  _HeroCard(
+                    spent: state.spentThisMonth,
+                    spentPrevious: state.spentLastMonth,
+                    income: state.incomeThisMonth,
+                    incomePrevious: state.incomeLastMonth,
+                    // The card focuses on capture; Analytics and Planner live in the
+                    // nav and aren't duplicated here (spec §25).
+                    onAdd: () => CommandBar.show(context),
+                    onIncome: () =>
+                        CommandBar.show(context, initialText: 'Received '),
+                    onTransfer: () =>
+                        CommandBar.show(context, initialText: 'Transfer '),
+                    onHistory: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const ExpenseListScreen(),
+                      ),
+                    ),
+                  ),
+                  // Horizontal snapshot cards — a quick sideways-scrolling read of
+                  // recent spending, shown only once there is data to summarise.
+                  if (state.spentThisMonth > 0) ...[
+                    const SizedBox(height: 28),
+                    const SectionHeader(title: 'This month'),
+                    const SizedBox(height: 14),
+                    _SnapshotRow(snapshots: _snapshotsFor(context, state)),
+                  ],
+                  if (state.profiles.length > 1) ...[
+                    const SizedBox(height: 28),
+                    const _ProfileStrip(),
+                  ],
+                  const SizedBox(height: 28),
+                  if (budgets.isNotEmpty)
+                    _BudgetSection(
+                      budgets: budgets,
+                      daysLeft: state.daysLeftThisMonth,
+                    )
+                  else
+                    _BudgetEmpty(
+                      hasExpenses: state.spentThisMonth > 0,
+                      onManage: () => ManageScreen.open(context),
+                    ),
+                  if (state.outstandingBalances.isNotEmpty) ...[
+                    const SizedBox(height: 28),
+                    _BalancesSection(balances: state.outstandingBalances),
+                  ],
+                  const SizedBox(height: 28),
+                  _PlannerSection(onSeeAll: onSeePlanner),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -321,7 +348,7 @@ class _TopBar extends StatelessWidget {
                 : Colors.white,
             side: BorderSide(color: context.hairline),
           ),
-          icon: const Icon(Icons.tune_rounded, size: 20),
+          icon: const Icon(PhosphorR.slidersHorizontal, size: 20),
         ),
       ],
     );
@@ -506,22 +533,22 @@ class _HeroCardState extends State<_HeroCard> {
           Row(
             children: [
               _HeroAction(
-                icon: Icons.add_rounded,
+                icon: PhosphorR.plus,
                 label: 'Add',
                 onTap: widget.onAdd,
               ),
               _HeroAction(
-                icon: Icons.south_west_rounded,
+                icon: PhosphorR.arrowDownLeft,
                 label: 'Income',
                 onTap: widget.onIncome,
               ),
               _HeroAction(
-                icon: Icons.swap_horiz_rounded,
+                icon: PhosphorR.arrowsLeftRight,
                 label: 'Transfer',
                 onTap: widget.onTransfer,
               ),
               _HeroAction(
-                icon: Icons.history_rounded,
+                icon: PhosphorR.clockCounterClockwise,
                 label: 'History',
                 onTap: widget.onHistory,
               ),
@@ -677,32 +704,32 @@ List<_Snapshot> _snapshotsFor(BuildContext context, AppState state) {
 
   return [
     _Snapshot(
-      icon: Icons.today_rounded,
+      icon: PhosphorR.calendarBlank,
       label: 'Today',
       value: Money.compact(state.spentToday),
       accent: context.scheme.primary,
     ),
     _Snapshot(
-      icon: Icons.calendar_view_week_rounded,
+      icon: PhosphorR.calendarDots,
       label: 'This week',
       value: Money.compact(state.spentInLastDays(7)),
       accent: Palette.color(6, brightness), // violet
     ),
     _Snapshot(
-      icon: Icons.trending_up_rounded,
+      icon: PhosphorR.trendUp,
       label: 'Daily average',
       // A daily average is neutral — green stays reserved for good/positive.
       value: Money.compact(state.dailyAverageThisMonth),
       accent: Palette.color(4, brightness), // teal
     ),
     _Snapshot(
-      icon: Icons.timeline_rounded,
+      icon: PhosphorR.chartLineUp,
       label: 'Projected',
       value: Money.compact(state.projectedThisMonth),
       accent: context.caution,
     ),
     _Snapshot(
-      icon: Icons.receipt_long_rounded,
+      icon: PhosphorR.receipt,
       label: 'Entries',
       value: '${state.expenseCountThisMonth}',
       accent: Palette.color(2, brightness), // pink
@@ -716,14 +743,14 @@ List<_Snapshot> _snapshotsFor(BuildContext context, AppState state) {
       ),
     if (biggest != null)
       _Snapshot(
-        icon: Icons.local_fire_department_rounded,
+        icon: PhosphorR.fire,
         label: 'Biggest',
         value: Money.compact(biggest.amount),
         accent: context.warn,
       ),
     if (income > 0)
       _Snapshot(
-        icon: Icons.south_west_rounded,
+        icon: PhosphorR.arrowDownLeft,
         label: 'Income',
         // Income is money in — green reads correctly as positive here.
         value: Money.compact(income),
@@ -731,7 +758,7 @@ List<_Snapshot> _snapshotsFor(BuildContext context, AppState state) {
       ),
     if (lastMonth > 0)
       _Snapshot(
-        icon: Icons.history_rounded,
+        icon: PhosphorR.clockCounterClockwise,
         label: 'Last month',
         value: Money.compact(lastMonth),
         accent: context.muted,
@@ -1094,7 +1121,7 @@ class _BudgetEmpty extends StatelessWidget {
           const SizedBox(height: 16),
           FilledButton.tonalIcon(
             onPressed: onManage,
-            icon: const Icon(Icons.add_rounded, size: 18),
+            icon: const Icon(PhosphorR.plus, size: 18),
             label: const Text('Set up a budget'),
           ),
         ],

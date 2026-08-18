@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'phosphor.dart';
 
 /// The icons a user can choose from when creating a category or profile.
 ///
@@ -6,6 +7,12 @@ import 'package:flutter/material.dart';
 /// `IconData` from a stored integer would defeat Flutter's icon tree-shaking
 /// and force `--no-tree-shake-icons` on every release build; a fixed registry
 /// of const icons keeps the font subset small and the choice explicit.
+///
+/// The glyphs are Phosphor (Regular weight) — a fresher, more consistent line
+/// than Material's rounded set that sits naturally with the app's squircle
+/// badges. They are const [PhosphorFlatIconData] with a static `fontPackage`,
+/// so tree-shaking is preserved. Names are stable, so no stored-category
+/// migration is needed.
 class IconChoice {
   const IconChoice(this.name, this.icon);
 
@@ -15,57 +22,56 @@ class IconChoice {
   final IconData icon;
 
   static const List<IconChoice> all = [
-    IconChoice('restaurant', Icons.restaurant_rounded),
-    IconChoice('basket', Icons.shopping_basket_rounded),
-    IconChoice('cart', Icons.shopping_cart_rounded),
-    IconChoice('bus', Icons.directions_bus_rounded),
-    IconChoice('car', Icons.directions_car_rounded),
-    IconChoice('fuel', Icons.local_gas_station_rounded),
-    IconChoice('home', Icons.home_rounded),
-    IconChoice('bolt', Icons.bolt_rounded),
-    IconChoice('water', Icons.water_drop_rounded),
-    IconChoice('wifi', Icons.wifi_rounded),
-    IconChoice('phone', Icons.smartphone_rounded),
-    IconChoice('signal', Icons.signal_cellular_alt_rounded),
-    IconChoice('subscription', Icons.autorenew_rounded),
-    IconChoice('heart', Icons.favorite_rounded),
-    IconChoice('school', Icons.school_rounded),
-    IconChoice('people', Icons.people_rounded),
-    IconChoice('store', Icons.storefront_rounded),
-    IconChoice('megaphone', Icons.campaign_rounded),
-    IconChoice('laptop', Icons.laptop_mac_rounded),
-    IconChoice('cloud', Icons.cloud_rounded),
-    IconChoice('briefcase', Icons.work_rounded),
-    IconChoice('gift', Icons.card_giftcard_rounded),
-    IconChoice('plane', Icons.flight_rounded),
-    IconChoice('tools', Icons.build_rounded),
-    IconChoice('sport', Icons.fitness_center_rounded),
-    IconChoice('movie', Icons.movie_rounded),
-    IconChoice('pet', Icons.pets_rounded),
-    IconChoice('bank', Icons.account_balance_rounded),
-    IconChoice('receipt', Icons.receipt_long_rounded),
-    // Everyday personal buckets — each new const glyph adds only itself to the
-    // font subset, so tree-shaking stays on.
-    IconChoice('coffee', Icons.local_cafe_rounded),
-    IconChoice('groceries', Icons.local_grocery_store_rounded),
-    IconChoice('health', Icons.medical_services_rounded),
-    IconChoice('games', Icons.sports_esports_rounded),
-    IconChoice('clothing', Icons.checkroom_rounded),
-    IconChoice('spa', Icons.spa_rounded),
-    IconChoice('kids', Icons.child_care_rounded),
-    IconChoice('savings', Icons.savings_rounded),
-    IconChoice('insurance', Icons.health_and_safety_rounded),
-    IconChoice('taxi', Icons.local_taxi_rounded),
-    IconChoice('parking', Icons.local_parking_rounded),
-    IconChoice('apartment', Icons.apartment_rounded),
-    IconChoice('salary', Icons.payments_rounded),
-    IconChoice('card', Icons.credit_card_rounded),
-    IconChoice('more', Icons.more_horiz_rounded),
+    IconChoice('restaurant', PhosphorR.forkKnife),
+    IconChoice('basket', PhosphorR.basket),
+    IconChoice('cart', PhosphorR.shoppingCart),
+    IconChoice('bus', PhosphorR.bus),
+    IconChoice('car', PhosphorR.car),
+    IconChoice('fuel', PhosphorR.gasPump),
+    IconChoice('home', PhosphorR.house),
+    IconChoice('bolt', PhosphorR.lightning),
+    IconChoice('water', PhosphorR.drop),
+    IconChoice('wifi', PhosphorR.wifiHigh),
+    IconChoice('phone', PhosphorR.deviceMobile),
+    IconChoice('signal', PhosphorR.cellSignalHigh),
+    IconChoice('subscription', PhosphorR.arrowsClockwise),
+    IconChoice('heart', PhosphorR.heart),
+    IconChoice('school', PhosphorR.graduationCap),
+    IconChoice('people', PhosphorR.users),
+    IconChoice('store', PhosphorR.storefront),
+    IconChoice('megaphone', PhosphorR.megaphone),
+    IconChoice('laptop', PhosphorR.laptop),
+    IconChoice('cloud', PhosphorR.cloud),
+    IconChoice('briefcase', PhosphorR.briefcase),
+    IconChoice('gift', PhosphorR.gift),
+    IconChoice('plane', PhosphorR.airplane),
+    IconChoice('tools', PhosphorR.wrench),
+    IconChoice('sport', PhosphorR.barbell),
+    IconChoice('movie', PhosphorR.filmSlate),
+    IconChoice('pet', PhosphorR.pawPrint),
+    IconChoice('bank', PhosphorR.bank),
+    IconChoice('receipt', PhosphorR.receipt),
+    // Everyday personal buckets.
+    IconChoice('coffee', PhosphorR.coffee),
+    IconChoice('groceries', PhosphorR.shoppingCart),
+    IconChoice('health', PhosphorR.firstAid),
+    IconChoice('games', PhosphorR.gameController),
+    IconChoice('clothing', PhosphorR.tShirt),
+    IconChoice('spa', PhosphorR.flower),
+    IconChoice('kids', PhosphorR.baby),
+    IconChoice('savings', PhosphorR.piggyBank),
+    IconChoice('insurance', PhosphorR.shieldCheck),
+    IconChoice('taxi', PhosphorR.taxi),
+    IconChoice('parking', PhosphorR.carProfile),
+    IconChoice('apartment', PhosphorR.buildings),
+    IconChoice('salary', PhosphorR.money),
+    IconChoice('card', PhosphorR.creditCard),
+    IconChoice('more', PhosphorR.dotsThreeOutline),
   ];
 
   static const IconChoice fallback = IconChoice(
     'more',
-    Icons.more_horiz_rounded,
+    PhosphorR.dotsThreeOutline,
   );
 
   /// Resolves a stored name, falling back rather than throwing so a category

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../models/phosphor.dart';
 
 import '../../models/scenario.dart';
 import '../../theme.dart';
@@ -35,42 +36,42 @@ class PlannerTool {
       kind: ScenarioKind.dailyHabit,
       title: 'Daily Habit Calculator',
       description: 'What a repeating spend costs per day, month and year',
-      icon: Icons.local_cafe_rounded,
+      icon: PhosphorR.coffee,
       builder: _dailyHabit,
     ),
     PlannerTool(
       kind: ScenarioKind.fuel,
       title: 'Fuel Calculator',
       description: 'Litres and shillings from distance and efficiency',
-      icon: Icons.local_gas_station_rounded,
+      icon: PhosphorR.gasPump,
       builder: _fuel,
     ),
     PlannerTool(
       kind: ScenarioKind.subscriptions,
       title: 'Subscription Planner',
       description: 'Every recurring service, totalled and dated',
-      icon: Icons.autorenew_rounded,
+      icon: PhosphorR.arrowsClockwise,
       builder: _subscriptions,
     ),
     PlannerTool(
       kind: ScenarioKind.business,
       title: 'Business Cost Planner',
       description: 'Operating costs and the revenue needed to cover them',
-      icon: Icons.storefront_rounded,
+      icon: PhosphorR.storefront,
       builder: _business,
     ),
     PlannerTool(
       kind: ScenarioKind.savings,
       title: 'Savings Simulator',
       description: 'Compare a habit against a cheaper alternative',
-      icon: Icons.savings_rounded,
+      icon: PhosphorR.piggyBank,
       builder: _savings,
     ),
     PlannerTool(
       kind: ScenarioKind.projection,
       title: 'Long-Term Projection',
       description: 'Where a habit lands over 1, 3, 5 and 10 years',
-      icon: Icons.timeline_rounded,
+      icon: PhosphorR.chartLineUp,
       builder: _projection,
     ),
   ];

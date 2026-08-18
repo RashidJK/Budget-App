@@ -43,6 +43,7 @@ dependencies:
   path_provider: ^2.1.6
   google_mlkit_text_recognition: ^0.16.0
   home_widget: ^0.9.3
+  phosphor_flutter: ^2.1.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -74,6 +75,22 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # Inter, bundled as a local asset (network google_fonts is blocked here) so
+  # both platforms render the same face. One variable file, mapped per weight.
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter.ttf
+          weight: 400
+        - asset: assets/fonts/Inter.ttf
+          weight: 500
+        - asset: assets/fonts/Inter.ttf
+          weight: 600
+        - asset: assets/fonts/Inter.ttf
+          weight: 700
+        - asset: assets/fonts/Inter.ttf
+          weight: 800
 
   # To add assets to your application, add an assets section, like this:
   # assets:

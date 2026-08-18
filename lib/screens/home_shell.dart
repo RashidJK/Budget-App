@@ -5,6 +5,7 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:home_widget/home_widget.dart';
+import '../models/phosphor.dart';
 
 import '../command/command_bar.dart';
 import '../theme.dart';
@@ -181,30 +182,30 @@ class _BudgetNavBar extends StatelessWidget {
                 child: Row(
                   children: [
                     _NavItem(
-                      icon: Icons.grid_view_outlined,
-                      activeIcon: Icons.grid_view_rounded,
+                      icon: PhosphorR.squaresFour,
+                      activeIcon: PhosphorF.squaresFour,
                       label: 'Home',
                       selected: index == 0,
                       onTap: () => onSelect(0),
                     ),
                     _NavItem(
-                      icon: Icons.receipt_long_outlined,
-                      activeIcon: Icons.receipt_long_rounded,
+                      icon: PhosphorR.receipt,
+                      activeIcon: PhosphorF.receipt,
                       label: 'Expenses',
                       selected: index == 1,
                       onTap: () => onSelect(1),
                     ),
                     _AddButton(onTap: onAdd),
                     _NavItem(
-                      icon: Icons.pie_chart_outline_rounded,
-                      activeIcon: Icons.pie_chart_rounded,
+                      icon: PhosphorR.chartPie,
+                      activeIcon: PhosphorF.chartPie,
                       label: 'Analytics',
                       selected: index == 2,
                       onTap: () => onSelect(2),
                     ),
                     _NavItem(
-                      icon: Icons.calculate_outlined,
-                      activeIcon: Icons.calculate_rounded,
+                      icon: PhosphorR.calculator,
+                      activeIcon: PhosphorF.calculator,
                       label: 'Planner',
                       selected: index == 3,
                       onTap: () => onSelect(3),
