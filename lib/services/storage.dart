@@ -17,6 +17,7 @@ class Storage {
   static const _scenariosKey = 'budget.scenarios.v1';
   static const _categoriesKey = 'budget.categories.v1';
   static const _profilesKey = 'budget.profiles.v1';
+  static const _accountsKey = 'budget.accounts.v1';
   static const _activeProfileKey = 'budget.activeProfile.v1';
   static const _activitiesKey = 'budget.activities.v1';
   static const _peopleKey = 'budget.people.v1';
@@ -58,6 +59,12 @@ class Storage {
 
   Future<void> writeProfiles(List<Map<String, dynamic>> profiles) =>
       _writeList(_profilesKey, profiles);
+
+  /// Money accounts — cash, bank, mobile-money wallets.
+  List<Map<String, dynamic>> readAccounts() => _readList(_accountsKey);
+
+  Future<void> writeAccounts(List<Map<String, dynamic>> accounts) =>
+      _writeList(_accountsKey, accounts);
 
   /// Null means "All profiles".
   String? readActiveProfile() => _prefs.getString(_activeProfileKey);

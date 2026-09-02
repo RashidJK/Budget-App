@@ -17,6 +17,7 @@ class Expense implements SyncFields {
     required this.profileId,
     required this.date,
     required this.updatedAt,
+    this.accountId,
     this.note = '',
     this.attachments = const [],
     this.metadata = const {},
@@ -37,6 +38,9 @@ class Expense implements SyncFields {
       // they were logged, which is the best available guess and keeps them
       // losing to any genuine later edit.
       updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ?? date,
+      // Null means "the default account" — records written before accounts
+      // existed resolve to it at read time in AppState.
+      accountId: json['accountId'] as String?,
       note: json['note'] as String? ?? '',
       attachments:
           (json['attachments'] as List?)?.whereType<String>().toList() ??
@@ -53,6 +57,10 @@ class Expense implements SyncFields {
   final double amount;
   final String categoryId;
   final String profileId;
+
+  /// Which account the money came out of. Null resolves to the default account
+  /// (money out of that account) so old records still balance.
+  final String? accountId;
 
   /// When the money was spent — user data, not sync metadata.
   final DateTime date;
@@ -92,6 +100,7 @@ class Expense implements SyncFields {
     'amount': amount,
     'categoryId': categoryId,
     'profileId': profileId,
+    'accountId': accountId,
     'date': date.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
     'deletedAt': deletedAt?.toIso8601String(),
@@ -107,6 +116,7 @@ class Expense implements SyncFields {
     double? amount,
     String? categoryId,
     String? profileId,
+    String? accountId,
     DateTime? date,
     String? note,
     List<String>? attachments,
@@ -119,6 +129,7 @@ class Expense implements SyncFields {
       amount: amount ?? this.amount,
       categoryId: categoryId ?? this.categoryId,
       profileId: profileId ?? this.profileId,
+      accountId: accountId ?? this.accountId,
       date: date ?? this.date,
       updatedAt: updatedAt ?? DateTime.now(),
       note: note ?? this.note,
@@ -137,6 +148,7 @@ class Expense implements SyncFields {
       amount: amount,
       categoryId: categoryId,
       profileId: profileId,
+      accountId: accountId,
       date: date,
       updatedAt: now,
       note: note,
@@ -154,6 +166,7 @@ class Expense implements SyncFields {
       amount: amount,
       categoryId: categoryId,
       profileId: profileId,
+      accountId: accountId,
       date: date,
       updatedAt: DateTime.now(),
       note: note,

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../command/command_parser.dart';
+import '../models/account.dart';
 import '../models/activity.dart';
 import '../models/category.dart';
 import '../models/expense.dart';
@@ -28,6 +29,7 @@ class AppState extends ChangeNotifier {
   List<Scenario> _scenarios = [];
   List<ExpenseCategory> _categories = [];
   List<Profile> _profiles = [];
+  List<Account> _accounts = [];
   List<Activity> _activities = [];
   List<Person> _people = [];
 
@@ -85,6 +87,15 @@ class AppState extends ChangeNotifier {
     _activities = _storage.readActivities().map(Activity.fromJson).toList();
     _people = _storage.readPeople().map(Person.fromJson).toList();
     _merchantCategories = _storage.readMerchantCategories();
+
+    // Accounts arrived after the first versions, so seed a default "Cash"
+    // account whenever none exist (fresh install or an upgrade). Records with
+    // no accountId resolve to it, so historical data still balances.
+    _accounts = _storage.readAccounts().map(Account.fromJson).toList();
+    if (_accounts.where((a) => !a.isDeleted).isEmpty) {
+      _accounts = List.of(Account.seed);
+      unawaited(_persistAccounts(notify: false));
+    }
 
     _activeProfileId = _storage.readActiveProfile();
   }
@@ -194,6 +205,109 @@ class AppState extends ChangeNotifier {
   }
 
   // -------------------------------------------------------------------------
+  // Accounts & balances — where the money is, not just where it went.
+  // -------------------------------------------------------------------------
+
+  /// Live accounts, in creation order.
+  List<Account> get accounts =>
+      List.unmodifiable(_accounts.where((a) => !a.isDeleted));
+
+  Account? accountById(String? id) {
+    if (id == null) return null;
+    for (final account in _accounts) {
+      if (account.id == id && !account.isDeleted) return account;
+    }
+    return null;
+  }
+
+  /// The account new records land in and old records resolve to.
+  String get defaultAccountId {
+    final live = accounts;
+    if (live.any((a) => a.id == Account.defaultId)) return Account.defaultId;
+    return live.isEmpty ? Account.defaultId : live.first.id;
+  }
+
+  Future<void> addAccount({
+    required String name,
+    required AccountType type,
+    double openingBalance = 0,
+    int? colorSlot,
+  }) async {
+    _accounts = [
+      ..._accounts,
+      Account(
+        id: _uuid.v4(),
+        name: name,
+        type: type,
+        openingBalance: openingBalance,
+        colorSlot: colorSlot ?? Palette.firstFree(_accountColorSlots),
+        updatedAt: DateTime.now(),
+      ),
+    ];
+    await _persistAccounts();
+  }
+
+  Future<void> updateAccount(Account account) async {
+    final index = _accounts.indexWhere((item) => item.id == account.id);
+    if (index == -1) return;
+    _accounts = [..._accounts]..[index] = account;
+    await _persistAccounts();
+  }
+
+  /// Deletes an account (tombstoned). Records that named it fall back to the
+  /// default account for balance purposes, so nothing is orphaned.
+  Future<void> deleteAccount(String id) async {
+    if (accounts.length <= 1) return; // never leave zero accounts
+    final index = _accounts.indexWhere((item) => item.id == id);
+    if (index == -1) return;
+    _accounts = [..._accounts]..[index] = _accounts[index].tombstone();
+    await _persistAccounts();
+  }
+
+  Iterable<int> get _accountColorSlots =>
+      accounts.map((a) => a.colorSlot).whereType<int>();
+
+  /// Current balance of one account: its opening balance plus every attributed
+  /// movement. Global (not profile-scoped) — cash on hand is cash on hand.
+  double accountBalance(String accountId) {
+    final fallback = defaultAccountId;
+    var balance = accountById(accountId)?.openingBalance ?? 0;
+
+    for (final expense in _expenses) {
+      if (expense.isDeleted) continue;
+      if ((expense.accountId ?? fallback) == accountId) {
+        balance -= expense.amount;
+      }
+    }
+    for (final activity in _activities) {
+      if (activity.isDeleted) continue;
+      balance += activity.cashDeltaFor(accountId, fallback);
+    }
+    return balance;
+  }
+
+  /// Every account with its current balance, largest first.
+  List<AccountBalance> get accountBalances {
+    final result = [
+      for (final account in accounts)
+        AccountBalance(account: account, balance: accountBalance(account.id)),
+    ];
+    result.sort((a, b) => b.balance.compareTo(a.balance));
+    return result;
+  }
+
+  /// Total money on hand across every account.
+  double get totalBalance =>
+      accounts.fold<double>(0, (sum, a) => sum + accountBalance(a.id));
+
+  Future<void> _persistAccounts({bool notify = true}) async {
+    if (notify) notifyListeners();
+    await _storage.writeAccounts(
+      _accounts.map((account) => account.toJson()).toList(),
+    );
+  }
+
+  // -------------------------------------------------------------------------
   // Categories
   // -------------------------------------------------------------------------
 
@@ -274,6 +388,7 @@ class AppState extends ChangeNotifier {
     required String categoryId,
     required DateTime date,
     String? profileId,
+    String? accountId,
     String note = '',
     List<String> attachments = const [],
     Map<String, dynamic> metadata = const {},
@@ -285,6 +400,7 @@ class AppState extends ChangeNotifier {
         amount: amount,
         categoryId: categoryId,
         profileId: profileId ?? defaultProfileId,
+        accountId: accountId ?? defaultAccountId,
         date: date,
         updatedAt: DateTime.now(),
         note: note,
@@ -649,6 +765,7 @@ class AppState extends ChangeNotifier {
         amount: parsed.amount,
         categoryId: parsed.categoryId ?? 'other',
         profileId: parsed.profileId ?? defaultProfileId,
+        accountId: defaultAccountId,
         date: parsed.date,
         updatedAt: DateTime.now(),
         note: parsed.merchant != null && parsed.description != parsed.merchant
@@ -679,6 +796,7 @@ class AppState extends ChangeNotifier {
       description: parsed.description,
       categoryId: parsed.categoryId,
       profileId: parsed.profileId ?? defaultProfileId,
+      accountId: defaultAccountId,
       paymentMethod: parsed.paymentMethod,
       sourceAccount: parsed.sourceAccount,
       destinationAccount: parsed.destinationAccount,

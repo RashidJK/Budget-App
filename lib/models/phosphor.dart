@@ -290,6 +290,16 @@ abstract final class PhosphorR {
     fontFamily: 'PhosphorRegular',
     fontPackage: _pkg,
   );
+  static const IconData wallet = IconData(
+    0xe68a,
+    fontFamily: 'PhosphorRegular',
+    fontPackage: _pkg,
+  );
+  static const IconData coins = IconData(
+    0xe78e,
+    fontFamily: 'PhosphorRegular',
+    fontPackage: _pkg,
+  );
 }
 
 /// Phosphor Fill glyphs (selected nav states).

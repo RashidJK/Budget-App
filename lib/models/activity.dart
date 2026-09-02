@@ -149,6 +149,8 @@ class Activity implements SyncFields {
     this.description = '',
     this.categoryId,
     this.profileId,
+    this.accountId,
+    this.toAccountId,
     this.paymentMethod,
     this.sourceAccount,
     this.destinationAccount,
@@ -173,6 +175,8 @@ class Activity implements SyncFields {
       description: json['description'] as String? ?? '',
       categoryId: json['categoryId'] as String?,
       profileId: json['profileId'] as String? ?? Profile.personalId,
+      accountId: json['accountId'] as String?,
+      toAccountId: json['toAccountId'] as String?,
       paymentMethod: PaymentMethod.fromName(json['paymentMethod'] as String?),
       sourceAccount: json['sourceAccount'] as String?,
       destinationAccount: json['destinationAccount'] as String?,
@@ -205,6 +209,13 @@ class Activity implements SyncFields {
   final String description;
   final String? categoryId;
   final String? profileId;
+
+  /// The account this activity moves money in/out of. For a transfer it is the
+  /// *source*; [toAccountId] is the destination. Null resolves to the default
+  /// account, so records written before accounts existed still balance.
+  final String? accountId;
+  final String? toAccountId;
+
   final PaymentMethod? paymentMethod;
 
   /// For transfers: where money came from / went to (e.g. "bank", "M-Pesa").
@@ -255,6 +266,36 @@ class Activity implements SyncFields {
     }
   }
 
+  /// Signed effect on [accountId]'s cash balance. [fallback] is the default
+  /// account this activity resolves to when it names none.
+  ///
+  /// Income and money coming back add; lending and repaying subtract. A
+  /// transfer subtracts from its source and adds to its destination, so it
+  /// nets to zero across all accounts.
+  double cashDeltaFor(String accountId, String fallback) {
+    final from = this.accountId ?? fallback;
+    if (type == ActivityType.transfer) {
+      final to = toAccountId ?? fallback;
+      var delta = 0.0;
+      if (from == accountId) delta -= amount;
+      if (to == accountId) delta += amount;
+      return delta;
+    }
+    if (from != accountId) return 0;
+    switch (type) {
+      case ActivityType.income:
+      case ActivityType.loanIn:
+      case ActivityType.receivableRepayment:
+        return amount;
+      case ActivityType.loanOut:
+      case ActivityType.loanRepayment:
+      case ActivityType.expense:
+        return -amount;
+      case ActivityType.transfer:
+        return 0; // handled above
+    }
+  }
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'type': type.name,
@@ -265,6 +306,8 @@ class Activity implements SyncFields {
     'description': description,
     'categoryId': categoryId,
     'profileId': profileId,
+    'accountId': accountId,
+    'toAccountId': toAccountId,
     'paymentMethod': paymentMethod?.name,
     'sourceAccount': sourceAccount,
     'destinationAccount': destinationAccount,
@@ -284,6 +327,8 @@ class Activity implements SyncFields {
     String? description,
     String? categoryId,
     String? profileId,
+    String? accountId,
+    String? toAccountId,
     PaymentMethod? paymentMethod,
     String? sourceAccount,
     String? destinationAccount,
@@ -305,6 +350,8 @@ class Activity implements SyncFields {
       description: description ?? this.description,
       categoryId: categoryId ?? this.categoryId,
       profileId: profileId ?? this.profileId,
+      accountId: accountId ?? this.accountId,
+      toAccountId: toAccountId ?? this.toAccountId,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       sourceAccount: sourceAccount ?? this.sourceAccount,
       destinationAccount: destinationAccount ?? this.destinationAccount,
@@ -334,6 +381,8 @@ class Activity implements SyncFields {
       description: description,
       categoryId: categoryId,
       profileId: profileId,
+      accountId: accountId,
+      toAccountId: toAccountId,
       paymentMethod: paymentMethod,
       sourceAccount: sourceAccount,
       destinationAccount: destinationAccount,
@@ -361,6 +410,8 @@ class Activity implements SyncFields {
       description: description,
       categoryId: categoryId,
       profileId: profileId,
+      accountId: accountId,
+      toAccountId: toAccountId,
       paymentMethod: paymentMethod,
       sourceAccount: sourceAccount,
       destinationAccount: destinationAccount,
