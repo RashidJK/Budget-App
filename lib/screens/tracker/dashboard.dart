@@ -4,6 +4,7 @@ import '../../models/phosphor.dart';
 import 'package:provider/provider.dart';
 
 import '../../command/command_bar.dart';
+import '../../models/account.dart';
 import '../../models/palette.dart';
 import '../../models/person.dart';
 import '../../services/format.dart';
@@ -11,11 +12,20 @@ import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/app_background.dart';
 import '../../widgets/badge_icon.dart';
+import '../../widgets/card_stack.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/stat.dart';
+import '../manage/accounts_screen.dart';
 import '../manage/manage_screen.dart';
 import '../planner/planner_home.dart';
 import 'expense_list.dart';
+
+/// Opens the full history list.
+void _openHistory(BuildContext context) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(builder: (_) => const ExpenseListScreen()),
+  );
+}
 
 /// The tracker's overview.
 ///
@@ -71,23 +81,35 @@ class DashboardScreen extends StatelessWidget {
                 children: [
                   _TopBar(),
                   const SizedBox(height: 18),
-                  _HeroCard(
-                    spent: state.spentThisMonth,
-                    spentPrevious: state.spentLastMonth,
-                    income: state.incomeThisMonth,
-                    incomePrevious: state.incomeLastMonth,
-                    // The card focuses on capture; Analytics and Planner live in the
-                    // nav and aren't duplicated here (spec §25).
-                    onAdd: () => CommandBar.show(context),
-                    onIncome: () =>
-                        CommandBar.show(context, initialText: 'Received '),
-                    onTransfer: () =>
-                        CommandBar.show(context, initialText: 'Transfer '),
-                    onHistory: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const ExpenseListScreen(),
+                  // A stacked deck: the month-to-date flow card on top, the
+                  // balance card peeking behind it. Swipe up to swap.
+                  CardStack(
+                    height: 250,
+                    cards: [
+                      _HeroCard(
+                        spent: state.spentThisMonth,
+                        spentPrevious: state.spentLastMonth,
+                        income: state.incomeThisMonth,
+                        incomePrevious: state.incomeLastMonth,
+                        onAdd: () => CommandBar.show(context),
+                        onIncome: () =>
+                            CommandBar.show(context, initialText: 'Received '),
+                        onTransfer: () =>
+                            CommandBar.show(context, initialText: 'Transfer '),
+                        onHistory: () => _openHistory(context),
                       ),
-                    ),
+                      _BalanceCard(
+                        total: state.totalBalance,
+                        accounts: state.accountBalances,
+                        onAdd: () => CommandBar.show(context),
+                        onIncome: () =>
+                            CommandBar.show(context, initialText: 'Received '),
+                        onTransfer: () =>
+                            CommandBar.show(context, initialText: 'Transfer '),
+                        onHistory: () => _openHistory(context),
+                        onManageAccounts: () => AccountsScreen.open(context),
+                      ),
+                    ],
                   ),
                   // Horizontal snapshot cards — a quick sideways-scrolling read of
                   // recent spending, shown only once there is data to summarise.
@@ -429,35 +451,7 @@ class _HeroCardState extends State<_HeroCard> {
 
     return Container(
       padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        // A near-black card in both themes — the hero anchors the screen, so it
-        // keeps its dark identity rather than flipping. The gradient adds depth
-        // and a faint brand-green undertone at the base.
-        gradient: AppTheme.heroGradient,
-        borderRadius: BorderRadius.circular(26),
-        // A hairline top rim-light so the card reads as lit and lifts off the
-        // near-black wash instead of pasting onto it.
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-        // Layered shadow: a tight contact, a wide ambient, and a whisper of
-        // brand under-glow echoing the FAB.
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.22),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.16),
-            blurRadius: 28,
-            offset: const Offset(0, 14),
-          ),
-          BoxShadow(
-            color: AppTheme.brandGreen.withValues(alpha: 0.10),
-            blurRadius: 34,
-            offset: const Offset(0, 16),
-          ),
-        ],
-      ),
+      decoration: heroCardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -529,33 +523,242 @@ class _HeroCardState extends State<_HeroCard> {
               fontSize: 12.5,
             ),
           ),
-          const SizedBox(height: 22),
-          Row(
-            children: [
-              _HeroAction(
-                icon: PhosphorR.plus,
-                label: 'Add',
-                onTap: widget.onAdd,
-              ),
-              _HeroAction(
-                icon: PhosphorR.arrowDownLeft,
-                label: 'Income',
-                onTap: widget.onIncome,
-              ),
-              _HeroAction(
-                icon: PhosphorR.arrowsLeftRight,
-                label: 'Transfer',
-                onTap: widget.onTransfer,
-              ),
-              _HeroAction(
-                icon: PhosphorR.clockCounterClockwise,
-                label: 'History',
-                onTap: widget.onHistory,
-              ),
-            ],
+          const Spacer(),
+          _HeroActionRow(
+            onAdd: widget.onAdd,
+            onIncome: widget.onIncome,
+            onTransfer: widget.onTransfer,
+            onHistory: widget.onHistory,
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The dark card's shared surface — gradient, top rim-light, layered shadow and
+/// brand under-glow — used by every card in the hero deck so they read as one
+/// stack.
+BoxDecoration heroCardDecoration() => BoxDecoration(
+  gradient: AppTheme.heroGradient,
+  borderRadius: BorderRadius.circular(26),
+  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+  boxShadow: [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.22),
+      blurRadius: 8,
+      offset: const Offset(0, 3),
+    ),
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.16),
+      blurRadius: 28,
+      offset: const Offset(0, 14),
+    ),
+    BoxShadow(
+      color: AppTheme.brandGreen.withValues(alpha: 0.10),
+      blurRadius: 34,
+      offset: const Offset(0, 16),
+    ),
+  ],
+);
+
+/// The balance card in the hero deck — how much money there is and where it
+/// sits, across every account.
+class _BalanceCard extends StatelessWidget {
+  const _BalanceCard({
+    required this.total,
+    required this.accounts,
+    required this.onAdd,
+    required this.onIncome,
+    required this.onTransfer,
+    required this.onHistory,
+    required this.onManageAccounts,
+  });
+
+  final double total;
+  final List<AccountBalance> accounts;
+  final VoidCallback onAdd;
+  final VoidCallback onIncome;
+  final VoidCallback onTransfer;
+  final VoidCallback onHistory;
+  final VoidCallback onManageAccounts;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: heroCardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Total balance',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: onManageAccounts,
+                behavior: HitTestBehavior.opaque,
+                child: Row(
+                  children: [
+                    Text(
+                      'Accounts',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.55),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 16,
+                      color: Colors.white.withValues(alpha: 0.55),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: AnimatedMoney(
+              value: total,
+              style: theme.textTheme.displayLarge?.copyWith(
+                color: Colors.white,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 32,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.zero,
+              itemCount: accounts.length + 1,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                if (index == accounts.length) {
+                  return _AccountChip.add(onTap: onManageAccounts);
+                }
+                return _AccountChip(balance: accounts[index]);
+              },
+            ),
+          ),
+          const Spacer(),
+          _HeroActionRow(
+            onAdd: onAdd,
+            onIncome: onIncome,
+            onTransfer: onTransfer,
+            onHistory: onHistory,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A translucent wallet chip on the dark balance card.
+class _AccountChip extends StatelessWidget {
+  const _AccountChip({required this.balance}) : isAdd = false, onTap = null;
+  const _AccountChip.add({required this.onTap}) : balance = null, isAdd = true;
+
+  final AccountBalance? balance;
+  final bool isAdd;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isAdd ? Icons.add_rounded : balance!.account.icon,
+            size: 14,
+            color: Colors.white.withValues(alpha: 0.85),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            isAdd ? 'Account' : balance!.account.name,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.9),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (!isAdd) ...[
+            const SizedBox(width: 6),
+            Text(
+              Money.compact(balance!.balance),
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 12,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+    if (onTap == null) return child;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: child,
+    );
+  }
+}
+
+/// The four circular quick actions shared across the hero deck's cards.
+class _HeroActionRow extends StatelessWidget {
+  const _HeroActionRow({
+    required this.onAdd,
+    required this.onIncome,
+    required this.onTransfer,
+    required this.onHistory,
+  });
+
+  final VoidCallback onAdd;
+  final VoidCallback onIncome;
+  final VoidCallback onTransfer;
+  final VoidCallback onHistory;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _HeroAction(icon: PhosphorR.plus, label: 'Add', onTap: onAdd),
+        _HeroAction(
+          icon: PhosphorR.arrowDownLeft,
+          label: 'Income',
+          onTap: onIncome,
+        ),
+        _HeroAction(
+          icon: PhosphorR.arrowsLeftRight,
+          label: 'Transfer',
+          onTap: onTransfer,
+        ),
+        _HeroAction(
+          icon: PhosphorR.clockCounterClockwise,
+          label: 'History',
+          onTap: onHistory,
+        ),
+      ],
     );
   }
 }
@@ -580,6 +783,7 @@ class _MetricToggle extends StatelessWidget {
         children: [
           for (final metric in _HeroMetric.values)
             GestureDetector(
+              key: ValueKey('metric-${metric.name}'),
               onTap: () => onChanged(metric),
               behavior: HitTestBehavior.opaque,
               child: AnimatedContainer(

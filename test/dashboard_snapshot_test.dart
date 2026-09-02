@@ -227,6 +227,11 @@ void main() {
           updatedAt: now,
         ),
       );
+      // Give the balance card a distinct total so its 40px figure never
+      // collides with any hero metric (spent 40k / income 100k / net 60k).
+      await state.updateAccount(
+        state.accounts.single.copyWith(openingBalance: 1000000),
+      );
 
       await _pumpDashboard(tester, state);
 
@@ -239,13 +244,14 @@ void main() {
       // Defaults to Spent.
       expect(heroFigure('TSh 40,000'), findsOneWidget);
 
-      // The first "Income" match is the toggle segment (above the actions).
-      await tester.tap(find.text('Income').first);
+      // Tap the toggle segments by key — both deck cards carry an "Income"
+      // action label, so plain text would be ambiguous.
+      await tester.tap(find.byKey(const ValueKey('metric-income')));
       await tester.pumpAndSettle(const Duration(milliseconds: 600));
       expect(heroFigure('TSh 100,000'), findsOneWidget);
 
       // Net = income − spent = 60,000.
-      await tester.tap(find.text('Net'));
+      await tester.tap(find.byKey(const ValueKey('metric-net')));
       await tester.pumpAndSettle(const Duration(milliseconds: 600));
       expect(heroFigure('TSh 60,000'), findsOneWidget);
     });
