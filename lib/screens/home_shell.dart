@@ -6,10 +6,10 @@ import 'package:home_widget/home_widget.dart';
 
 import '../command/command_bar.dart';
 import '../models/phosphor.dart';
-import '../theme.dart';
 import '../widgets/morph_nav_bar.dart';
 import 'analytics/analytics_screen.dart';
 import 'planner/planner_home.dart';
+import 'quick_capture.dart';
 import 'tracker/add_expense.dart';
 import 'tracker/dashboard.dart';
 import 'tracker/expense_list.dart';
@@ -89,19 +89,9 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      // A quick-add button on the Home tab only. It lives on this shell
-      // Scaffold — the one that owns the nav bar — so it floats cleanly above
-      // the floating nav pill. A FAB on the nested dashboard Scaffold would
-      // instead sit against the screen bottom, behind the nav.
-      floatingActionButton: _index == 0
-          ? FloatingActionButton(
-              onPressed: () => AddExpenseSheet.show(context),
-              tooltip: 'Add expense',
-              backgroundColor: AppTheme.brandGreen,
-              foregroundColor: Colors.white,
-              child: const Icon(Icons.add_rounded),
-            )
-          : null,
+      // No FAB: the nav bar's "+" now raises the capture menu (Add expense,
+      // Income, Transfer, Scan) from every screen, so a separate Home FAB would
+      // just be a second green "+" stacked on the same corner.
       // IndexedStack preserves each tab's scroll position and the planner's
       // half-entered inputs when the user pops between tabs.
       body: IndexedStack(
@@ -119,7 +109,7 @@ class _HomeShellState extends State<HomeShell> {
       bottomNavigationBar: MorphNavBar(
         activeIndex: _index,
         onSelect: _select,
-        onAdd: () => CommandBar.show(context),
+        actions: captureActions(context),
         items: const [
           MorphNavItem(
             icon: PhosphorR.squaresFour,

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../command/command_bar.dart';
 import '../../models/account.dart';
 import '../../models/phosphor.dart';
 import '../../services/format.dart';
@@ -11,6 +10,7 @@ import '../../widgets/app_background.dart';
 import '../../widgets/badge_icon.dart';
 import '../../widgets/morph_nav_bar.dart';
 import '../../widgets/section_header.dart';
+import '../quick_capture.dart';
 import 'accounts_screen.dart';
 
 /// One account, opened up: its balance, its own ledger and its cash-flow.
@@ -124,7 +124,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       bottomNavigationBar: MorphNavBar(
         activeIndex: _tab,
         onSelect: _select,
-        onAdd: () => CommandBar.show(context),
+        actions: captureActions(context),
         items: const [
           MorphNavItem(
             icon: PhosphorR.squaresFour,
