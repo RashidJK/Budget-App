@@ -226,4 +226,95 @@ void main() {
       expect(state.accountBalance(cash.id), -5000);
     });
   });
+
+  group('account ledger — movements and flow', () {
+    test('movements are signed from the account and newest first', () async {
+      final state = await _freshState();
+      final cash = state.accounts.single;
+
+      await state.addExpense(
+        title: 'Lunch',
+        amount: 30000,
+        categoryId: 'eating_out',
+        date: DateTime(2026, 1, 2),
+      );
+      // Give income a fixed, later date so ordering is deterministic.
+      await state.addActivity(
+        Activity(
+          id: 'salary',
+          type: ActivityType.income,
+          amount: 50000,
+          date: DateTime(2026, 1, 5),
+          updatedAt: DateTime.now(),
+          accountId: cash.id,
+        ),
+      );
+
+      final movements = state.accountMovements(cash.id);
+      expect(movements, isNotEmpty);
+      // Newest first — the Jan 5 income leads the Jan 2 lunch.
+      expect(movements.first.date.isAfter(movements.last.date), isTrue);
+      // Expenses read as money out (negative), income as money in (positive).
+      final lunch = movements.firstWhere((m) => m.title == 'Lunch');
+      expect(lunch.delta, -30000);
+      expect(lunch.isInflow, isFalse);
+      final salary = movements.firstWhere((m) => m.delta > 0);
+      expect(salary.isInflow, isTrue);
+    });
+
+    test('a transfer shows on both accounts, oppositely signed', () async {
+      final state = await _freshState();
+      final cash = state.accounts.single;
+      await state.updateAccount(cash.copyWith(openingBalance: 100000));
+      await state.addAccount(name: 'M-Pesa', type: AccountType.mobileMoney);
+      final mpesa = state.accounts.firstWhere((a) => a.name == 'M-Pesa');
+
+      await state.addActivity(
+        Activity(
+          id: 'xfer',
+          type: ActivityType.transfer,
+          amount: 40000,
+          date: DateTime(2026, 2, 1),
+          updatedAt: DateTime.now(),
+          accountId: cash.id,
+          toAccountId: mpesa.id,
+        ),
+      );
+
+      final fromCash = state.accountMovements(cash.id).single;
+      final intoMpesa = state.accountMovements(mpesa.id).single;
+      expect(fromCash.delta, -40000);
+      expect(fromCash.title, 'Transfer to M-Pesa');
+      expect(intoMpesa.delta, 40000);
+      expect(intoMpesa.title, 'Transfer from Cash');
+    });
+
+    test('accountFlow sums this-month money in and out', () async {
+      final state = await _freshState();
+      final cash = state.accounts.single;
+      final now = DateTime.now();
+
+      await state.addActivity(
+        Activity(
+          id: 'in',
+          type: ActivityType.income,
+          amount: 80000,
+          date: now,
+          updatedAt: DateTime.now(),
+          accountId: cash.id,
+        ),
+      );
+      await state.addExpense(
+        title: 'Groceries',
+        amount: 25000,
+        categoryId: 'groceries',
+        date: now,
+      );
+
+      final flow = state.accountFlow(cash.id, now);
+      expect(flow.inflow, 80000);
+      expect(flow.outflow, 25000);
+      expect(flow.net, 55000);
+    });
+  });
 }

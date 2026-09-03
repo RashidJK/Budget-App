@@ -271,3 +271,30 @@ extension AppColors on BuildContext {
     boxShadow: cardShadow,
   );
 }
+
+/// The signature "hero" surface — the dark, softly-lifted gradient card used for
+/// the dashboard's headline figure and an account's balance. Top-level (not on
+/// the context extension) so it reads the same regardless of the ambient theme:
+/// the hero is always dark on purpose.
+BoxDecoration heroCardDecoration() => BoxDecoration(
+  gradient: AppTheme.heroGradient,
+  borderRadius: BorderRadius.circular(26),
+  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+  boxShadow: [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.22),
+      blurRadius: 8,
+      offset: const Offset(0, 3),
+    ),
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.16),
+      blurRadius: 28,
+      offset: const Offset(0, 14),
+    ),
+    BoxShadow(
+      color: AppTheme.brandGreen.withValues(alpha: 0.10),
+      blurRadius: 34,
+      offset: const Offset(0, 16),
+    ),
+  ],
+);

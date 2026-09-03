@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show IconData;
 import 'package:uuid/uuid.dart';
 
 import '../command/command_parser.dart';
 import '../models/account.dart';
+import '../models/phosphor.dart';
 import '../models/activity.dart';
 import '../models/category.dart';
 import '../models/expense.dart';
@@ -299,6 +301,103 @@ class AppState extends ChangeNotifier {
   /// Total money on hand across every account.
   double get totalBalance =>
       accounts.fold<double>(0, (sum, a) => sum + accountBalance(a.id));
+
+  /// The account's own ledger — every expense and activity that touched it,
+  /// signed from its point of view, newest first. This is what the account
+  /// detail screen lists; balances above are just its running sum.
+  List<AccountMovement> accountMovements(String accountId) {
+    final fallback = defaultAccountId;
+    final out = <AccountMovement>[];
+
+    for (final expense in _expenses) {
+      if (expense.isDeleted) continue;
+      if ((expense.accountId ?? fallback) != accountId) continue;
+      final category = categoryById(expense.categoryId);
+      out.add(
+        AccountMovement(
+          date: expense.date,
+          title: expense.title.isEmpty ? category.name : expense.title,
+          subtitle: category.name,
+          delta: -expense.amount,
+          icon: category.icon,
+        ),
+      );
+    }
+
+    for (final activity in _activities) {
+      if (activity.isDeleted) continue;
+      final delta = activity.cashDeltaFor(accountId, fallback);
+      if (delta == 0) continue;
+      out.add(
+        AccountMovement(
+          date: activity.date,
+          title: _movementTitle(activity, accountId, fallback),
+          subtitle: activity.type.label,
+          delta: delta,
+          icon: _movementIcon(activity.type),
+        ),
+      );
+    }
+
+    out.sort((a, b) => b.date.compareTo(a.date));
+    return out;
+  }
+
+  /// Money in vs out of [accountId] during [month].
+  AccountFlow accountFlow(String accountId, DateTime month) {
+    var inflow = 0.0;
+    var outflow = 0.0;
+    for (final movement in accountMovements(accountId)) {
+      if (movement.date.year != month.year ||
+          movement.date.month != month.month) {
+        continue;
+      }
+      if (movement.delta >= 0) {
+        inflow += movement.delta;
+      } else {
+        outflow += -movement.delta;
+      }
+    }
+    return AccountFlow(inflow: inflow, outflow: outflow);
+  }
+
+  String _movementTitle(Activity activity, String accountId, String fallback) {
+    switch (activity.type) {
+      case ActivityType.transfer:
+        final isSource = (activity.accountId ?? fallback) == accountId;
+        final other = isSource
+            ? (activity.toAccountId ?? fallback)
+            : (activity.accountId ?? fallback);
+        final name = accountById(other)?.name ?? 'account';
+        return isSource ? 'Transfer to $name' : 'Transfer from $name';
+      case ActivityType.income:
+        return activity.description.isEmpty ? 'Income' : activity.description;
+      case ActivityType.expense:
+        return activity.description.isEmpty ? 'Expense' : activity.description;
+      case ActivityType.loanOut:
+      case ActivityType.loanIn:
+      case ActivityType.loanRepayment:
+      case ActivityType.receivableRepayment:
+        final who = personById(activity.personId)?.name ?? 'someone';
+        return switch (activity.type) {
+          ActivityType.loanOut => 'Lent $who',
+          ActivityType.loanIn => 'Borrowed from $who',
+          ActivityType.loanRepayment => 'Repaid $who',
+          ActivityType.receivableRepayment => '$who repaid you',
+          _ => activity.type.label,
+        };
+    }
+  }
+
+  IconData _movementIcon(ActivityType type) => switch (type) {
+    ActivityType.transfer => PhosphorR.arrowsLeftRight,
+    ActivityType.income => PhosphorR.coins,
+    ActivityType.expense => PhosphorR.receipt,
+    ActivityType.loanOut ||
+    ActivityType.loanIn ||
+    ActivityType.loanRepayment ||
+    ActivityType.receivableRepayment => PhosphorR.users,
+  };
 
   Future<void> _persistAccounts({bool notify = true}) async {
     if (notify) notifyListeners();

@@ -149,3 +149,35 @@ class AccountBalance {
   final Account account;
   final double balance;
 }
+
+/// One signed line in an account's ledger — an expense, transfer, loan or
+/// income seen from *this* account's point of view. [delta] is positive for
+/// money that entered the account and negative for money that left it, so a row
+/// renders green/red straight from its sign.
+class AccountMovement {
+  const AccountMovement({
+    required this.date,
+    required this.title,
+    required this.subtitle,
+    required this.delta,
+    required this.icon,
+  });
+
+  final DateTime date;
+  final String title;
+  final String subtitle;
+  final double delta;
+  final IconData icon;
+
+  bool get isInflow => delta >= 0;
+}
+
+/// Money in vs out of one account over a period — the account's own cash-flow.
+class AccountFlow {
+  const AccountFlow({required this.inflow, required this.outflow});
+
+  final double inflow;
+  final double outflow;
+
+  double get net => inflow - outflow;
+}

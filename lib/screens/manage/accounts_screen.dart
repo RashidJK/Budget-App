@@ -9,6 +9,7 @@ import '../../widgets/app_background.dart';
 import '../../widgets/badge_icon.dart';
 import '../../widgets/inputs.dart';
 import '../../widgets/section_header.dart';
+import 'account_detail_screen.dart';
 
 /// Where the money lives — create and manage cash / bank / mobile-money
 /// accounts and their balances.
@@ -18,6 +19,11 @@ class AccountsScreen extends StatelessWidget {
   static Future<void> open(BuildContext context) => Navigator.of(context).push(
     MaterialPageRoute<void>(builder: (_) => const AccountsScreen()),
   );
+
+  /// Opens the create/edit sheet directly — used by the account detail screen's
+  /// "More" tab so editing lives in exactly one place.
+  static Future<void> edit(BuildContext context, Account account) =>
+      _AccountSheet.show(context, existing: account);
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +96,7 @@ class _AccountRow extends StatelessWidget {
     final color = account.of(context);
 
     return InkWell(
-      onTap: () => _AccountSheet.show(context, existing: account),
+      onTap: () => AccountDetailScreen.open(context, account.id),
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.all(16),

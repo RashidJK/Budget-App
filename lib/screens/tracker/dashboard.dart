@@ -15,6 +15,7 @@ import '../../widgets/badge_icon.dart';
 import '../../widgets/card_stack.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/stat.dart';
+import '../manage/account_detail_screen.dart';
 import '../manage/accounts_screen.dart';
 import '../manage/manage_screen.dart';
 import '../planner/planner_home.dart';
@@ -108,6 +109,8 @@ class DashboardScreen extends StatelessWidget {
                             CommandBar.show(context, initialText: 'Transfer '),
                         onHistory: () => _openHistory(context),
                         onManageAccounts: () => AccountsScreen.open(context),
+                        onOpenAccount: (id) =>
+                            AccountDetailScreen.open(context, id),
                       ),
                     ],
                   ),
@@ -539,29 +542,6 @@ class _HeroCardState extends State<_HeroCard> {
 /// The dark card's shared surface — gradient, top rim-light, layered shadow and
 /// brand under-glow — used by every card in the hero deck so they read as one
 /// stack.
-BoxDecoration heroCardDecoration() => BoxDecoration(
-  gradient: AppTheme.heroGradient,
-  borderRadius: BorderRadius.circular(26),
-  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-  boxShadow: [
-    BoxShadow(
-      color: Colors.black.withValues(alpha: 0.22),
-      blurRadius: 8,
-      offset: const Offset(0, 3),
-    ),
-    BoxShadow(
-      color: Colors.black.withValues(alpha: 0.16),
-      blurRadius: 28,
-      offset: const Offset(0, 14),
-    ),
-    BoxShadow(
-      color: AppTheme.brandGreen.withValues(alpha: 0.10),
-      blurRadius: 34,
-      offset: const Offset(0, 16),
-    ),
-  ],
-);
-
 /// The balance card in the hero deck — how much money there is and where it
 /// sits, across every account.
 class _BalanceCard extends StatelessWidget {
@@ -573,6 +553,7 @@ class _BalanceCard extends StatelessWidget {
     required this.onTransfer,
     required this.onHistory,
     required this.onManageAccounts,
+    required this.onOpenAccount,
   });
 
   final double total;
@@ -582,6 +563,7 @@ class _BalanceCard extends StatelessWidget {
   final VoidCallback onTransfer;
   final VoidCallback onHistory;
   final VoidCallback onManageAccounts;
+  final ValueChanged<String> onOpenAccount;
 
   @override
   Widget build(BuildContext context) {
@@ -650,7 +632,10 @@ class _BalanceCard extends StatelessWidget {
                 if (index == accounts.length) {
                   return _AccountChip.add(onTap: onManageAccounts);
                 }
-                return _AccountChip(balance: accounts[index]);
+                return _AccountChip(
+                  balance: accounts[index],
+                  onTap: () => onOpenAccount(accounts[index].account.id),
+                );
               },
             ),
           ),
@@ -669,7 +654,7 @@ class _BalanceCard extends StatelessWidget {
 
 /// A translucent wallet chip on the dark balance card.
 class _AccountChip extends StatelessWidget {
-  const _AccountChip({required this.balance}) : isAdd = false, onTap = null;
+  const _AccountChip({required this.balance, this.onTap}) : isAdd = false;
   const _AccountChip.add({required this.onTap}) : balance = null, isAdd = true;
 
   final AccountBalance? balance;
