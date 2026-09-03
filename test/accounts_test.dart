@@ -1,3 +1,4 @@
+import 'package:budget/command/command_parser.dart';
 import 'package:budget/models/account.dart';
 import 'package:budget/models/activity.dart';
 import 'package:budget/services/storage.dart';
@@ -132,5 +133,97 @@ void main() {
     expect(ranked.first.account.name, 'Bank');
     expect(ranked.first.balance, 500000);
     expect(state.totalBalance, 530000);
+  });
+
+  group('command-bar account attribution', () {
+    test('"spent 50000 on fuel from M-Pesa" leaves M-Pesa', () async {
+      final state = await _freshState();
+      await state.addAccount(
+        name: 'M-Pesa',
+        type: AccountType.mobileMoney,
+        openingBalance: 100000,
+      );
+      final mpesa = state.accounts.firstWhere((a) => a.name == 'M-Pesa');
+
+      final result = CommandParser(
+        state.parseContext(),
+      ).parse('spent 50000 on fuel from M-Pesa');
+      expect(result.kind, CommandKind.create);
+      expect(result.activity!.type, ActivityType.expense);
+      expect(result.activity!.accountId, mpesa.id);
+
+      await state.capture(result.activity!);
+      expect(state.accountBalance(mpesa.id), 50000);
+    });
+
+    test('"move 200000 from CRDB to M-Pesa" moves, total unchanged', () async {
+      final state = await _freshState();
+      await state.addAccount(
+        name: 'CRDB',
+        type: AccountType.bank,
+        openingBalance: 1000000,
+      );
+      await state.addAccount(
+        name: 'M-Pesa',
+        type: AccountType.mobileMoney,
+        openingBalance: 100000,
+      );
+      final crdb = state.accounts.firstWhere((a) => a.name == 'CRDB');
+      final mpesa = state.accounts.firstWhere((a) => a.name == 'M-Pesa');
+
+      final result = CommandParser(
+        state.parseContext(),
+      ).parse('move 200000 from CRDB to M-Pesa');
+      expect(result.activity!.type, ActivityType.transfer);
+      expect(result.activity!.accountId, crdb.id);
+      expect(result.activity!.toAccountId, mpesa.id);
+
+      await state.capture(result.activity!);
+      expect(state.accountBalance(crdb.id), 800000);
+      expect(state.accountBalance(mpesa.id), 300000);
+      expect(state.totalBalance, 1100000);
+    });
+
+    test('"received 500000 salary to bank" lands in the bank', () async {
+      final state = await _freshState();
+      await state.addAccount(name: 'NMB', type: AccountType.bank);
+      final nmb = state.accounts.firstWhere((a) => a.name == 'NMB');
+
+      final result = CommandParser(
+        state.parseContext(),
+      ).parse('received 500000 salary to bank');
+      expect(result.activity!.type, ActivityType.income);
+      expect(result.activity!.accountId, nmb.id);
+
+      await state.capture(result.activity!);
+      expect(state.accountBalance(nmb.id), 500000);
+    });
+
+    test('"I lent John 100000 from cash" leaves cash, John owes', () async {
+      final state = await _freshState();
+      final cash = state.accounts.single;
+      await state.updateAccount(cash.copyWith(openingBalance: 200000));
+
+      final result = CommandParser(
+        state.parseContext(),
+      ).parse('I lent John 100000 from cash');
+      expect(result.activity!.type, ActivityType.loanOut);
+      expect(result.activity!.accountId, cash.id);
+
+      await state.capture(result.activity!);
+      expect(state.accountBalance(cash.id), 100000);
+      expect(state.balanceWith(state.people.single.id), 100000);
+    });
+
+    test('an amount with no account lands in the default account', () async {
+      final state = await _freshState();
+      final cash = state.accounts.single;
+
+      final result = CommandParser(state.parseContext()).parse('5000 lunch');
+      expect(result.activity!.accountId, isNull);
+
+      await state.capture(result.activity!);
+      expect(state.accountBalance(cash.id), -5000);
+    });
   });
 }

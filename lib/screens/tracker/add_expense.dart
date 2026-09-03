@@ -43,6 +43,7 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
 
   late String _categoryId;
   late String _profileId;
+  late String _accountId;
   late DateTime _date;
   late List<String> _attachments;
 
@@ -73,6 +74,7 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
         existing?.categoryId ??
         (state.categories.isEmpty ? 'other' : state.categories.first.id);
     _profileId = existing?.profileId ?? state.defaultProfileId;
+    _accountId = existing?.accountId ?? state.defaultAccountId;
     _date = existing?.date ?? DateTime.now();
     _parsedAmount = existing?.amount ?? 0;
     _attachments = List.of(existing?.attachments ?? const []);
@@ -136,6 +138,7 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
         amount: _parsedAmount,
         categoryId: _categoryId,
         profileId: _profileId,
+        accountId: _accountId,
         date: _date,
         note: _note.text.trim(),
         attachments: _attachments,
@@ -148,6 +151,7 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
           amount: _parsedAmount,
           categoryId: _categoryId,
           profileId: _profileId,
+          accountId: _accountId,
           date: _date,
           note: _note.text.trim(),
           attachments: _attachments,
@@ -280,6 +284,13 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
               selectedId: _profileId,
               onChanged: (id) => setState(() => _profileId = id),
             ),
+            if (context.watch<AppState>().accounts.length > 1) ...[
+              const SizedBox(height: 16),
+              AccountPicker(
+                selectedId: _accountId,
+                onChanged: (id) => setState(() => _accountId = id),
+              ),
+            ],
             const SizedBox(height: 16),
             InkWell(
               onTap: _pickDate,

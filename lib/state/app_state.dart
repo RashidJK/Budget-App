@@ -722,9 +722,43 @@ class AppState extends ChangeNotifier {
       profileMatches: {
         for (final profile in _profiles) profile.name.toLowerCase(): profile.id,
       },
+      accountMatches: _accountMatches(),
       merchantCategories: Map.of(_merchantCategories),
       defaultProfileId: defaultProfileId,
     );
+  }
+
+  /// Spoken account names/aliases → id, so the parser can attribute "from
+  /// M-Pesa". Each account is matched by its own name (spaces/hyphens squashed)
+  /// and by the common spoken aliases for its type.
+  Map<String, String> _accountMatches() {
+    final map = <String, String>{};
+    void add(String key, String id) {
+      final k = key.toLowerCase();
+      map.putIfAbsent(k, () => id);
+      map.putIfAbsent(k.replaceAll(RegExp(r'[\s\-]'), ''), () => id);
+    }
+
+    for (final account in accounts) {
+      add(account.name, account.id);
+      switch (account.type) {
+        case AccountType.cash:
+          add('cash', account.id);
+        case AccountType.mobileMoney:
+          for (final a in ['mpesa', 'm-pesa', 'mobile money', 'mobile']) {
+            add(a, account.id);
+          }
+        case AccountType.bank:
+          add('bank', account.id);
+        case AccountType.card:
+          for (final a in ['card', 'credit card', 'visa']) {
+            add(a, account.id);
+          }
+        case AccountType.other:
+          break;
+      }
+    }
+    return map;
   }
 
   /// Remembers that [merchant] was filed under [categoryId], so the next
@@ -765,7 +799,7 @@ class AppState extends ChangeNotifier {
         amount: parsed.amount,
         categoryId: parsed.categoryId ?? 'other',
         profileId: parsed.profileId ?? defaultProfileId,
-        accountId: defaultAccountId,
+        accountId: parsed.accountId ?? defaultAccountId,
         date: parsed.date,
         updatedAt: DateTime.now(),
         note: parsed.merchant != null && parsed.description != parsed.merchant
@@ -796,7 +830,8 @@ class AppState extends ChangeNotifier {
       description: parsed.description,
       categoryId: parsed.categoryId,
       profileId: parsed.profileId ?? defaultProfileId,
-      accountId: defaultAccountId,
+      accountId: parsed.accountId ?? defaultAccountId,
+      toAccountId: parsed.toAccountId,
       paymentMethod: parsed.paymentMethod,
       sourceAccount: parsed.sourceAccount,
       destinationAccount: parsed.destinationAccount,

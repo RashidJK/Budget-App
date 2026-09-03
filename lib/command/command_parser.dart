@@ -42,6 +42,7 @@ class ParseContext {
     this.loanNetByPersonKey = const {},
     this.knownCategoryIds = const {},
     this.profileMatches = const {},
+    this.accountMatches = const {},
     this.merchantCategories = const {},
     this.defaultProfileId = 'personal',
   });
@@ -59,6 +60,10 @@ class ParseContext {
 
   /// Lowercased profile name/alias → profile id, for "Flow-HQ paid …" (§24).
   final Map<String, String> profileMatches;
+
+  /// Lowercased account name/alias → account id, so "paid … from M-Pesa" and
+  /// "move X from CRDB to NMB" attribute to the real accounts.
+  final Map<String, String> accountMatches;
 
   /// Learned lowercased merchant → category id, so a merchant seen before is
   /// categorised the same way next time (spec §5).
@@ -116,6 +121,8 @@ class ParsedActivity {
     this.description = '',
     this.categoryId,
     this.profileId,
+    this.accountId,
+    this.toAccountId,
     this.personName,
     this.sourceAccount,
     this.destinationAccount,
@@ -130,6 +137,12 @@ class ParsedActivity {
   final String description;
   final String? categoryId;
   final String? profileId;
+
+  /// Resolved account ids: the account the money moves out of / into, and — for
+  /// a transfer — its destination.
+  final String? accountId;
+  final String? toAccountId;
+
   final String? personName;
   final String? sourceAccount;
   final String? destinationAccount;
@@ -152,6 +165,8 @@ class ParsedActivity {
       description: description,
       categoryId: categoryId ?? this.categoryId,
       profileId: profileId ?? this.profileId,
+      accountId: accountId,
+      toAccountId: toAccountId,
       personName: personName,
       sourceAccount: sourceAccount,
       destinationAccount: destinationAccount,
@@ -368,6 +383,22 @@ class CommandParser {
         ? _guessCategory(lower, merchant)
         : null;
 
+    // Attribute to real accounts. A transfer moves source → destination;
+    // money in lands in the destination account, money out leaves the source.
+    final (sourceId, destId) = _resolveAccountIds(lower);
+    final String? accountId;
+    final String? toAccountId;
+    if (type == ActivityType.transfer) {
+      accountId = sourceId;
+      toAccountId = destId;
+    } else if (type.isInflow) {
+      accountId = destId ?? sourceId;
+      toAccountId = null;
+    } else {
+      accountId = sourceId ?? destId;
+      toAccountId = null;
+    }
+
     return ParsedCommand(
       kind: CommandKind.create,
       rawText: raw,
@@ -380,6 +411,8 @@ class CommandParser {
         description: description,
         categoryId: categoryId,
         profileId: profileId ?? context.defaultProfileId,
+        accountId: accountId,
+        toAccountId: toAccountId,
         personName: person,
         sourceAccount: accounts.from,
         destinationAccount: accounts.to,
@@ -402,6 +435,7 @@ class CommandParser {
     // one's own holdings. A withdrawal (bank → cash) and a deposit (cash →
     // bank) are transfers too, not spending or earning (spec §6, §34).
     if (accounts.isComplete ||
+        _matches(lower, r'\bmove\b') ||
         _containsAny(lower, [
           'transfer',
           'transferred',
@@ -715,6 +749,39 @@ class CommandParser {
       if (word != 'account') {
         return word[0].toUpperCase() + word.substring(1);
       }
+    }
+    return null;
+  }
+
+  /// Resolves the "from/with/using" (source) and "to/into" (destination)
+  /// account phrases to real account ids, against the user's actual accounts.
+  (String?, String?) _resolveAccountIds(String lower) {
+    final source = _matchAccountId(
+      RegExp(
+        r'\b(?:from|with|using|via|out of|paid with)\s+(?:my\s+)?'
+        r'([a-z][a-z\-]*(?:\s+[a-z]+){0,2})',
+      ).firstMatch(lower)?.group(1),
+    );
+    final dest = _matchAccountId(
+      RegExp(
+        r'\b(?:to|into)\s+(?:my\s+)?([a-z][a-z\-]*(?:\s+[a-z]+){0,2})',
+      ).firstMatch(lower)?.group(1),
+    );
+    return (source, dest);
+  }
+
+  /// Matches a spoken account phrase against the user's accounts, longest
+  /// prefix first ("nmb bank" before "nmb"), tolerating spaces/hyphens. Only
+  /// fires on a real account name, so "from John" never mis-attributes.
+  String? _matchAccountId(String? phrase) {
+    if (phrase == null) return null;
+    final words = phrase.trim().toLowerCase().split(RegExp(r'\s+'));
+    for (var take = words.length; take >= 1; take--) {
+      final cand = words.take(take).join(' ');
+      final id =
+          context.accountMatches[cand] ??
+          context.accountMatches[cand.replaceAll(RegExp(r'[\s\-]'), '')];
+      if (id != null) return id;
     }
     return null;
   }

@@ -389,6 +389,64 @@ class _AddChip extends StatelessWidget {
 ///
 /// Hidden entirely when only one profile exists — a chooser with a single
 /// option is noise on a form the user fills in several times a day.
+/// Chips to choose which money account a record touches. Hidden until there's
+/// more than one account — a single-account user has no choice to make.
+class AccountPicker extends StatelessWidget {
+  const AccountPicker({
+    super.key,
+    required this.selectedId,
+    required this.onChanged,
+    this.label = 'Account',
+  });
+
+  final String selectedId;
+  final ValueChanged<String> onChanged;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final accounts = context.watch<AppState>().accounts;
+    if (accounts.length < 2) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: context.muted,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final account in accounts)
+              ChoiceChip(
+                label: Text(account.name),
+                avatar: Icon(
+                  account.icon,
+                  size: 16,
+                  color: account.of(context),
+                ),
+                selected: account.id == selectedId,
+                showCheckmark: false,
+                onSelected: (_) => onChanged(account.id),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: context.hairline),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 class ProfilePicker extends StatelessWidget {
   const ProfilePicker({
     super.key,
