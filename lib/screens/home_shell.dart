@@ -109,7 +109,7 @@ class _HomeShellState extends State<HomeShell> {
       bottomNavigationBar: MorphNavBar(
         activeIndex: _index,
         onSelect: _select,
-        actions: captureActions(context),
+        onCapture: (text) => captureFromText(context, text),
         items: const [
           MorphNavItem(
             icon: PhosphorR.squaresFour,

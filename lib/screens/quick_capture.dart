@@ -1,40 +1,67 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
+import 'package:provider/provider.dart';
 
 import '../command/command_bar.dart';
-import '../models/phosphor.dart';
-import '../theme.dart';
-import '../widgets/morph_nav_bar.dart';
-import 'tracker/add_expense.dart';
+import '../command/command_parser.dart';
+import '../models/activity.dart';
+import '../services/format.dart';
+import '../state/app_state.dart';
 
-/// The universal capture menu that rises from the nav bar's "+". Capture-first
-/// (spec §4): the same set of quick actions from every screen, so logging money
-/// is one tap away wherever you are.
+/// Capture the nav bar's inline prompt. Parses [text] with the same NL parser
+/// as the command bar and records it straight away, with an Undo snackbar —
+/// capture-first (spec §4), without leaving the bar.
 ///
-/// Shared by the home shell and the account detail screen so the "+" behaves
-/// identically as the bar morphs around it.
-List<MorphAction> captureActions(BuildContext context) => [
-  MorphAction(
-    icon: PhosphorR.plus,
-    label: 'Add expense',
-    accent: context.scheme.primary,
-    onTap: () => AddExpenseSheet.show(context),
-  ),
-  MorphAction(
-    icon: PhosphorR.arrowDownLeft,
-    label: 'Income',
-    accent: context.good,
-    onTap: () => CommandBar.show(context, initialText: 'Received '),
-  ),
-  MorphAction(
-    icon: PhosphorR.arrowsLeftRight,
-    label: 'Transfer',
-    accent: const Color(0xFF7C6BF5),
-    onTap: () => CommandBar.show(context, initialText: 'Transfer '),
-  ),
-  MorphAction(
-    icon: PhosphorR.receipt,
-    label: 'Scan or type',
-    accent: context.caution,
-    onTap: () => CommandBar.show(context),
-  ),
-];
+/// Anything that isn't a plain record (a question, a plan) hands off to the full
+/// command bar so those flows still work. Returns true when handled, so the bar
+/// can close its prompt.
+Future<bool> captureFromText(BuildContext context, String text) async {
+  final trimmed = text.trim();
+  if (trimmed.isEmpty) return false;
+
+  final state = context.read<AppState>();
+  final parsed = CommandParser(state.parseContext()).parse(trimmed);
+  final activity = parsed.activity;
+
+  if (parsed.kind != CommandKind.create || activity == null) {
+    // Not a straight record — let the full command bar handle it.
+    CommandBar.show(context, initialText: trimmed);
+    return true;
+  }
+
+  final result = await state.capture(
+    activity,
+    source: ActivitySource.command,
+    confidence: parsed.confidence,
+  );
+  if (!context.mounted) return true;
+
+  HapticFeedback.lightImpact();
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        content: Text(_summaryFor(activity)),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => state.undoCapture(result),
+        ),
+      ),
+    );
+  return true;
+}
+
+/// A one-line confirmation of what just landed, e.g. "Added Lunch · −TSh 5,000".
+String _summaryFor(ParsedActivity activity) {
+  final money = Money.format(activity.amount);
+  final label = activity.description.isNotEmpty
+      ? activity.description
+      : activity.type.label;
+  return switch (activity.type) {
+    ActivityType.income ||
+    ActivityType.loanIn ||
+    ActivityType.receivableRepayment => 'Added $label · +$money',
+    ActivityType.transfer => 'Transferred $money',
+    _ => 'Added $label · −$money',
+  };
+}

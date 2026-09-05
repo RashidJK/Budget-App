@@ -124,7 +124,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       bottomNavigationBar: MorphNavBar(
         activeIndex: _tab,
         onSelect: _select,
-        actions: captureActions(context),
+        onCapture: (text) => captureFromText(context, text),
         items: const [
           MorphNavItem(
             icon: PhosphorR.squaresFour,
