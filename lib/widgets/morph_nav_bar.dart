@@ -3,7 +3,6 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
 
-import '../models/phosphor.dart';
 import '../theme.dart';
 
 /// One destination in a [MorphNavBar]'s island.
@@ -331,9 +330,7 @@ class _PromptIsland extends StatelessWidget {
     return _IslandShell(
       child: Row(
         children: [
-          const SizedBox(width: 8),
-          Icon(PhosphorR.lightning, size: 20, color: context.scheme.primary),
-          const SizedBox(width: 10),
+          const SizedBox(width: 16),
           Expanded(
             child: TextField(
               controller: controller,
@@ -344,9 +341,19 @@ class _PromptIsland extends StatelessWidget {
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
+              // Fully transparent so the island's frosted glass shows through —
+              // no solid fill, no focus border painting over it.
               decoration: InputDecoration(
                 isCollapsed: true,
+                filled: false,
+                fillColor: Colors.transparent,
+                contentPadding: EdgeInsets.zero,
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
                 hintText: hint,
                 hintStyle: TextStyle(
                   color: context.muted,
@@ -398,45 +405,88 @@ class _RightButton extends StatelessWidget {
       label: capturing ? 'Back to ${backItem.label}' : 'Add or capture',
       child: GestureDetector(
         onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 240),
-          curve: Curves.easeOutCubic,
+        child: SizedBox(
           width: 60,
           height: 60,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: capturing ? null : AppTheme.brandGradient,
-            color: capturing ? context.card : null,
-            border: capturing ? Border.all(color: context.hairline) : null,
-            boxShadow: [
-              BoxShadow(
-                color: capturing
-                    ? Colors.black.withValues(alpha: context.isDark ? 0.3 : 0.1)
-                    : AppTheme.brandGreen.withValues(alpha: 0.42),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
           child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
+            duration: const Duration(milliseconds: 240),
             transitionBuilder: (child, anim) => ScaleTransition(
               scale: anim,
               child: FadeTransition(opacity: anim, child: child),
             ),
             child: capturing
-                ? Icon(
-                    backItem.activeIcon,
-                    key: ValueKey('back-${backItem.label}'),
-                    color: backItem.accent ?? context.scheme.primary,
-                    size: 24,
+                ? _GlassCircle(
+                    key: const ValueKey('back'),
+                    child: Icon(
+                      backItem.activeIcon,
+                      color: backItem.accent ?? context.scheme.primary,
+                      size: 24,
+                    ),
                   )
-                : const Icon(
-                    Icons.add_rounded,
-                    key: ValueKey('add'),
-                    color: Colors.white,
-                    size: 30,
+                : Container(
+                    key: const ValueKey('add'),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: AppTheme.brandGradient,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.brandGreen.withValues(alpha: 0.42),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.add_rounded,
+                      color: Colors.white,
+                      size: 30,
+                    ),
                   ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A frosted-glass circle matching the island shell — used for the "back"
+/// button so it reads as the same material as the bar.
+class _GlassCircle extends StatelessWidget {
+  const _GlassCircle({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = context.isDark;
+    final fill = dark
+        ? const Color(0xFF232322).withValues(alpha: 0.62)
+        : Colors.white.withValues(alpha: 0.72);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: dark ? 0.3 : 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: Container(
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: fill,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: dark ? 0.14 : 0.6),
+              ),
+            ),
+            child: child,
           ),
         ),
       ),
