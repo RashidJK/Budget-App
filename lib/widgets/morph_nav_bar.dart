@@ -22,23 +22,19 @@ class MorphNavItem {
   final Color? accent;
 }
 
-/// The app's bottom navigation, in two floating islands:
+/// The app's bottom navigation as islands and circles.
 ///
-///   ┌ destinations ─────────┐   ╭───╮
-///   │ ▣  ▤   ◐   ▥ │        │ + │
-///   └───────────────────────┘   ╰───╯
+/// At rest: a **nav island** (the destinations, active one expanded) on the
+/// left, and one **right island** holding two circles — the **+** and a
+/// **Functions** circle.
 ///
-/// The left island holds the destinations; only the *selected* one expands to
-/// show its label, the rest sit as bare icons.
-///
-/// Press the "+" and the bar **turns into capture in place**: the left island
-/// *becomes* an expense prompt (type "5000 lunch", "received 500k salary", "move
-/// 200k to mpesa" — the parser sorts the rest) and the right circle flips to the
-/// icon of the tab you were on, so one tap takes you back where you were. No
-/// modal, no dimming — the bar itself is the prompt.
-///
-/// It's context-aware: each screen hands it different [items], so the islands
-/// morph per screen (inside an account they become that account's destinations).
+/// Tap **+** and it opens the capture prompt directly: the island splits, the
+/// nav collapses to the current-tab dot, and the prompt takes the middle.
+/// Tap **Functions** and the island splits into separate circles as it expands
+/// into contextual controls (back · forward · more). Either way the tab-dot is
+/// one tap back to where you were.
+enum _Mode { rest, add, fn }
+
 class MorphNavBar extends StatefulWidget {
   const MorphNavBar({
     super.key,
@@ -64,7 +60,7 @@ class MorphNavBar extends StatefulWidget {
 }
 
 class _MorphNavBarState extends State<MorphNavBar> {
-  bool _capturing = false;
+  _Mode _mode = _Mode.rest;
   final _controller = TextEditingController();
   final _focus = FocusNode();
 
@@ -75,85 +71,259 @@ class _MorphNavBarState extends State<MorphNavBar> {
     super.dispose();
   }
 
-  void _startCapture() {
+  void _toRest() {
+    _focus.unfocus();
+    _controller.clear();
+    setState(() => _mode = _Mode.rest);
+  }
+
+  void _toAdd() {
     HapticFeedback.lightImpact();
-    setState(() => _capturing = true);
+    setState(() => _mode = _Mode.add);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focus.requestFocus();
     });
   }
 
-  void _endCapture() {
-    _focus.unfocus();
-    _controller.clear();
-    setState(() => _capturing = false);
+  void _toFn() {
+    HapticFeedback.lightImpact();
+    setState(() => _mode = _Mode.fn);
   }
 
   Future<void> _submit() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
     final handled = await widget.onCapture(text);
-    if (handled && mounted) _endCapture();
+    if (handled && mounted) _toRest();
   }
 
   @override
   Widget build(BuildContext context) {
-    // A bottomNavigationBar doesn't rise for the keyboard on its own, so lift
-    // the bar by the keyboard inset while capturing — the prompt stays in view.
-    final insets = MediaQuery.viewInsetsOf(context).bottom;
-    final activeItem = widget.items[widget.activeIndex.clamp(
+    final insets = _mode == _Mode.add
+        ? MediaQuery.viewInsetsOf(context).bottom
+        : 0.0;
+    final active = widget.items[widget.activeIndex.clamp(
       0,
       widget.items.length - 1,
     )];
 
+    final row = switch (_mode) {
+      _Mode.rest => Row(
+        key: const ValueKey('rest'),
+        children: [
+          Expanded(child: _navIsland()),
+          const SizedBox(width: 12),
+          _groupedRight(),
+        ],
+      ),
+      // Capture is exactly the prompt as before: the wide prompt island with
+      // the "back to your tab" circle on the right — nothing else.
+      _Mode.add => Row(
+        key: const ValueKey('add'),
+        children: [
+          Expanded(child: _promptIsland()),
+          const SizedBox(width: 12),
+          _tabDot(active),
+        ],
+      ),
+      _Mode.fn => Row(
+        key: const ValueKey('fn'),
+        children: [
+          _tabDot(active),
+          const SizedBox(width: 12),
+          _AddCircle(onTap: _toAdd),
+          const SizedBox(width: 12),
+          Expanded(child: _functionsIsland()),
+        ],
+      ),
+    };
+
     return SafeArea(
       top: false,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(16, 0, 16, 12 + (_capturing ? insets : 0)),
-        child: Row(
-          children: [
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 260),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInCubic,
-                child: _capturing
-                    ? _PromptIsland(
-                        key: const ValueKey('prompt'),
-                        controller: _controller,
-                        focus: _focus,
-                        hint: widget.captureHint,
-                        onSubmit: _submit,
-                      )
-                    : _DestinationIsland(
-                        key: const ValueKey('destinations'),
-                        items: widget.items,
-                        activeIndex: widget.activeIndex,
-                        onSelect: widget.onSelect,
-                      ),
+        padding: EdgeInsets.fromLTRB(16, 0, 16, 12 + insets),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, anim) => FadeTransition(
+            opacity: anim,
+            child: ScaleTransition(
+              scale: Tween(begin: 0.96, end: 1.0).animate(anim),
+              child: child,
+            ),
+          ),
+          child: row,
+        ),
+      ),
+    );
+  }
+
+  // --- rest -----------------------------------------------------------------
+
+  Widget _navIsland() {
+    return _IslandShell(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          for (var i = 0; i < widget.items.length; i++)
+            _MorphTab(
+              data: widget.items[i],
+              selected: i == widget.activeIndex,
+              onTap: () => widget.onSelect(i),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// The right island at rest: the + and the Functions circle, grouped.
+  Widget _groupedRight() {
+    return _IslandShell(
+      padding: const EdgeInsets.symmetric(horizontal: 7),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _AddCircle(onTap: _toAdd, size: 46),
+          const SizedBox(width: 8),
+          _FnCircle(onTap: _toFn, glass: false),
+        ],
+      ),
+    );
+  }
+
+  // --- add ------------------------------------------------------------------
+
+  Widget _promptIsland() {
+    return _IslandShell(
+      child: Row(
+        children: [
+          const SizedBox(width: 16),
+          Expanded(
+            child: TextField(
+              controller: _controller,
+              focusNode: _focus,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _submit(),
+              cursorColor: AppTheme.brandGreen,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+              decoration: InputDecoration(
+                isCollapsed: true,
+                filled: false,
+                fillColor: Colors.transparent,
+                contentPadding: EdgeInsets.zero,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                hintText: widget.captureHint,
+                hintStyle: TextStyle(
+                  color: context.muted,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
-            const SizedBox(width: 12),
-            _RightButton(
-              capturing: _capturing,
-              // While capturing, the circle wears the icon of the tab you left,
-              // so it reads as "back to Home / Planner / …".
-              backItem: activeItem,
-              onTap: _capturing ? _endCapture : _startCapture,
-            ),
-          ],
+          ),
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _controller,
+            builder: (context, value, _) {
+              final ready = value.text.trim().isNotEmpty;
+              return IconButton(
+                onPressed: ready ? _submit : null,
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                  Icons.arrow_upward_rounded,
+                  size: 22,
+                  color: ready ? AppTheme.brandGreen : context.muted,
+                ),
+                tooltip: 'Record',
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- fn -------------------------------------------------------------------
+
+  Widget _functionsIsland() {
+    return _IslandShell(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _fnAction(
+            Icons.chevron_left_rounded,
+            'Back',
+            onTap: _toRest,
+          ),
+          _fnAction(Icons.chevron_right_rounded, 'Forward', onTap: null),
+          _fnAction(Icons.more_horiz_rounded, 'More', onTap: () {}),
+        ],
+      ),
+    );
+  }
+
+  Widget _fnAction(IconData icon, String label, {VoidCallback? onTap}) {
+    final enabled = onTap != null;
+    return Semantics(
+      button: true,
+      label: label,
+      child: InkResponse(
+        onTap: enabled
+            ? () {
+                HapticFeedback.selectionClick();
+                onTap();
+              }
+            : null,
+        radius: 26,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Icon(
+            icon,
+            size: 24,
+            color: enabled
+                ? context.scheme.onSurface
+                : context.scheme.onSurface.withValues(alpha: 0.3),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- shared circles -------------------------------------------------------
+
+  Widget _tabDot(MorphNavItem item) {
+    return Semantics(
+      button: true,
+      label: 'Back to ${item.label}',
+      child: GestureDetector(
+        onTap: _toRest,
+        child: _GlassCircle(
+          child: Icon(
+            item.activeIcon,
+            color: item.accent ?? context.scheme.primary,
+            size: 24,
+          ),
         ),
       ),
     );
   }
 }
 
-/// Shared glass treatment for the island, so the destinations and the prompt
-/// read as the same surface morphing.
+/// Shared frosted-glass shell for an island or a wide segment.
 class _IslandShell extends StatelessWidget {
-  const _IslandShell({required this.child});
+  const _IslandShell({
+    required this.child,
+    this.padding = const EdgeInsets.symmetric(horizontal: 6),
+  });
 
   final Widget child;
+  final EdgeInsets padding;
 
   @override
   Widget build(BuildContext context) {
@@ -164,7 +334,7 @@ class _IslandShell extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: dark ? 0.3 : 0.08),
@@ -174,15 +344,15 @@ class _IslandShell extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(30),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
           child: Container(
             height: 60,
-            padding: const EdgeInsets.symmetric(horizontal: 6),
+            padding: padding,
             decoration: BoxDecoration(
               color: fill,
-              borderRadius: BorderRadius.circular(26),
+              borderRadius: BorderRadius.circular(30),
               border: Border.all(
                 color: Colors.white.withValues(alpha: dark ? 0.14 : 0.6),
               ),
@@ -190,37 +360,6 @@ class _IslandShell extends StatelessWidget {
             child: child,
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// The left island in its normal state — destinations, active one expanded.
-class _DestinationIsland extends StatelessWidget {
-  const _DestinationIsland({
-    super.key,
-    required this.items,
-    required this.activeIndex,
-    required this.onSelect,
-  });
-
-  final List<MorphNavItem> items;
-  final int activeIndex;
-  final ValueChanged<int> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return _IslandShell(
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          for (var i = 0; i < items.length; i++)
-            _MorphTab(
-              data: items[i],
-              selected: i == activeIndex,
-              onTap: () => onSelect(i),
-            ),
-        ],
       ),
     );
   }
@@ -254,14 +393,12 @@ class _MorphTab extends StatelessWidget {
           HapticFeedback.selectionClick();
           onTap();
         },
-        // The outer Semantics already carries the label + selected state; hide
-        // the inner icon/label so the tab is a single accessible node.
         child: ExcludeSemantics(
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 260),
             curve: Curves.easeOutCubic,
             padding: EdgeInsets.symmetric(
-              horizontal: selected ? 14 : 11,
+              horizontal: selected ? 13 : 9,
               vertical: 9,
             ),
             decoration: BoxDecoration(
@@ -278,7 +415,6 @@ class _MorphTab extends StatelessWidget {
                   size: 22,
                   color: color,
                 ),
-                // The label reveals only when selected, animating pill width.
                 AnimatedSize(
                   duration: const Duration(milliseconds: 260),
                   curve: Curves.easeOutCubic,
@@ -310,149 +446,88 @@ class _MorphTab extends StatelessWidget {
   }
 }
 
-/// The left island in capture mode — the expense prompt, in place.
-class _PromptIsland extends StatelessWidget {
-  const _PromptIsland({
-    super.key,
-    required this.controller,
-    required this.focus,
-    required this.hint,
-    required this.onSubmit,
-  });
+/// The green brand "+" circle.
+class _AddCircle extends StatelessWidget {
+  const _AddCircle({required this.onTap, this.size = 60});
 
-  final TextEditingController controller;
-  final FocusNode focus;
-  final String hint;
-  final VoidCallback onSubmit;
-
-  @override
-  Widget build(BuildContext context) {
-    return _IslandShell(
-      child: Row(
-        children: [
-          const SizedBox(width: 16),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              focusNode: focus,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => onSubmit(),
-              cursorColor: AppTheme.brandGreen,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-              // Fully transparent so the island's frosted glass shows through —
-              // no solid fill, no focus border painting over it.
-              decoration: InputDecoration(
-                isCollapsed: true,
-                filled: false,
-                fillColor: Colors.transparent,
-                contentPadding: EdgeInsets.zero,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                disabledBorder: InputBorder.none,
-                errorBorder: InputBorder.none,
-                focusedErrorBorder: InputBorder.none,
-                hintText: hint,
-                hintStyle: TextStyle(
-                  color: context.muted,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ),
-          // The send affordance lights up once there's something to record.
-          ValueListenableBuilder<TextEditingValue>(
-            valueListenable: controller,
-            builder: (context, value, _) {
-              final ready = value.text.trim().isNotEmpty;
-              return IconButton(
-                onPressed: ready ? onSubmit : null,
-                visualDensity: VisualDensity.compact,
-                icon: Icon(
-                  Icons.arrow_upward_rounded,
-                  size: 22,
-                  color: ready ? AppTheme.brandGreen : context.muted,
-                ),
-                tooltip: 'Record',
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The right island. Normally the universal "+"; while capturing it wears the
-/// icon of the tab you came from, as a one-tap way back.
-class _RightButton extends StatelessWidget {
-  const _RightButton({
-    required this.capturing,
-    required this.backItem,
-    required this.onTap,
-  });
-
-  final bool capturing;
-  final MorphNavItem backItem;
   final VoidCallback onTap;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: capturing ? 'Back to ${backItem.label}' : 'Add or capture',
+      label: 'Add or capture',
       child: GestureDetector(
-        onTap: onTap,
-        child: SizedBox(
-          width: 60,
-          height: 60,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 240),
-            transitionBuilder: (child, anim) => ScaleTransition(
-              scale: anim,
-              child: FadeTransition(opacity: anim, child: child),
-            ),
-            child: capturing
-                ? _GlassCircle(
-                    key: const ValueKey('back'),
-                    child: Icon(
-                      backItem.activeIcon,
-                      color: backItem.accent ?? context.scheme.primary,
-                      size: 24,
-                    ),
-                  )
-                : Container(
-                    key: const ValueKey('add'),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: AppTheme.brandGradient,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.brandGreen.withValues(alpha: 0.42),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.add_rounded,
-                      color: Colors.white,
-                      size: 30,
-                    ),
-                  ),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: AppTheme.brandGradient,
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.brandGreen.withValues(alpha: 0.42),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
+              ),
+            ],
           ),
+          child: Icon(Icons.add_rounded, color: Colors.white, size: size * 0.5),
         ),
       ),
     );
   }
 }
 
-/// A frosted-glass circle matching the island shell — used for the "back"
-/// button so it reads as the same material as the bar.
+/// The Functions circle — a "⋯" that opens contextual controls.
+class _FnCircle extends StatelessWidget {
+  const _FnCircle({required this.onTap, required this.glass});
+
+  final VoidCallback onTap;
+
+  /// A standalone frosted circle (true), or a tinted disc inside the grouped
+  /// island (false).
+  final bool glass;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = Icon(
+      Icons.more_horiz_rounded,
+      size: 24,
+      color: context.muted,
+    );
+    return Semantics(
+      button: true,
+      label: 'Functions',
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: glass
+            ? _GlassCircle(child: icon)
+            : Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: context.scheme.onSurface.withValues(alpha: 0.06),
+                ),
+                child: icon,
+              ),
+      ),
+    );
+  }
+}
+
+/// A frosted-glass circle matching the island shell.
 class _GlassCircle extends StatelessWidget {
-  const _GlassCircle({super.key, required this.child});
+  const _GlassCircle({required this.child});
 
   final Widget child;
 
@@ -478,6 +553,8 @@ class _GlassCircle extends StatelessWidget {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
           child: Container(
+            width: 60,
+            height: 60,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
