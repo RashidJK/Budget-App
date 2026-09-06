@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
@@ -59,19 +60,34 @@ class MorphNavBar extends StatefulWidget {
   State<MorphNavBar> createState() => _MorphNavBarState();
 }
 
-class _MorphNavBarState extends State<MorphNavBar> {
+class _MorphNavBarState extends State<MorphNavBar>
+    with SingleTickerProviderStateMixin {
   _Mode _mode = _Mode.rest;
   final _controller = TextEditingController();
   final _focus = FocusNode();
 
+  // Drives the Siri-style gradient stroke around the prompt while capturing.
+  late final AnimationController _stroke;
+
+  @override
+  void initState() {
+    super.initState();
+    _stroke = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2600),
+    );
+  }
+
   @override
   void dispose() {
+    _stroke.dispose();
     _controller.dispose();
     _focus.dispose();
     super.dispose();
   }
 
   void _toRest() {
+    _stroke.stop();
     _focus.unfocus();
     _controller.clear();
     setState(() => _mode = _Mode.rest);
@@ -79,6 +95,9 @@ class _MorphNavBarState extends State<MorphNavBar> {
 
   void _toAdd() {
     HapticFeedback.lightImpact();
+    _stroke
+      ..value = 0
+      ..repeat();
     setState(() => _mode = _Mode.add);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focus.requestFocus();
@@ -86,6 +105,7 @@ class _MorphNavBarState extends State<MorphNavBar> {
   }
 
   void _toFn() {
+    _stroke.stop();
     HapticFeedback.lightImpact();
     setState(() => _mode = _Mode.fn);
   }
@@ -121,7 +141,9 @@ class _MorphNavBarState extends State<MorphNavBar> {
       _Mode.add => Row(
         key: const ValueKey('add'),
         children: [
-          Expanded(child: _promptIsland()),
+          Expanded(
+            child: _SiriStroke(t: _stroke, child: _promptIsland()),
+          ),
           const SizedBox(width: 12),
           _tabDot(active),
         ],
@@ -514,6 +536,75 @@ class _FnCircle extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A Siri-style stroke: a multi-hue sweep gradient that rotates around the
+/// prompt's edge with a soft outer glow, so the capture field feels "listening".
+class _SiriStroke extends StatelessWidget {
+  const _SiriStroke({required this.t, required this.child});
+
+  final Animation<double> t;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: t,
+      builder: (context, inner) => CustomPaint(
+        foregroundPainter: _StrokePainter(t.value),
+        child: inner,
+      ),
+      child: child,
+    );
+  }
+}
+
+class _StrokePainter extends CustomPainter {
+  _StrokePainter(this.t);
+
+  final double t;
+
+  // Brand green flowing through teal, cyan and indigo and back — Siri-ish, but
+  // anchored to the app's green.
+  static const _colors = [
+    Color(0xFF97E29E),
+    Color(0xFF3CA98B),
+    Color(0xFF33B1E0),
+    Color(0xFF6C7BF5),
+    Color(0xFF97E29E),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final radius = Radius.circular(size.height / 2);
+    final shader = SweepGradient(
+      colors: _colors,
+      stops: const [0.0, 0.28, 0.55, 0.8, 1.0],
+      transform: GradientRotation(t * 2 * math.pi),
+    ).createShader(rect);
+
+    // Soft outer glow.
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect.deflate(1.4), radius),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.2
+        ..shader = shader
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+    );
+    // Crisp stroke on the edge.
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect.deflate(1.1), radius),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..shader = shader,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_StrokePainter old) => old.t != t;
 }
 
 /// A frosted-glass circle matching the island shell.

@@ -7,13 +7,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Pressing "+" morphs the left island into an inline expense prompt in place,
-/// and the right circle becomes a "back to the tab" button. Capture happens in
-/// the bar itself — no modal.
+/// Tapping "+" opens the capture prompt in place and the right circle becomes a
+/// "back to the tab" button. The prompt wears a repeating Siri-style stroke, so
+/// once it's open we pump fixed frames rather than settling (which never ends).
 void main() {
-  testWidgets('the + morphs the island into a prompt that records', (
-    tester,
-  ) async {
+  testWidgets('the + opens a prompt that records an expense', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final state = AppState(await Storage.open());
     addTearDown(state.dispose);
@@ -29,16 +27,18 @@ void main() {
     expect(state.expenses, isEmpty);
     expect(find.byType(TextField), findsNothing);
 
-    // Press "+": the prompt appears and the right circle offers the way back.
+    // Press "+": the prompt and the "back" button appear.
     await tester.tap(find.bySemanticsLabel('Add or capture'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     expect(find.byType(TextField), findsOneWidget);
     expect(find.bySemanticsLabel('Back to Home'), findsOneWidget);
 
     // Type an expense and submit it.
     await tester.enterText(find.byType(TextField), '5000 lunch');
     await tester.testTextInput.receiveAction(TextInputAction.done);
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
 
     // It was recorded, and the bar returned to its "+".
     expect(state.expenses, isNotEmpty);
@@ -60,13 +60,15 @@ void main() {
     await tester.pumpAndSettle(const Duration(milliseconds: 600));
 
     await tester.tap(find.bySemanticsLabel('Add or capture'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.enterText(find.byType(TextField), '5000 lunch');
     await tester.pump();
 
     // Tap the "back to Home" circle — nothing recorded, prompt closed.
     await tester.tap(find.bySemanticsLabel('Back to Home'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
 
     expect(state.expenses, isEmpty);
     expect(find.byType(TextField), findsNothing);
