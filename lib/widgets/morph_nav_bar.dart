@@ -177,7 +177,8 @@ class _MorphNavBarState extends State<MorphNavBar> {
     );
   }
 
-  /// The right island at rest: the + and the Functions circle, grouped.
+  /// The right island at rest: the + and the Functions "⋯", grouped on one
+  /// frosted pill. The "⋯" is a bare icon so the island's glass shows through.
   Widget _groupedRight() {
     return _IslandShell(
       padding: const EdgeInsets.symmetric(horizontal: 7),
@@ -185,8 +186,8 @@ class _MorphNavBarState extends State<MorphNavBar> {
         mainAxisSize: MainAxisSize.min,
         children: [
           _AddCircle(onTap: _toAdd, size: 46),
-          const SizedBox(width: 8),
-          _FnCircle(onTap: _toFn, glass: false),
+          const SizedBox(width: 4),
+          _FnCircle(onTap: _toFn),
         ],
       ),
     );
@@ -484,23 +485,15 @@ class _AddCircle extends StatelessWidget {
   }
 }
 
-/// The Functions circle — a "⋯" that opens contextual controls.
+/// The Functions "⋯" inside the grouped island — a bare icon sitting on the
+/// island's frosted glass (no disc of its own), so the glass reads through.
 class _FnCircle extends StatelessWidget {
-  const _FnCircle({required this.onTap, required this.glass});
+  const _FnCircle({required this.onTap});
 
   final VoidCallback onTap;
 
-  /// A standalone frosted circle (true), or a tinted disc inside the grouped
-  /// island (false).
-  final bool glass;
-
   @override
   Widget build(BuildContext context) {
-    final icon = Icon(
-      Icons.more_horiz_rounded,
-      size: 24,
-      color: context.muted,
-    );
     return Semantics(
       button: true,
       label: 'Functions',
@@ -509,17 +502,15 @@ class _FnCircle extends StatelessWidget {
           HapticFeedback.selectionClick();
           onTap();
         },
-        child: glass
-            ? _GlassCircle(child: icon)
-            : Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: context.scheme.onSurface.withValues(alpha: 0.06),
-                ),
-                child: icon,
-              ),
+        child: SizedBox(
+          width: 46,
+          height: 46,
+          child: Icon(
+            Icons.more_horiz_rounded,
+            size: 24,
+            color: context.muted,
+          ),
+        ),
       ),
     );
   }
