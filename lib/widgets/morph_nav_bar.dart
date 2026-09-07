@@ -165,14 +165,23 @@ class _MorphNavBarState extends State<MorphNavBar>
       child: Padding(
         padding: EdgeInsets.fromLTRB(16, 0, 16, 12 + insets),
         child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 360),
           switchInCurve: Curves.easeOutCubic,
           switchOutCurve: Curves.easeInCubic,
+          // Grow from the right — where the "+" sits — so the prompt unfurls out
+          // of the button rather than cross-fading in place.
           transitionBuilder: (child, anim) => FadeTransition(
             opacity: anim,
-            child: ScaleTransition(
-              scale: Tween(begin: 0.96, end: 1.0).animate(anim),
-              child: child,
+            child: SlideTransition(
+              position: Tween(
+                begin: const Offset(0.06, 0),
+                end: Offset.zero,
+              ).animate(anim),
+              child: ScaleTransition(
+                alignment: Alignment.centerRight,
+                scale: Tween(begin: 0.86, end: 1.0).animate(anim),
+                child: child,
+              ),
             ),
           ),
           child: row,
@@ -551,7 +560,10 @@ class _SiriStroke extends StatelessWidget {
     return AnimatedBuilder(
       animation: t,
       builder: (context, inner) => CustomPaint(
-        foregroundPainter: _StrokePainter(t.value),
+        // Bloom behind the pill (the glass covers its inner half, leaving the
+        // outer halo); crisp bright edge in front, on the border.
+        painter: _StrokePainter(t.value, foreground: false),
+        foregroundPainter: _StrokePainter(t.value, foreground: true),
         child: inner,
       ),
       child: child,
@@ -560,18 +572,19 @@ class _SiriStroke extends StatelessWidget {
 }
 
 class _StrokePainter extends CustomPainter {
-  _StrokePainter(this.t);
+  _StrokePainter(this.t, {required this.foreground});
 
   final double t;
+  final bool foreground;
 
-  // Brand green flowing through teal, cyan and indigo and back — Siri-ish, but
-  // anchored to the app's green.
+  // A warm-to-cool AI spectrum — amber, pink, violet, cyan — that sweeps round
+  // the edge so one side glows warm and the other cool, like the reference.
   static const _colors = [
-    Color(0xFF97E29E),
-    Color(0xFF3CA98B),
-    Color(0xFF33B1E0),
-    Color(0xFF6C7BF5),
-    Color(0xFF97E29E),
+    Color(0xFFFFB35E),
+    Color(0xFFFF6FA5),
+    Color(0xFF8A6BF5),
+    Color(0xFF35B6E8),
+    Color(0xFFFFB35E),
   ];
 
   @override
@@ -580,31 +593,41 @@ class _StrokePainter extends CustomPainter {
     final radius = Radius.circular(size.height / 2);
     final shader = SweepGradient(
       colors: _colors,
-      stops: const [0.0, 0.28, 0.55, 0.8, 1.0],
+      stops: const [0.0, 0.3, 0.55, 0.82, 1.0],
       transform: GradientRotation(t * 2 * math.pi),
-    ).createShader(rect);
+    ).createShader(rect.inflate(6));
 
-    // Soft outer glow.
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect.deflate(1.4), radius),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3.2
-        ..shader = shader
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
-    );
-    // Crisp stroke on the edge.
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect.deflate(1.1), radius),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..shader = shader,
-    );
+    if (foreground) {
+      // Crisp bright edge on the pill's border.
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect.deflate(1), radius),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.8
+          ..shader = shader,
+      );
+      return;
+    }
+
+    void glow(double width, double blur, double inflate) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect.inflate(inflate), radius),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = width
+          ..shader = shader
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, blur),
+      );
+    }
+
+    // Broad outer bloom, then a tighter halo — both behind the pill.
+    glow(16, 24, 5);
+    glow(8, 11, 2);
   }
 
   @override
-  bool shouldRepaint(_StrokePainter old) => old.t != t;
+  bool shouldRepaint(_StrokePainter old) =>
+      old.t != t || old.foreground != foreground;
 }
 
 /// A frosted-glass circle matching the island shell.
