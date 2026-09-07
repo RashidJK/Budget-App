@@ -168,18 +168,16 @@ class _MorphNavBarState extends State<MorphNavBar>
           duration: const Duration(milliseconds: 360),
           switchInCurve: Curves.easeOutCubic,
           switchOutCurve: Curves.easeInCubic,
-          // Grow from the right — where the "+" sits — so the prompt unfurls out
-          // of the button rather than cross-fading in place.
+          // Rise from below — the prompt slides up into place and fades in.
           transitionBuilder: (child, anim) => FadeTransition(
             opacity: anim,
             child: SlideTransition(
               position: Tween(
-                begin: const Offset(0.06, 0),
+                begin: const Offset(0, 0.4),
                 end: Offset.zero,
               ).animate(anim),
               child: ScaleTransition(
-                alignment: Alignment.centerRight,
-                scale: Tween(begin: 0.86, end: 1.0).animate(anim),
+                scale: Tween(begin: 0.94, end: 1.0).animate(anim),
                 child: child,
               ),
             ),
