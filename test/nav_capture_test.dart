@@ -30,7 +30,7 @@ void main() {
     // Press "+": the prompt and the "back" button appear.
     await tester.tap(find.bySemanticsLabel('Add or capture'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(TextField), findsOneWidget);
     expect(find.bySemanticsLabel('Back to Home'), findsOneWidget);
 
@@ -61,14 +61,14 @@ void main() {
 
     await tester.tap(find.bySemanticsLabel('Add or capture'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.enterText(find.byType(TextField), '5000 lunch');
     await tester.pump();
 
     // Tap the "back to Home" circle — nothing recorded, prompt closed.
     await tester.tap(find.bySemanticsLabel('Back to Home'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(state.expenses, isEmpty);
     expect(find.byType(TextField), findsNothing);

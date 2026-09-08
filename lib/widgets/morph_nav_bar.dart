@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
+import 'dart:ui' show ImageFilter, lerpDouble;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
@@ -25,15 +25,14 @@ class MorphNavItem {
 
 /// The app's bottom navigation as islands and circles.
 ///
-/// At rest: a **nav island** (the destinations, active one expanded) on the
-/// left, and one **right island** holding two circles — the **+** and a
-/// **Functions** circle.
+/// At rest: a **nav island** (destinations, active one expanded) on the left,
+/// and one **right island** holding two circles — the **+** and a **Functions**
+/// "⋯".
 ///
-/// Tap **+** and it opens the capture prompt directly: the island splits, the
-/// nav collapses to the current-tab dot, and the prompt takes the middle.
-/// Tap **Functions** and the island splits into separate circles as it expands
-/// into contextual controls (back · forward · more). Either way the tab-dot is
-/// one tap back to where you were.
+/// Tap **+** and the prompt slides open in place; tap **Functions** and the
+/// right island splits into circles as it expands into back · forward · more.
+/// The islands don't cross-fade — they **morph**: the segment widths slide
+/// between layouts while each piece stays crisp and is clipped as it goes.
 enum _Mode { rest, add, fn }
 
 class MorphNavBar extends StatefulWidget {
@@ -61,17 +60,26 @@ class MorphNavBar extends StatefulWidget {
 }
 
 class _MorphNavBarState extends State<MorphNavBar>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   _Mode _mode = _Mode.rest;
+  _Mode _prev = _Mode.rest;
+
   final _controller = TextEditingController();
   final _focus = FocusNode();
 
-  // Drives the Siri-style gradient stroke around the prompt while capturing.
+  // Slides the segment widths between layouts on a mode change.
+  late final AnimationController _morph;
+  // The Siri-style gradient stroke around the prompt while capturing.
   late final AnimationController _stroke;
 
   @override
   void initState() {
     super.initState();
+    _morph = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+      value: 1,
+    );
     _stroke = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2600),
@@ -80,17 +88,27 @@ class _MorphNavBarState extends State<MorphNavBar>
 
   @override
   void dispose() {
+    _morph.dispose();
     _stroke.dispose();
     _controller.dispose();
     _focus.dispose();
     super.dispose();
   }
 
+  void _go(_Mode mode) {
+    if (mode == _mode) return;
+    setState(() {
+      _prev = _mode;
+      _mode = mode;
+    });
+    _morph.forward(from: 0);
+  }
+
   void _toRest() {
     _stroke.stop();
     _focus.unfocus();
     _controller.clear();
-    setState(() => _mode = _Mode.rest);
+    _go(_Mode.rest);
   }
 
   void _toAdd() {
@@ -98,7 +116,7 @@ class _MorphNavBarState extends State<MorphNavBar>
     _stroke
       ..value = 0
       ..repeat();
-    setState(() => _mode = _Mode.add);
+    _go(_Mode.add);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focus.requestFocus();
     });
@@ -107,7 +125,7 @@ class _MorphNavBarState extends State<MorphNavBar>
   void _toFn() {
     _stroke.stop();
     HapticFeedback.lightImpact();
-    setState(() => _mode = _Mode.fn);
+    _go(_Mode.fn);
   }
 
   Future<void> _submit() async {
@@ -116,6 +134,21 @@ class _MorphNavBarState extends State<MorphNavBar>
     final handled = await widget.onCapture(text);
     if (handled && mounted) _toRest();
   }
+
+  // Segment layout for a mode: [nav, gap, capture, gap, aux], summing to [W].
+  List<double> _layout(_Mode mode, double w) {
+    switch (mode) {
+      case _Mode.rest:
+        return [w - 120, 12, 52, 4, 52];
+      case _Mode.add:
+        return [0, 12, w - 96, 12, 72];
+      case _Mode.fn:
+        return [72, 12, 72, 12, w - 168];
+    }
+  }
+
+  double _presence(_Mode mode, double t) =>
+      (_mode == mode ? t : 0) + (_prev == mode ? 1 - t : 0);
 
   @override
   Widget build(BuildContext context) {
@@ -127,68 +160,115 @@ class _MorphNavBarState extends State<MorphNavBar>
       widget.items.length - 1,
     )];
 
-    final row = switch (_mode) {
-      _Mode.rest => Row(
-        key: const ValueKey('rest'),
-        children: [
-          Expanded(child: _navIsland()),
-          const SizedBox(width: 12),
-          _groupedRight(),
-        ],
-      ),
-      // Capture is exactly the prompt as before: the wide prompt island with
-      // the "back to your tab" circle on the right — nothing else.
-      _Mode.add => Row(
-        key: const ValueKey('add'),
-        children: [
-          Expanded(
-            child: _SiriStroke(t: _stroke, child: _promptIsland()),
-          ),
-          const SizedBox(width: 12),
-          _tabDot(active),
-        ],
-      ),
-      _Mode.fn => Row(
-        key: const ValueKey('fn'),
-        children: [
-          _tabDot(active),
-          const SizedBox(width: 12),
-          _AddCircle(onTap: _toAdd),
-          const SizedBox(width: 12),
-          Expanded(child: _functionsIsland()),
-        ],
-      ),
-    };
-
     return SafeArea(
       top: false,
       child: Padding(
         padding: EdgeInsets.fromLTRB(16, 0, 16, 12 + insets),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 360),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
-          // Rise from below — the prompt slides up into place and fades in.
-          transitionBuilder: (child, anim) => FadeTransition(
-            opacity: anim,
-            child: SlideTransition(
-              position: Tween(
-                begin: const Offset(0, 0.4),
-                end: Offset.zero,
-              ).animate(anim),
-              child: ScaleTransition(
-                scale: Tween(begin: 0.94, end: 1.0).animate(anim),
-                child: child,
-              ),
-            ),
-          ),
-          child: row,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final w = constraints.maxWidth;
+            return AnimatedBuilder(
+              animation: _morph,
+              builder: (context, _) {
+                final t = Curves.easeInOutCubic.transform(_morph.value);
+                final animating = _morph.value < 1;
+                final a = _layout(_prev, w);
+                final b = _layout(_mode, w);
+                double at(int i) => lerpDouble(a[i], b[i], t)!;
+                final w0 = at(0), g0 = at(1), w1 = at(2), g1 = at(3), w2 = at(3 + 1);
+
+                return SizedBox(
+                  height: 60,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      // The grouped pill behind the + and ⋯, only at rest.
+                      Positioned(
+                        left: w0 + g0,
+                        top: 0,
+                        bottom: 0,
+                        width: w1 + g1 + w2,
+                        child: Opacity(
+                          opacity: _presence(_Mode.rest, t).clamp(0.0, 1.0),
+                          child: const IgnorePointer(child: _GlassSurface()),
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: w0,
+                            child: _navSlot(active, w, t, animating),
+                          ),
+                          SizedBox(width: g0),
+                          SizedBox(
+                            width: w1,
+                            child: _captureSlot(w, t, animating),
+                          ),
+                          SizedBox(width: g1),
+                          SizedBox(
+                            width: w2,
+                            child: _auxSlot(active, w, t, animating),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
         ),
       ),
     );
   }
 
-  // --- rest -----------------------------------------------------------------
+  // --- slots ----------------------------------------------------------------
+
+  Widget _navSlot(MorphNavItem active, double w, double t, bool animating) {
+    return _CrossSlot(
+      t: t,
+      animating: animating,
+      prev: _prev,
+      curr: _mode,
+      contentFor: (m) => switch (m) {
+        _Mode.rest => (_navIsland(), w - 120, Alignment.centerLeft),
+        _Mode.fn => (_tabDot(active), 60.0, Alignment.center),
+        _Mode.add => (const SizedBox.shrink(), 0.0, Alignment.center),
+      },
+    );
+  }
+
+  Widget _captureSlot(double w, double t, bool animating) {
+    return _CrossSlot(
+      t: t,
+      animating: animating,
+      prev: _prev,
+      curr: _mode,
+      // The prompt's Siri glow blooms ~30px past the pill; give it room.
+      clipMargin: 34,
+      contentFor: (m) => switch (m) {
+        _Mode.rest => (_AddCircle(onTap: _toAdd, size: 52), 52.0, Alignment.center),
+        _Mode.add => (_prompt(), w - 96, Alignment.centerLeft),
+        _Mode.fn => (_AddCircle(onTap: _toAdd), 60.0, Alignment.center),
+      },
+    );
+  }
+
+  Widget _auxSlot(MorphNavItem active, double w, double t, bool animating) {
+    return _CrossSlot(
+      t: t,
+      animating: animating,
+      prev: _prev,
+      curr: _mode,
+      contentFor: (m) => switch (m) {
+        _Mode.rest => (_FnDots(onTap: _toFn), 52.0, Alignment.center),
+        _Mode.add => (_tabDot(active), 60.0, Alignment.center),
+        _Mode.fn => (_functionsIsland(), w - 168, Alignment.centerLeft),
+      },
+    );
+  }
+
+  // --- content --------------------------------------------------------------
 
   Widget _navIsland() {
     return _IslandShell(
@@ -206,91 +286,70 @@ class _MorphNavBarState extends State<MorphNavBar>
     );
   }
 
-  /// The right island at rest: the + and the Functions "⋯", grouped on one
-  /// frosted pill. The "⋯" is a bare icon so the island's glass shows through.
-  Widget _groupedRight() {
-    return _IslandShell(
-      padding: const EdgeInsets.symmetric(horizontal: 7),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _AddCircle(onTap: _toAdd, size: 46),
-          const SizedBox(width: 4),
-          _FnCircle(onTap: _toFn),
-        ],
-      ),
-    );
-  }
-
-  // --- add ------------------------------------------------------------------
-
-  Widget _promptIsland() {
-    return _IslandShell(
-      child: Row(
-        children: [
-          const SizedBox(width: 16),
-          Expanded(
-            child: TextField(
-              controller: _controller,
-              focusNode: _focus,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _submit(),
-              cursorColor: AppTheme.brandGreen,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
-              decoration: InputDecoration(
-                isCollapsed: true,
-                filled: false,
-                fillColor: Colors.transparent,
-                contentPadding: EdgeInsets.zero,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                disabledBorder: InputBorder.none,
-                errorBorder: InputBorder.none,
-                focusedErrorBorder: InputBorder.none,
-                hintText: widget.captureHint,
-                hintStyle: TextStyle(
-                  color: context.muted,
-                  fontWeight: FontWeight.w500,
+  Widget _prompt() {
+    return _SiriStroke(
+      t: _stroke,
+      child: _IslandShell(
+        child: Row(
+          children: [
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                focusNode: _focus,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _submit(),
+                cursorColor: AppTheme.brandGreen,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                decoration: InputDecoration(
+                  isCollapsed: true,
+                  filled: false,
+                  fillColor: Colors.transparent,
+                  contentPadding: EdgeInsets.zero,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  focusedErrorBorder: InputBorder.none,
+                  hintText: widget.captureHint,
+                  hintStyle: TextStyle(
+                    color: context.muted,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ),
-          ),
-          ValueListenableBuilder<TextEditingValue>(
-            valueListenable: _controller,
-            builder: (context, value, _) {
-              final ready = value.text.trim().isNotEmpty;
-              return IconButton(
-                onPressed: ready ? _submit : null,
-                visualDensity: VisualDensity.compact,
-                icon: Icon(
-                  Icons.arrow_upward_rounded,
-                  size: 22,
-                  color: ready ? AppTheme.brandGreen : context.muted,
-                ),
-                tooltip: 'Record',
-              );
-            },
-          ),
-        ],
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _controller,
+              builder: (context, value, _) {
+                final ready = value.text.trim().isNotEmpty;
+                return IconButton(
+                  onPressed: ready ? _submit : null,
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(
+                    Icons.arrow_upward_rounded,
+                    size: 22,
+                    color: ready ? AppTheme.brandGreen : context.muted,
+                  ),
+                  tooltip: 'Record',
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
-
-  // --- fn -------------------------------------------------------------------
 
   Widget _functionsIsland() {
     return _IslandShell(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _fnAction(
-            Icons.chevron_left_rounded,
-            'Back',
-            onTap: _toRest,
-          ),
+          _fnAction(Icons.chevron_left_rounded, 'Back', onTap: _toRest),
           _fnAction(Icons.chevron_right_rounded, 'Forward', onTap: null),
           _fnAction(Icons.more_horiz_rounded, 'More', onTap: () {}),
         ],
@@ -325,8 +384,6 @@ class _MorphNavBarState extends State<MorphNavBar>
     );
   }
 
-  // --- shared circles -------------------------------------------------------
-
   Widget _tabDot(MorphNavItem item) {
     return Semantics(
       button: true,
@@ -345,15 +402,104 @@ class _MorphNavBarState extends State<MorphNavBar>
   }
 }
 
-/// Shared frosted-glass shell for an island or a wide segment.
-class _IslandShell extends StatelessWidget {
-  const _IslandShell({
-    required this.child,
-    this.padding = const EdgeInsets.symmetric(horizontal: 6),
+/// One slot that cross-fades between the previous and current mode's content —
+/// each rendered at its own natural width and clipped, so the piece stays crisp
+/// while the slot's width animates.
+class _CrossSlot extends StatelessWidget {
+  const _CrossSlot({
+    required this.t,
+    required this.animating,
+    required this.prev,
+    required this.curr,
+    required this.contentFor,
+    this.clipMargin = 0,
   });
 
+  final double t;
+  final bool animating;
+  final _Mode prev;
+  final _Mode curr;
+  final (Widget, double, Alignment) Function(_Mode) contentFor;
+
+  /// Extra room around the slot's clip, so a glow can bloom past the edge
+  /// instead of being boxed into the rectangle.
+  final double clipMargin;
+
+  Widget _layer(_Mode mode, double opacity) {
+    if (opacity <= 0.001) return const SizedBox.shrink();
+    final (child, width, align) = contentFor(mode);
+    if (width <= 0) return const SizedBox.shrink();
+    return Positioned.fill(
+      child: IgnorePointer(
+        ignoring: opacity < 0.5,
+        child: Opacity(
+          opacity: opacity.clamp(0.0, 1.0),
+          child: ClipRect(
+            clipper: clipMargin > 0 ? _BloomClip(clipMargin) : null,
+            child: OverflowBox(
+              minWidth: width,
+              maxWidth: width,
+              minHeight: 60,
+              maxHeight: 60,
+              alignment: align,
+              child: SizedBox(width: width, height: 60, child: child),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        if (animating && prev != curr) _layer(prev, 1 - t),
+        _layer(curr, animating ? t : 1.0),
+      ],
+    );
+  }
+}
+
+/// Clips a slot but leaves [m] px of room on every side, so a glow can bloom
+/// past the edge rather than ending in a hard rectangle.
+class _BloomClip extends CustomClipper<Rect> {
+  const _BloomClip(this.m);
+
+  final double m;
+
+  @override
+  Rect getClip(Size size) =>
+      Rect.fromLTRB(-m, -m, size.width + m, size.height + m);
+
+  @override
+  bool shouldReclip(_BloomClip old) => old.m != m;
+}
+
+/// Shared frosted-glass shell for a stadium-shaped island or segment.
+class _IslandShell extends StatelessWidget {
+  const _IslandShell({required this.child});
+
   final Widget child;
-  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return _GlassSurface(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: child,
+      ),
+    );
+  }
+}
+
+/// The raw frosted stadium — fills its box; used on its own as the grouped pill
+/// and wrapped by [_IslandShell] for content.
+class _GlassSurface extends StatelessWidget {
+  const _GlassSurface({this.child});
+
+  final Widget? child;
 
   @override
   Widget build(BuildContext context) {
@@ -379,7 +525,6 @@ class _IslandShell extends StatelessWidget {
           filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
           child: Container(
             height: 60,
-            padding: padding,
             decoration: BoxDecoration(
               color: fill,
               borderRadius: BorderRadius.circular(30),
@@ -514,10 +659,9 @@ class _AddCircle extends StatelessWidget {
   }
 }
 
-/// The Functions "⋯" inside the grouped island — a bare icon sitting on the
-/// island's frosted glass (no disc of its own), so the glass reads through.
-class _FnCircle extends StatelessWidget {
-  const _FnCircle({required this.onTap});
+/// The Functions "⋯" — a bare icon sitting on the grouped island's glass.
+class _FnDots extends StatelessWidget {
+  const _FnDots({required this.onTap});
 
   final VoidCallback onTap;
 
@@ -531,22 +675,16 @@ class _FnCircle extends StatelessWidget {
           HapticFeedback.selectionClick();
           onTap();
         },
-        child: SizedBox(
-          width: 46,
-          height: 46,
-          child: Icon(
-            Icons.more_horiz_rounded,
-            size: 24,
-            color: context.muted,
-          ),
+        child: Center(
+          child: Icon(Icons.more_horiz_rounded, size: 24, color: context.muted),
         ),
       ),
     );
   }
 }
 
-/// A Siri-style stroke: a multi-hue sweep gradient that rotates around the
-/// prompt's edge with a soft outer glow, so the capture field feels "listening".
+/// A Siri-style stroke: a warm-to-cool sweep gradient blooming behind the
+/// prompt with a crisp bright edge in front.
 class _SiriStroke extends StatelessWidget {
   const _SiriStroke({required this.t, required this.child});
 
@@ -558,8 +696,6 @@ class _SiriStroke extends StatelessWidget {
     return AnimatedBuilder(
       animation: t,
       builder: (context, inner) => CustomPaint(
-        // Bloom behind the pill (the glass covers its inner half, leaving the
-        // outer halo); crisp bright edge in front, on the border.
         painter: _StrokePainter(t.value, foreground: false),
         foregroundPainter: _StrokePainter(t.value, foreground: true),
         child: inner,
@@ -575,8 +711,6 @@ class _StrokePainter extends CustomPainter {
   final double t;
   final bool foreground;
 
-  // A warm-to-cool AI spectrum — amber, pink, violet, cyan — that sweeps round
-  // the edge so one side glows warm and the other cool, like the reference.
   static const _colors = [
     Color(0xFFFFB35E),
     Color(0xFFFF6FA5),
@@ -596,7 +730,6 @@ class _StrokePainter extends CustomPainter {
     ).createShader(rect.inflate(6));
 
     if (foreground) {
-      // Crisp bright edge on the pill's border.
       canvas.drawRRect(
         RRect.fromRectAndRadius(rect.deflate(1), radius),
         Paint()
@@ -618,7 +751,6 @@ class _StrokePainter extends CustomPainter {
       );
     }
 
-    // Broad outer bloom, then a tighter halo — both behind the pill.
     glow(16, 24, 5);
     glow(8, 11, 2);
   }
