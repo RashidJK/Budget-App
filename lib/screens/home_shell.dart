@@ -110,6 +110,7 @@ class _HomeShellState extends State<HomeShell> {
         activeIndex: _index,
         onSelect: _select,
         onCapture: (text) => captureFromText(context, text),
+        onScan: () => CommandBar.show(context, startScan: true),
         items: const [
           MorphNavItem(
             icon: PhosphorR.squaresFour,

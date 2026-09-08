@@ -34,6 +34,7 @@ class CommandBar {
     BuildContext context, {
     ReceiptScanner? scanner,
     String? initialText,
+    bool startScan = false,
   }) {
     return showModalBottomSheet<void>(
       context: context,
@@ -44,16 +45,24 @@ class CommandBar {
       builder: (_) => _CommandSheet(
         scanner: scanner ?? defaultReceiptScanner,
         initialText: initialText,
+        startScan: startScan,
       ),
     );
   }
 }
 
 class _CommandSheet extends StatefulWidget {
-  const _CommandSheet({required this.scanner, this.initialText});
+  const _CommandSheet({
+    required this.scanner,
+    this.initialText,
+    this.startScan = false,
+  });
 
   final ReceiptScanner scanner;
   final String? initialText;
+
+  /// Open straight into the camera — the nav prompt's scan shortcut.
+  final bool startScan;
 
   @override
   State<_CommandSheet> createState() => _CommandSheetState();
@@ -98,8 +107,16 @@ class _CommandSheetState extends State<_CommandSheet> {
         if (mounted) _onChanged(seed);
       });
     }
-    // Focus immediately so the keyboard is up on open (spec §4).
-    WidgetsBinding.instance.addPostFrameCallback((_) => _focus.requestFocus());
+    if (widget.startScan) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _scan();
+      });
+    } else {
+      // Focus immediately so the keyboard is up on open (spec §4).
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _focus.requestFocus(),
+      );
+    }
 
     _hintTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (!mounted) return;

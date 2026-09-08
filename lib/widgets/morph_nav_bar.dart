@@ -42,6 +42,7 @@ class MorphNavBar extends StatefulWidget {
     required this.activeIndex,
     required this.onSelect,
     required this.onCapture,
+    this.onScan,
     this.captureHint = "Try 'Transfer 100k to M-Pesa'",
   });
 
@@ -52,6 +53,9 @@ class MorphNavBar extends StatefulWidget {
   /// Parse + record the typed prompt. Returns true when handled (so the bar can
   /// close its prompt); false to keep the field open.
   final Future<bool> Function(String text) onCapture;
+
+  /// Opens the receipt scanner. When null, the prompt shows no camera.
+  final VoidCallback? onScan;
 
   final String captureHint;
 
@@ -322,6 +326,17 @@ class _MorphNavBarState extends State<MorphNavBar>
                 ),
               ),
             ),
+            if (widget.onScan != null)
+              IconButton(
+                onPressed: widget.onScan,
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                  Icons.photo_camera_rounded,
+                  size: 21,
+                  color: context.muted,
+                ),
+                tooltip: 'Scan a receipt',
+              ),
             ValueListenableBuilder<TextEditingValue>(
               valueListenable: _controller,
               builder: (context, value, _) {

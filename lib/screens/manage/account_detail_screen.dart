@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../command/command_bar.dart';
 import '../../models/account.dart';
 import '../../models/phosphor.dart';
 import '../../services/format.dart';
@@ -125,6 +126,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         activeIndex: _tab,
         onSelect: _select,
         onCapture: (text) => captureFromText(context, text),
+        onScan: () => CommandBar.show(context, startScan: true),
         items: const [
           MorphNavItem(
             icon: PhosphorR.squaresFour,
