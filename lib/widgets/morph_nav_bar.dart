@@ -139,6 +139,14 @@ class _MorphNavBarState extends State<MorphNavBar>
     if (handled && mounted) _toRest();
   }
 
+  // Seed the field from a quick-action pill, then let the user finish typing.
+  void _prime(String starter) {
+    HapticFeedback.selectionClick();
+    _controller.text = starter;
+    _controller.selection = TextSelection.collapsed(offset: starter.length);
+    _focus.requestFocus();
+  }
+
   // Segment layout for a mode: [nav, gap, capture, gap, aux], summing to [W].
   List<double> _layout(_Mode mode, double w) {
     switch (mode) {
@@ -181,7 +189,13 @@ class _MorphNavBarState extends State<MorphNavBar>
                 double at(int i) => lerpDouble(a[i], b[i], t)!;
                 final w0 = at(0), g0 = at(1), w1 = at(2), g1 = at(3), w2 = at(3 + 1);
 
-                return SizedBox(
+                final addness = _presence(_Mode.add, t).clamp(0.0, 1.0);
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _pillsBlock(addness),
+                    SizedBox(
                   height: 60,
                   child: Stack(
                     clipBehavior: Clip.none,
@@ -217,6 +231,8 @@ class _MorphNavBarState extends State<MorphNavBar>
                       ),
                     ],
                   ),
+                    ),
+                  ],
                 );
               },
             );
@@ -410,6 +426,95 @@ class _MorphNavBarState extends State<MorphNavBar>
             item.activeIcon,
             color: item.accent ?? context.scheme.primary,
             size: 24,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- quick-action pills (above the prompt) --------------------------------
+
+  /// Rises into view above the prompt as you enter capture; collapses away
+  /// otherwise. [f] is how "present" the add state is (0..1).
+  Widget _pillsBlock(double f) {
+    return ClipRect(
+      child: Align(
+        alignment: Alignment.bottomLeft,
+        heightFactor: f,
+        child: IgnorePointer(
+          ignoring: f < 0.5,
+          child: Opacity(
+            opacity: f,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _pillsRow(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _pillsRow() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _pill(Icons.south_west_rounded, 'Income', context.good, 'Received '),
+        const SizedBox(width: 8),
+        _pill(
+          Icons.swap_horiz_rounded,
+          'Transfer',
+          const Color(0xFF7C6BF5),
+          'Transfer ',
+        ),
+        const SizedBox(width: 8),
+        _pill(
+          Icons.people_alt_rounded,
+          'Loan',
+          context.scheme.primary,
+          'Lent ',
+        ),
+      ],
+    );
+  }
+
+  Widget _pill(IconData icon, String label, Color accent, String starter) {
+    final dark = context.isDark;
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
+        onTap: () => _prime(starter),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: dark
+                ? const Color(0xFF232322).withValues(alpha: 0.72)
+                : Colors.white.withValues(alpha: 0.86),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: context.hairline),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: dark ? 0.28 : 0.06),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: accent),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: context.scheme.onSurface,
+                ),
+              ),
+            ],
           ),
         ),
       ),
