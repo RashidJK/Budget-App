@@ -117,6 +117,7 @@ class _MorphNavBarState extends State<MorphNavBar>
 
   void _toAdd() {
     HapticFeedback.lightImpact();
+    _playRipple();
     _stroke
       ..value = 0
       ..repeat();
@@ -130,6 +131,28 @@ class _MorphNavBarState extends State<MorphNavBar>
     _stroke.stop();
     HapticFeedback.lightImpact();
     _go(_Mode.fn);
+  }
+
+  // Swipe up on the bar to open capture; swipe down to close it. The bar sits
+  // above the home indicator, so this doesn't fight the iOS home gesture.
+  void _onSwipe(DragEndDetails d) {
+    final v = d.primaryVelocity ?? 0;
+    if (_mode == _Mode.rest && v < -320) {
+      _toAdd();
+    } else if (_mode == _Mode.add && v > 320) {
+      _toRest();
+    }
+  }
+
+  // A Siri-style ripple washing up the screen from the bottom, as capture opens.
+  void _playRipple() {
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) return;
+    late final OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (_) => _SiriRipple(onDone: entry.remove),
+    );
+    overlay.insert(entry);
   }
 
   Future<void> _submit() async {
@@ -190,7 +213,10 @@ class _MorphNavBarState extends State<MorphNavBar>
                 final w0 = at(0), g0 = at(1), w1 = at(2), g1 = at(3), w2 = at(3 + 1);
 
                 final addness = _presence(_Mode.add, t).clamp(0.0, 1.0);
-                return Column(
+                return GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onVerticalDragEnd: _onSwipe,
+                  child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -233,6 +259,7 @@ class _MorphNavBarState extends State<MorphNavBar>
                   ),
                     ),
                   ],
+                  ),
                 );
               },
             );
@@ -878,6 +905,111 @@ class _StrokePainter extends CustomPainter {
   @override
   bool shouldRepaint(_StrokePainter old) =>
       old.t != t || old.foreground != foreground;
+}
+
+/// The Apple-Intelligence-style screen-edge glow — a soft gradient that hugs
+/// the screen's rounded-rectangle perimeter, bleeding inward, blooming then
+/// fading as capture opens, its colours sweeping gently round. It removes
+/// itself when the animation finishes.
+class _SiriRipple extends StatefulWidget {
+  const _SiriRipple({required this.onDone});
+
+  final VoidCallback onDone;
+
+  @override
+  State<_SiriRipple> createState() => _SiriRippleState();
+}
+
+class _SiriRippleState extends State<_SiriRipple>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..addStatusListener((s) {
+      if (s == AnimationStatus.completed) widget.onDone();
+    });
+    _c.forward();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (context, _) =>
+              CustomPaint(painter: _RipplePainter(_c.value)),
+        ),
+      ),
+    );
+  }
+}
+
+class _RipplePainter extends CustomPainter {
+  _RipplePainter(this.t);
+
+  final double t;
+
+  // A full warm-to-cool loop distributed around the edge.
+  static const _edge = [
+    Color(0xFFFFB35E),
+    Color(0xFFFF6FA5),
+    Color(0xFF8A6BF5),
+    Color(0xFF35B6E8),
+    Color(0xFF4FD196),
+    Color(0xFFFFB35E),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Rise then fall in intensity across the animation.
+    final env = math.sin(math.pi * t.clamp(0.0, 1.0));
+    if (env <= 0.01) return;
+
+    // Fade the whole glow by the envelope via a layer alpha.
+    canvas.saveLayer(
+      Offset.zero & size,
+      Paint()..color = Color.fromRGBO(0, 0, 0, env.clamp(0.0, 1.0)),
+    );
+
+    // Hug the screen's rounded corners; the wide blur spills inward.
+    final rect = (Offset.zero & size).deflate(2);
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(54));
+    final shader = SweepGradient(
+      colors: _edge,
+      transform: GradientRotation(0.15 + t * math.pi),
+    ).createShader(rect);
+
+    void glow(double width, double blur) {
+      canvas.drawRRect(
+        rrect,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = width
+          ..shader = shader
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, blur),
+      );
+    }
+
+    glow(30, 28); // broad soft inner glow
+    glow(14, 12); // mid halo
+    glow(6, 4); // soft definition — no hard line
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_RipplePainter old) => old.t != t;
 }
 
 /// A frosted-glass circle matching the island shell.
