@@ -858,12 +858,13 @@ class _StrokePainter extends CustomPainter {
   final double t;
   final bool foreground;
 
+  // Brand green, flowing light → teal → light as it sweeps round the prompt.
   static const _colors = [
-    Color(0xFFFFB35E),
-    Color(0xFFFF6FA5),
-    Color(0xFF8A6BF5),
-    Color(0xFF35B6E8),
-    Color(0xFFFFB35E),
+    Color(0xFF97E29E),
+    Color(0xFF5FD09E),
+    Color(0xFF3CA98B),
+    Color(0xFF5FD09E),
+    Color(0xFF97E29E),
   ];
 
   @override
@@ -961,14 +962,11 @@ class _RipplePainter extends CustomPainter {
 
   final double t;
 
-  // A full warm-to-cool loop distributed around the edge.
+  // Two greens — light into teal — looped so the sweep has no seam.
   static const _edge = [
-    Color(0xFFFFB35E),
-    Color(0xFFFF6FA5),
-    Color(0xFF8A6BF5),
-    Color(0xFF35B6E8),
-    Color(0xFF4FD196),
-    Color(0xFFFFB35E),
+    Color(0xFF97E29E),
+    Color(0xFF3CA98B),
+    Color(0xFF97E29E),
   ];
 
   @override
