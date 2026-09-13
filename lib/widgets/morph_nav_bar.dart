@@ -178,7 +178,7 @@ class _MorphNavBarState extends State<MorphNavBar>
   List<double> _layout(_Mode mode, double w) {
     switch (mode) {
       case _Mode.rest:
-        return [w - 134, 12, 46, 4, 72];
+        return [w - 120, 12, 52, 4, 52];
       case _Mode.add:
         return [0, 12, w - 96, 12, 72];
       case _Mode.fn:
@@ -312,7 +312,11 @@ class _MorphNavBarState extends State<MorphNavBar>
       prev: _prev,
       curr: _mode,
       contentFor: (m) => switch (m) {
-        _Mode.rest => (_restActions(), 72.0, Alignment.center),
+        _Mode.rest => (
+          _iconTap(Icons.more_horiz_rounded, 'More', context.muted, _toFn),
+          52.0,
+          Alignment.center,
+        ),
         _Mode.add => (_tabDot(active), 60.0, Alignment.center),
         _Mode.fn => (_functionsIsland(), w - 168, Alignment.centerLeft),
       },
@@ -412,14 +416,27 @@ class _MorphNavBarState extends State<MorphNavBar>
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _fnAction(Icons.chevron_left_rounded, 'Back', onTap: _toRest),
-          _fnAction(Icons.chevron_right_rounded, 'Forward', onTap: null),
-          _fnAction(Icons.more_horiz_rounded, 'More', onTap: () {}),
+          if (widget.onBriefing != null)
+            _fnAction(
+              Icons.auto_awesome_rounded,
+              'Your briefing',
+              color: context.scheme.primary,
+              onTap: () {
+                widget.onBriefing!();
+                _toRest();
+              },
+            ),
         ],
       ),
     );
   }
 
-  Widget _fnAction(IconData icon, String label, {VoidCallback? onTap}) {
+  Widget _fnAction(
+    IconData icon,
+    String label, {
+    VoidCallback? onTap,
+    Color? color,
+  }) {
     final enabled = onTap != null;
     return Semantics(
       button: true,
@@ -438,28 +455,11 @@ class _MorphNavBarState extends State<MorphNavBar>
             icon,
             size: 24,
             color: enabled
-                ? context.scheme.onSurface
+                ? (color ?? context.scheme.onSurface)
                 : context.scheme.onSurface.withValues(alpha: 0.3),
           ),
         ),
       ),
-    );
-  }
-
-  /// The right island's icons at rest: Functions (⋯) and the briefing (✨).
-  Widget _restActions() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _iconTap(Icons.more_horiz_rounded, 'Functions', context.muted, _toFn),
-        if (widget.onBriefing != null)
-          _iconTap(
-            Icons.auto_awesome_rounded,
-            'Your briefing',
-            context.scheme.primary,
-            widget.onBriefing!,
-          ),
-      ],
     );
   }
 
@@ -765,7 +765,7 @@ class _MorphTab extends StatelessWidget {
             duration: const Duration(milliseconds: 260),
             curve: Curves.easeOutCubic,
             padding: EdgeInsets.symmetric(
-              horizontal: selected ? 12 : 8,
+              horizontal: selected ? 13 : 9,
               vertical: 9,
             ),
             decoration: BoxDecoration(
@@ -789,7 +789,7 @@ class _MorphTab extends StatelessWidget {
                       ? Padding(
                           padding: const EdgeInsets.only(left: 8),
                           child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 84),
+                            constraints: const BoxConstraints(maxWidth: 96),
                             child: Text(
                               data.label,
                               maxLines: 1,

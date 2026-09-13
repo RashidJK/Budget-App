@@ -5,14 +5,32 @@ import '../services/format.dart';
 import '../state/app_state.dart';
 
 /// A floating blue "briefing" island — a friendly, at-a-glance summary of where
-/// your money stands, opened from the nav bar.
+/// your money stands. Drops in from the top of the screen, opened from the bar.
 Future<void> showBriefing(BuildContext context) {
-  return showModalBottomSheet<void>(
+  return showGeneralDialog<void>(
     context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
+    barrierDismissible: true,
+    barrierLabel: 'Briefing',
     barrierColor: Colors.black.withValues(alpha: 0.4),
-    builder: (_) => const _BriefingCard(),
+    transitionDuration: const Duration(milliseconds: 360),
+    pageBuilder: (_, _, _) => const _BriefingCard(),
+    transitionBuilder: (context, anim, _, child) {
+      final curved = CurvedAnimation(
+        parent: anim,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: SlideTransition(
+          position: Tween(
+            begin: const Offset(0, -0.18),
+            end: Offset.zero,
+          ).animate(curved),
+          child: child,
+        ),
+      );
+    },
   );
 }
 
@@ -44,15 +62,12 @@ class _BriefingCard extends StatelessWidget {
       textScaler: TextScaler.noScaling,
     );
 
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 14,
-        right: 14,
-        top: 6,
-        bottom: MediaQuery.viewInsetsOf(context).bottom + 14,
-      ),
-      child: Container(
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: Container(
         width: double.infinity,
+        margin: const EdgeInsets.fromLTRB(14, 8, 14, 0),
         padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
@@ -139,6 +154,7 @@ class _BriefingCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }
