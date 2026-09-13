@@ -11,6 +11,7 @@ import '../../widgets/app_background.dart';
 import '../../widgets/badge_icon.dart';
 import '../../widgets/morph_nav_bar.dart';
 import '../../widgets/section_header.dart';
+import '../briefing.dart';
 import '../quick_capture.dart';
 import 'accounts_screen.dart';
 
@@ -127,6 +128,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         onSelect: _select,
         onCapture: (text) => captureFromText(context, text),
         onScan: () => CommandBar.show(context, startScan: true),
+        onBriefing: () => showBriefing(context),
         items: const [
           MorphNavItem(
             icon: PhosphorR.squaresFour,

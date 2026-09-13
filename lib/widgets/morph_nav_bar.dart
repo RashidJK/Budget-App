@@ -43,6 +43,7 @@ class MorphNavBar extends StatefulWidget {
     required this.onSelect,
     required this.onCapture,
     this.onScan,
+    this.onBriefing,
     this.captureHint = "Try 'Transfer 100k to M-Pesa'",
   });
 
@@ -56,6 +57,9 @@ class MorphNavBar extends StatefulWidget {
 
   /// Opens the receipt scanner. When null, the prompt shows no camera.
   final VoidCallback? onScan;
+
+  /// Opens the blue briefing island. When null, the briefing icon is hidden.
+  final VoidCallback? onBriefing;
 
   final String captureHint;
 
@@ -174,7 +178,7 @@ class _MorphNavBarState extends State<MorphNavBar>
   List<double> _layout(_Mode mode, double w) {
     switch (mode) {
       case _Mode.rest:
-        return [w - 120, 12, 52, 4, 52];
+        return [w - 134, 12, 46, 4, 72];
       case _Mode.add:
         return [0, 12, w - 96, 12, 72];
       case _Mode.fn:
@@ -294,7 +298,7 @@ class _MorphNavBarState extends State<MorphNavBar>
       // The prompt's Siri glow blooms ~30px past the pill; give it room.
       clipMargin: 34,
       contentFor: (m) => switch (m) {
-        _Mode.rest => (_AddCircle(onTap: _toAdd, size: 52), 52.0, Alignment.center),
+        _Mode.rest => (_AddCircle(onTap: _toAdd, size: 46), 46.0, Alignment.center),
         _Mode.add => (_prompt(), w - 96, Alignment.centerLeft),
         _Mode.fn => (_AddCircle(onTap: _toAdd), 60.0, Alignment.center),
       },
@@ -308,7 +312,7 @@ class _MorphNavBarState extends State<MorphNavBar>
       prev: _prev,
       curr: _mode,
       contentFor: (m) => switch (m) {
-        _Mode.rest => (_FnDots(onTap: _toFn), 52.0, Alignment.center),
+        _Mode.rest => (_restActions(), 72.0, Alignment.center),
         _Mode.add => (_tabDot(active), 60.0, Alignment.center),
         _Mode.fn => (_functionsIsland(), w - 168, Alignment.centerLeft),
       },
@@ -437,6 +441,47 @@ class _MorphNavBarState extends State<MorphNavBar>
                 ? context.scheme.onSurface
                 : context.scheme.onSurface.withValues(alpha: 0.3),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// The right island's icons at rest: Functions (⋯) and the briefing (✨).
+  Widget _restActions() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _iconTap(Icons.more_horiz_rounded, 'Functions', context.muted, _toFn),
+        if (widget.onBriefing != null)
+          _iconTap(
+            Icons.auto_awesome_rounded,
+            'Your briefing',
+            context.scheme.primary,
+            widget.onBriefing!,
+          ),
+      ],
+    );
+  }
+
+  Widget _iconTap(
+    IconData icon,
+    String label,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: SizedBox(
+          width: 34,
+          height: 60,
+          child: Center(child: Icon(icon, size: 22, color: color)),
         ),
       ),
     );
@@ -720,7 +765,7 @@ class _MorphTab extends StatelessWidget {
             duration: const Duration(milliseconds: 260),
             curve: Curves.easeOutCubic,
             padding: EdgeInsets.symmetric(
-              horizontal: selected ? 13 : 9,
+              horizontal: selected ? 12 : 8,
               vertical: 9,
             ),
             decoration: BoxDecoration(
@@ -744,7 +789,7 @@ class _MorphTab extends StatelessWidget {
                       ? Padding(
                           padding: const EdgeInsets.only(left: 8),
                           child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 96),
+                            constraints: const BoxConstraints(maxWidth: 84),
                             child: Text(
                               data.label,
                               maxLines: 1,
@@ -800,30 +845,6 @@ class _AddCircle extends StatelessWidget {
             ],
           ),
           child: Icon(Icons.add_rounded, color: Colors.white, size: size * 0.5),
-        ),
-      ),
-    );
-  }
-}
-
-/// The Functions "⋯" — a bare icon sitting on the grouped island's glass.
-class _FnDots extends StatelessWidget {
-  const _FnDots({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: 'Functions',
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap();
-        },
-        child: Center(
-          child: Icon(Icons.more_horiz_rounded, size: 24, color: context.muted),
         ),
       ),
     );

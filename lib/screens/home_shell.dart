@@ -6,6 +6,7 @@ import 'package:home_widget/home_widget.dart';
 
 import '../command/command_bar.dart';
 import '../models/phosphor.dart';
+import 'briefing.dart';
 import '../widgets/morph_nav_bar.dart';
 import 'analytics/analytics_screen.dart';
 import 'planner/planner_home.dart';
@@ -111,6 +112,7 @@ class _HomeShellState extends State<HomeShell> {
         onSelect: _select,
         onCapture: (text) => captureFromText(context, text),
         onScan: () => CommandBar.show(context, startScan: true),
+        onBriefing: () => showBriefing(context),
         items: const [
           MorphNavItem(
             icon: PhosphorR.squaresFour,
