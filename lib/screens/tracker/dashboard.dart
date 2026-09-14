@@ -50,6 +50,9 @@ class DashboardScreen extends StatelessWidget {
     final blue = context.isDark
         ? const Color(0xFF20418C)
         : const Color(0xFF2F62E0);
+    // Status-bar height: the wash bleeds all the way up behind it, so this is
+    // added to the header's top padding rather than clipped away by a SafeArea.
+    final topInset = MediaQuery.paddingOf(context).top;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -80,11 +83,9 @@ class DashboardScreen extends StatelessWidget {
                 ),
               ),
             ),
-            SafeArea(
-              bottom: false,
-              child: ListView(
-                padding: const EdgeInsets.only(bottom: 120),
-                children: [
+            ListView(
+              padding: const EdgeInsets.only(bottom: 120),
+              children: [
                   DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -95,7 +96,7 @@ class DashboardScreen extends StatelessWidget {
                       ),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                      padding: EdgeInsets.fromLTRB(16, 8 + topInset, 16, 4),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -185,7 +186,6 @@ class DashboardScreen extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
           ],
         ),
       ),
