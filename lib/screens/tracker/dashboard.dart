@@ -45,6 +45,11 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final budgets = state.budgetProgress();
+    // Blue wash for the top of the screen — behind the header and hero deck —
+    // fading to nothing before the budgets.
+    final blue = context.isDark
+        ? const Color(0xFF20418C)
+        : const Color(0xFF2F62E0);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -78,14 +83,30 @@ class DashboardScreen extends StatelessWidget {
             SafeArea(
               bottom: false,
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+                padding: const EdgeInsets.only(bottom: 120),
                 children: [
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [blue, blue, blue.withValues(alpha: 0)],
+                        stops: const [0.0, 0.62, 0.96],
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
                   _TopBar(),
                   const SizedBox(height: 18),
                   // A stacked deck: the month-to-date flow card on top, the
                   // balance card peeking behind it. Swipe up to swap.
                   CardStack(
                     height: 250,
+                    peek: 26,
+                    notchFront: true,
                     cards: [
                       _HeroCard(
                         spent: state.spentThisMonth,
@@ -112,6 +133,17 @@ class DashboardScreen extends StatelessWidget {
                         onOpenAccount: (id) =>
                             AccountDetailScreen.open(context, id),
                       ),
+                      // One card per account, largest balance first.
+                      for (final ab in state.accountBalances)
+                        _AccountCard(
+                          balance: ab,
+                          flow: state.accountFlow(
+                            ab.account.id,
+                            DateTime.now(),
+                          ),
+                          onOpen: () =>
+                              AccountDetailScreen.open(context, ab.account.id),
+                        ),
                     ],
                   ),
                   // Horizontal snapshot cards — a quick sideways-scrolling read of
@@ -122,10 +154,15 @@ class DashboardScreen extends StatelessWidget {
                     const SizedBox(height: 14),
                     _SnapshotRow(snapshots: _snapshotsFor(context, state)),
                   ],
-                  if (state.profiles.length > 1) ...[
-                    const SizedBox(height: 28),
-                    const _ProfileStrip(),
-                  ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                   const SizedBox(height: 28),
                   if (budgets.isNotEmpty)
                     _BudgetSection(
@@ -143,6 +180,9 @@ class DashboardScreen extends StatelessWidget {
                   ],
                   const SizedBox(height: 28),
                   _PlannerSection(onSeeAll: onSeePlanner),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -345,6 +385,11 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // Only surface the profile switcher once there is more than one wallet to
+    // switch between — otherwise "All" is the only choice.
+    final hasProfiles = context.select<AppState, bool>(
+      (s) => s.profiles.length > 1,
+    );
 
     return Row(
       children: [
@@ -353,17 +398,24 @@ class _TopBar extends StatelessWidget {
           children: [
             Text(
               _greeting(),
-              style: theme.textTheme.bodyMedium?.copyWith(color: context.muted),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Colors.white.withValues(alpha: 0.72),
+              ),
             ),
             Text(
               'Your money',
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.w700,
+                color: Colors.white,
               ),
             ),
           ],
         ),
         const Spacer(),
+        if (hasProfiles) ...[
+          const _ProfilePill(),
+          const SizedBox(width: 8),
+        ],
         IconButton(
           onPressed: () => ManageScreen.open(context),
           tooltip: 'Categories, budgets & profiles',
@@ -648,6 +700,136 @@ class _BalanceCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// One account as its own card in the hero deck — name, live balance, and this
+/// month's money in vs out. Tap to open the account.
+class _AccountCard extends StatelessWidget {
+  const _AccountCard({
+    required this.balance,
+    required this.flow,
+    required this.onOpen,
+  });
+
+  final AccountBalance balance;
+  final AccountFlow flow;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final account = balance.account;
+    final accent = account.of(context);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onOpen,
+      child: Container(
+        padding: const EdgeInsets.all(22),
+        decoration: heroCardDecoration(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                BadgeIcon(icon: account.icon, accent: accent),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        account.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        account.type.label,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.55),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.white.withValues(alpha: 0.55),
+                ),
+              ],
+            ),
+            const Spacer(),
+            Text(
+              'Balance',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 4),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                Money.format(balance.balance),
+                style: theme.textTheme.displayLarge?.copyWith(
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            const Spacer(),
+            Row(
+              children: [
+                _flowBit(context, 'In', flow.inflow, context.good),
+                const SizedBox(width: 20),
+                _flowBit(context, 'Out', flow.outflow, context.warn),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _flowBit(BuildContext context, String label, double amount, Color c) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          label == 'In'
+              ? Icons.south_west_rounded
+              : Icons.north_east_rounded,
+          size: 15,
+          color: c,
+        ),
+        const SizedBox(width: 5),
+        Text(
+          Money.compact(amount),
+          style: TextStyle(
+            color: c,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.5),
+            fontSize: 12,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1038,87 +1220,105 @@ class _SnapshotCard extends StatelessWidget {
 }
 
 /// Profile switcher — rescopes the whole screen.
-class _ProfileStrip extends StatelessWidget {
-  const _ProfileStrip();
+/// The profile switcher — a compact pill in the header showing the active
+/// wallet, tapped to drop a menu of All + every profile. It sits on the blue
+/// wash, so it's styled in translucent white to read against it.
+class _ProfilePill extends StatelessWidget {
+  const _ProfilePill();
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final active = state.activeProfileId;
+    final active = state.activeProfile;
+    final label = active?.name ?? 'All';
+    final icon = active?.icon ?? Icons.all_inclusive_rounded;
+    final theme = Theme.of(context);
 
-    return SizedBox(
-      height: 36,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.zero,
-        children: [
-          _ProfileChip(
-            label: 'All',
-            icon: Icons.all_inclusive_rounded,
-            color: context.scheme.primary,
-            selected: active == null,
-            onTap: () => state.setActiveProfile(null),
+    return PopupMenuButton<String?>(
+      tooltip: 'Switch profile',
+      position: PopupMenuPosition.under,
+      offset: const Offset(0, 6),
+      color: context.isDark ? const Color(0xFF232322) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: context.hairline),
+      ),
+      onSelected: state.setActiveProfile,
+      itemBuilder: (context) => [
+        _menuItem(
+          context,
+          id: null,
+          label: 'All',
+          icon: Icons.all_inclusive_rounded,
+          color: context.scheme.primary,
+          selected: state.activeProfileId == null,
+        ),
+        for (final profile in state.profiles)
+          _menuItem(
+            context,
+            id: profile.id,
+            label: profile.name,
+            icon: profile.icon,
+            color: profile.of(context),
+            selected: state.activeProfileId == profile.id,
           ),
-          for (final profile in state.profiles) ...[
-            const SizedBox(width: 8),
-            _ProfileChip(
-              label: profile.name,
-              icon: profile.icon,
-              color: profile.of(context),
-              selected: active == profile.id,
-              onTap: () => state.setActiveProfile(profile.id),
+      ],
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.30)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 18,
+              color: Colors.white,
             ),
           ],
-        ],
+        ),
       ),
     );
   }
-}
 
-class _ProfileChip extends StatelessWidget {
-  const _ProfileChip({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final Color color;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: BoxDecoration(
-          color: selected
-              ? color.withValues(alpha: context.isDark ? 0.28 : 0.14)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? color : context.hairline,
-            width: selected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 7),
-            Text(
-              label,
-              style: Theme.of(
-                context,
-              ).textTheme.labelLarge?.copyWith(color: context.scheme.onSurface),
+  PopupMenuItem<String?> _menuItem(
+    BuildContext context, {
+    required String? id,
+    required String label,
+    required IconData icon,
+    required Color color,
+    required bool selected,
+  }) {
+    return PopupMenuItem<String?>(
+      value: id,
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: context.scheme.onSurface,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
             ),
+          ),
+          if (selected) ...[
+            const Spacer(),
+            Icon(Icons.check_rounded, size: 18, color: color),
           ],
-        ),
+        ],
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:budget/models/activity.dart';
 import 'package:budget/screens/tracker/dashboard.dart';
 import 'package:budget/state/app_state.dart';
+import 'package:budget/widgets/card_stack.dart';
 import 'package:budget/services/storage.dart';
 import 'package:budget/theme.dart';
 import 'package:flutter/material.dart';
@@ -192,8 +193,18 @@ void main() {
       );
       await tester.pumpAndSettle(const Duration(milliseconds: 600));
 
-      // The income snapshot card now shows its figure.
-      expect(find.text('TSh 120K'), findsOneWidget);
+      // The income snapshot card now shows its figure. The deck's account cards
+      // echo the same amount as their "In", so count only the one outside the
+      // deck — the snapshot card.
+      final figures = find.text('TSh 120K');
+      final inDeck = find.descendant(
+        of: find.byType(CardStack),
+        matching: find.text('TSh 120K'),
+      );
+      expect(
+        tester.widgetList(figures).length - tester.widgetList(inDeck).length,
+        1,
+      );
     });
 
     testWidgets('the row is absent before any spend', (tester) async {

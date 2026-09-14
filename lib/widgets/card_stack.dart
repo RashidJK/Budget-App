@@ -13,7 +13,12 @@ class CardStack extends StatefulWidget {
     required this.height,
     this.peek = 12,
     this.initialIndex = 0,
+    this.notchFront = false,
   });
+
+  /// Cut a concave "wallet pocket" notch into the top of the front card, so the
+  /// card behind shows through it — the layered-wallet look.
+  final bool notchFront;
 
   /// Front-first: the first entry starts on top.
   final List<Widget> cards;
@@ -42,13 +47,64 @@ class _CardStackState extends State<CardStack> {
     if (_front < 0) _front += n;
   }
 
+  Widget _buildCard(_DeckEntry entry) {
+    Widget card = widget.cards[entry.index];
+
+    // The front card wears the wallet-pocket notch, so the card behind shows
+    // through the dip. Its own shadow is clipped, so the shape draws one.
+    if (widget.notchFront && entry.depth == 0) {
+      const notch = WalletNotchBorder();
+      card = DecoratedBox(
+        decoration: const ShapeDecoration(
+          shape: notch,
+          shadows: [
+            BoxShadow(
+              color: Color(0x3B000000),
+              blurRadius: 28,
+              offset: Offset(0, 14),
+            ),
+            BoxShadow(
+              color: Color(0x24000000),
+              blurRadius: 8,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: ClipPath(
+          clipper: const ShapeBorderClipper(shape: notch),
+          child: card,
+        ),
+      );
+    }
+
+    if (entry.depth == 0) {
+      // Front card: swipe to change, buttons still tappable.
+      return GestureDetector(
+        behavior: HitTestBehavior.deferToChild,
+        onVerticalDragEnd: (details) {
+          final v = details.primaryVelocity ?? 0;
+          if (v < -200) {
+            _advance(1); // fling up → next
+          } else if (v > 200) {
+            _advance(-1); // fling down → previous
+          }
+        },
+        child: card,
+      );
+    }
+    // A peeking card: tap it to pull it forward.
+    return GestureDetector(onTap: () => _advance(1), child: card);
+  }
+
   @override
   Widget build(BuildContext context) {
     final n = widget.cards.length;
     final maxDepth = n - 1;
-    // The topmost peek sits `maxDepth * peek` above the front card, so reserve
-    // that much headroom.
-    final reserved = maxDepth * widget.peek;
+    // Only the first two cards behind peek; deeper ones sit at the same spot and
+    // fade, so the deck's headroom stays fixed however many cards it holds.
+    const maxVisible = 2;
+    final visible = maxDepth < maxVisible ? maxDepth : maxVisible;
+    final reserved = visible * widget.peek;
 
     // Order back-to-front so the front card paints last (on top).
     final entries = <_DeckEntry>[];
@@ -68,38 +124,26 @@ class _CardStackState extends State<CardStack> {
               key: ValueKey(entry.index),
               duration: const Duration(milliseconds: 320),
               curve: Curves.easeOutCubic,
-              top: (maxDepth - entry.depth) * widget.peek,
+              top:
+                  reserved -
+                  (entry.depth < maxVisible ? entry.depth : maxVisible) *
+                      widget.peek,
               left: 0,
               right: 0,
               height: widget.height,
               child: AnimatedScale(
                 duration: const Duration(milliseconds: 320),
                 curve: Curves.easeOutCubic,
-                scale: 1 - entry.depth * 0.04,
+                scale:
+                    1 -
+                    (entry.depth < maxVisible ? entry.depth : maxVisible) *
+                        0.04,
                 alignment: Alignment.topCenter,
                 child: AnimatedOpacity(
                   duration: const Duration(milliseconds: 320),
                   // Cards more than two deep fade out so a long deck stays tidy.
                   opacity: entry.depth <= 2 ? 1 : 0,
-                  child: entry.depth == 0
-                      // Front card: swipe to change, buttons still tappable.
-                      ? GestureDetector(
-                          behavior: HitTestBehavior.deferToChild,
-                          onVerticalDragEnd: (details) {
-                            final v = details.primaryVelocity ?? 0;
-                            if (v < -200) {
-                              _advance(1); // fling up → next
-                            } else if (v > 200) {
-                              _advance(-1); // fling down → previous
-                            }
-                          },
-                          child: widget.cards[entry.index],
-                        )
-                      // A peeking card: tap it to pull it forward.
-                      : GestureDetector(
-                          onTap: () => _advance(1),
-                          child: widget.cards[entry.index],
-                        ),
+                  child: _buildCard(entry),
                 ),
               ),
             ),
@@ -114,4 +158,70 @@ class _DeckEntry {
 
   final int index;
   final int depth;
+}
+
+/// A rounded card outline with a shallow concave notch scooped out of the top
+/// centre — the "pocket" a stacked wallet card sits in.
+class WalletNotchBorder extends ShapeBorder {
+  const WalletNotchBorder({
+    this.radius = 26,
+    this.notchWidth = 122,
+    this.notchDepth = 16,
+  });
+
+  final double radius;
+  final double notchWidth;
+  final double notchDepth;
+
+  Path _shape(Rect rect) {
+    final r = radius;
+    final cx = rect.center.dx;
+    final nw = notchWidth;
+    final nd = notchDepth;
+    return Path()
+      ..moveTo(rect.left + r, rect.top)
+      ..lineTo(cx - nw / 2, rect.top)
+      // concave dip: control below the top edge pulls the curve down by ~nd.
+      ..quadraticBezierTo(cx, rect.top + nd * 2, cx + nw / 2, rect.top)
+      ..lineTo(rect.right - r, rect.top)
+      ..arcToPoint(
+        Offset(rect.right, rect.top + r),
+        radius: Radius.circular(r),
+      )
+      ..lineTo(rect.right, rect.bottom - r)
+      ..arcToPoint(
+        Offset(rect.right - r, rect.bottom),
+        radius: Radius.circular(r),
+      )
+      ..lineTo(rect.left + r, rect.bottom)
+      ..arcToPoint(
+        Offset(rect.left, rect.bottom - r),
+        radius: Radius.circular(r),
+      )
+      ..lineTo(rect.left, rect.top + r)
+      ..arcToPoint(
+        Offset(rect.left + r, rect.top),
+        radius: Radius.circular(r),
+      )
+      ..close();
+  }
+
+  @override
+  EdgeInsetsGeometry get dimensions => EdgeInsets.zero;
+
+  @override
+  Path getInnerPath(Rect rect, {TextDirection? textDirection}) => _shape(rect);
+
+  @override
+  Path getOuterPath(Rect rect, {TextDirection? textDirection}) => _shape(rect);
+
+  @override
+  void paint(Canvas canvas, Rect rect, {TextDirection? textDirection}) {}
+
+  @override
+  ShapeBorder scale(double t) => WalletNotchBorder(
+    radius: radius * t,
+    notchWidth: notchWidth * t,
+    notchDepth: notchDepth * t,
+  );
 }
