@@ -4,8 +4,9 @@ import 'package:provider/provider.dart';
 import '../services/format.dart';
 import '../state/app_state.dart';
 
-/// A floating blue "briefing" island — a friendly, at-a-glance summary of where
-/// your money stands. Drops in from the top of the screen, opened from the bar.
+/// A blue "briefing" island — a friendly, at-a-glance summary of where your
+/// money stands. Drops down from the very top edge of the screen (bleeding
+/// behind the status bar), opened from the bar.
 Future<void> showBriefing(BuildContext context) {
   return showGeneralDialog<void>(
     context: context,
@@ -53,6 +54,9 @@ class _BriefingCard extends StatelessWidget {
     final incomeMonth = state.incomeThisMonth;
     final balance = state.totalBalance;
     final accounts = state.accounts.length;
+    // Bleed up behind the status bar rather than floating below it, so the
+    // island reads as dropping in from the very top edge of the screen.
+    final topInset = MediaQuery.paddingOf(context).top;
 
     const white = Colors.white;
     final soft = Colors.white.withValues(alpha: 0.72);
@@ -62,25 +66,26 @@ class _BriefingCard extends StatelessWidget {
       textScaler: TextScaler.noScaling,
     );
 
-    return SafeArea(
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: Container(
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Container(
         width: double.infinity,
-        margin: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-        padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
+        // Content clears the notch, but the blue fills right up to y=0.
+        padding: EdgeInsets.fromLTRB(22, topInset + 20, 22, 22),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF3B82F6), Color(0xFF2458E6)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF5B9BFF), Color(0xFF2F6BEE), Color(0xFF1E4FD8)],
           ),
-          borderRadius: BorderRadius.circular(26),
+          borderRadius: const BorderRadius.vertical(
+            bottom: Radius.circular(30),
+          ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF2458E6).withValues(alpha: 0.4),
-              blurRadius: 30,
-              offset: const Offset(0, 14),
+              color: const Color(0xFF1E4FD8).withValues(alpha: 0.42),
+              blurRadius: 34,
+              offset: const Offset(0, 16),
             ),
           ],
         ),
@@ -136,9 +141,7 @@ class _BriefingCard extends StatelessWidget {
                   ],
                   const Text('. You hold '),
                   num(Money.compact(balance)),
-                  Text(
-                    ' across $accounts account${accounts == 1 ? '' : 's'}.',
-                  ),
+                  Text(' across $accounts account${accounts == 1 ? '' : 's'}.'),
                 ],
               ),
             ),
@@ -154,7 +157,6 @@ class _BriefingCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
       ),
     );
   }
