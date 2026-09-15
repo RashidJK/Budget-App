@@ -46,7 +46,7 @@ class DashboardScreen extends StatelessWidget {
     final state = context.watch<AppState>();
     final budgets = state.budgetProgress();
     // Blue wash for the top of the screen — behind the header and hero deck —
-    // fading to nothing before the budgets.
+    // fading out right at the "Your budgets" heading.
     final blue = context.isDark
         ? const Color(0xFF20418C)
         : const Color(0xFF2F62E0);
@@ -92,7 +92,7 @@ class DashboardScreen extends StatelessWidget {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [blue, blue, blue.withValues(alpha: 0)],
-                      stops: const [0.0, 0.42, 0.78],
+                      stops: const [0.0, 0.55, 1.0],
                     ),
                   ),
                   child: Padding(
@@ -168,6 +168,9 @@ class DashboardScreen extends StatelessWidget {
                             snapshots: _snapshotsFor(context, state),
                           ),
                         ],
+                        // Carry the wash a little past the deck so it fades out
+                        // right at the "Your budgets" heading below.
+                        const SizedBox(height: 28),
                       ],
                     ),
                   ),
@@ -177,7 +180,6 @@ class DashboardScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const SizedBox(height: 28),
                       if (budgets.isNotEmpty)
                         _BudgetSection(
                           budgets: budgets,
