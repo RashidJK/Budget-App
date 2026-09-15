@@ -66,96 +66,103 @@ class _BriefingCard extends StatelessWidget {
       textScaler: TextScaler.noScaling,
     );
 
-    return Align(
-      alignment: Alignment.topCenter,
-      child: Container(
-        width: double.infinity,
-        // Content clears the notch, but the blue fills right up to y=0.
-        padding: EdgeInsets.fromLTRB(22, topInset + 20, 22, 22),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF5B9BFF), Color(0xFF2F6BEE), Color(0xFF1E4FD8)],
-          ),
-          borderRadius: const BorderRadius.vertical(
-            bottom: Radius.circular(30),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF1E4FD8).withValues(alpha: 0.42),
-              blurRadius: 34,
-              offset: const Offset(0, 16),
+    // showGeneralDialog doesn't put a Material above the card, so text would
+    // otherwise fall back to the default underlined style — this supplies one.
+    return Material(
+      type: MaterialType.transparency,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: Container(
+          width: double.infinity,
+          // Content clears the notch, but the blue fills right up to y=0.
+          padding: EdgeInsets.fromLTRB(22, topInset + 20, 22, 22),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF2F62E0), Color(0xFF1E45C0), Color(0xFF122E86)],
             ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.auto_awesome_rounded,
-                    color: white,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  name == null ? _greeting() : '${_greeting()}, $name',
-                  style: TextStyle(
-                    color: soft,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+            borderRadius: const BorderRadius.vertical(
+              bottom: Radius.circular(30),
             ),
-            const SizedBox(height: 16),
-            DefaultTextStyle(
-              style: const TextStyle(
-                color: white,
-                fontSize: 19,
-                height: 1.4,
-                fontWeight: FontWeight.w500,
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF122E86).withValues(alpha: 0.45),
+                blurRadius: 34,
+                offset: const Offset(0, 16),
               ),
-              child: Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  const Text('You spent '),
-                  num(Money.compact(spentToday)),
-                  const Text(' today, '),
-                  num(Money.compact(spentMonth)),
-                  const Text(' this month'),
-                  if (incomeMonth > 0) ...[
-                    const Text(' — and earned '),
-                    num(Money.compact(incomeMonth)),
-                  ],
-                  const Text('. You hold '),
-                  num(Money.compact(balance)),
-                  Text(' across $accounts account${accounts == 1 ? '' : 's'}.'),
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.auto_awesome_rounded,
+                      color: white,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    name == null ? _greeting() : '${_greeting()}, $name',
+                    style: TextStyle(
+                      color: soft,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
-            ),
-            const SizedBox(height: 18),
-            Container(height: 1, color: Colors.white.withValues(alpha: 0.16)),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                _Stat(label: 'Today', value: Money.compact(spentToday)),
-                _Stat(label: 'This month', value: Money.compact(spentMonth)),
-                _Stat(label: 'Balance', value: Money.compact(balance)),
-              ],
-            ),
-          ],
+              const SizedBox(height: 16),
+              DefaultTextStyle(
+                style: const TextStyle(
+                  color: white,
+                  fontSize: 19,
+                  height: 1.4,
+                  fontWeight: FontWeight.w500,
+                ),
+                child: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Text('You spent '),
+                    num(Money.compact(spentToday)),
+                    const Text(' today, '),
+                    num(Money.compact(spentMonth)),
+                    const Text(' this month'),
+                    if (incomeMonth > 0) ...[
+                      const Text(' — and earned '),
+                      num(Money.compact(incomeMonth)),
+                    ],
+                    const Text('. You hold '),
+                    num(Money.compact(balance)),
+                    Text(
+                      ' across $accounts account${accounts == 1 ? '' : 's'}.',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Container(height: 1, color: Colors.white.withValues(alpha: 0.16)),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  _Stat(label: 'Today', value: Money.compact(spentToday)),
+                  _Stat(label: 'This month', value: Money.compact(spentMonth)),
+                  _Stat(label: 'Balance', value: Money.compact(balance)),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
