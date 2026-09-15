@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 /// A short deck of cards shown stacked, with the ones behind peeking a little
 /// above the front card. Swipe **up** on the front card (or tap a peeking one)
-/// to bring the next card forward; swipe down to go back.
+/// to bring the next card forward; swipe down to go back. A row of page dots
+/// below the deck marks how many cards there are and which is on top — tap one
+/// to jump straight to that card.
 ///
 /// The front card is fully interactive — taps on its buttons pass straight
 /// through; only a deliberate vertical fling changes the card.
@@ -45,6 +47,12 @@ class _CardStackState extends State<CardStack> {
     if (n < 2) return;
     setState(() => _front = (_front + direction) % n);
     if (_front < 0) _front += n;
+  }
+
+  /// Bring card [index] to the front — used by the page dots.
+  void _jumpTo(int index) {
+    if (index == _front) return;
+    setState(() => _front = index);
   }
 
   Widget _buildCard(_DeckEntry entry) {
@@ -114,36 +122,76 @@ class _CardStackState extends State<CardStack> {
     }
     entries.sort((a, b) => b.depth.compareTo(a.depth));
 
-    return SizedBox(
-      height: widget.height + reserved,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          for (final entry in entries)
-            AnimatedPositioned(
-              key: ValueKey(entry.index),
-              duration: const Duration(milliseconds: 320),
-              curve: Curves.easeOutCubic,
-              top:
-                  reserved -
-                  (entry.depth < maxVisible ? entry.depth : maxVisible) *
-                      widget.peek,
-              left: 0,
-              right: 0,
-              height: widget.height,
-              child: AnimatedScale(
-                duration: const Duration(milliseconds: 320),
-                curve: Curves.easeOutCubic,
-                scale:
-                    1 -
-                    (entry.depth < maxVisible ? entry.depth : maxVisible) *
-                        0.04,
-                alignment: Alignment.topCenter,
-                child: AnimatedOpacity(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: widget.height + reserved,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              for (final entry in entries)
+                AnimatedPositioned(
+                  key: ValueKey(entry.index),
                   duration: const Duration(milliseconds: 320),
-                  // Cards more than two deep fade out so a long deck stays tidy.
-                  opacity: entry.depth <= 2 ? 1 : 0,
-                  child: _buildCard(entry),
+                  curve: Curves.easeOutCubic,
+                  top:
+                      reserved -
+                      (entry.depth < maxVisible ? entry.depth : maxVisible) *
+                          widget.peek,
+                  left: 0,
+                  right: 0,
+                  height: widget.height,
+                  child: AnimatedScale(
+                    duration: const Duration(milliseconds: 320),
+                    curve: Curves.easeOutCubic,
+                    scale:
+                        1 -
+                        (entry.depth < maxVisible ? entry.depth : maxVisible) *
+                            0.04,
+                    alignment: Alignment.topCenter,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 320),
+                      // Cards more than two deep fade so a long deck stays tidy.
+                      opacity: entry.depth <= 2 ? 1 : 0,
+                      child: _buildCard(entry),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        // Page dots: one per card, the current one drawn out into a pill. They
+        // signal the deck is a stack and jump straight to a card when tapped.
+        if (n > 1) _dots(context, n),
+      ],
+    );
+  }
+
+  Widget _dots(BuildContext context, int n) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          for (var i = 0; i < n; i++)
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _jumpTo(i),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  width: i == _front ? 18 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: i == _front
+                        ? scheme.primary
+                        : scheme.onSurface.withValues(alpha: 0.22),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
                 ),
               ),
             ),
@@ -184,10 +232,7 @@ class WalletNotchBorder extends ShapeBorder {
       // concave dip: control below the top edge pulls the curve down by ~nd.
       ..quadraticBezierTo(cx, rect.top + nd * 2, cx + nw / 2, rect.top)
       ..lineTo(rect.right - r, rect.top)
-      ..arcToPoint(
-        Offset(rect.right, rect.top + r),
-        radius: Radius.circular(r),
-      )
+      ..arcToPoint(Offset(rect.right, rect.top + r), radius: Radius.circular(r))
       ..lineTo(rect.right, rect.bottom - r)
       ..arcToPoint(
         Offset(rect.right - r, rect.bottom),
@@ -199,10 +244,7 @@ class WalletNotchBorder extends ShapeBorder {
         radius: Radius.circular(r),
       )
       ..lineTo(rect.left, rect.top + r)
-      ..arcToPoint(
-        Offset(rect.left + r, rect.top),
-        radius: Radius.circular(r),
-      )
+      ..arcToPoint(Offset(rect.left + r, rect.top), radius: Radius.circular(r))
       ..close();
   }
 
