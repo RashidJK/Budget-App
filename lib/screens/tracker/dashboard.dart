@@ -190,6 +190,11 @@ class DashboardScreen extends StatelessWidget {
                           hasExpenses: state.spentThisMonth > 0,
                           onManage: () => ManageScreen.open(context),
                         ),
+                      if (state.scopedExpenses.isNotEmpty ||
+                          state.scopedActivities.isNotEmpty) ...[
+                        const SizedBox(height: 28),
+                        _RecentSection(onSeeAll: () => _openHistory(context)),
+                      ],
                       if (state.outstandingBalances.isNotEmpty) ...[
                         const SizedBox(height: 28),
                         _BalancesSection(balances: state.outstandingBalances),
@@ -204,6 +209,49 @@ class DashboardScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The five most recent entries — expenses and activities interleaved by
+/// recency — as a compact peek. "See all" opens the full history; the rows are
+/// dense (no swipe) so this stays a glance, not a place to manage from.
+class _RecentSection extends StatelessWidget {
+  const _RecentSection({required this.onSeeAll});
+
+  final VoidCallback onSeeAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    // Merge the two ledgers into one recency-sorted feed, newest first.
+    final entries = <({DateTime date, Widget row})>[
+      for (final e in state.scopedExpenses)
+        (date: e.date, row: ExpenseRow(expense: e, dense: true)),
+      for (final a in state.scopedActivities)
+        (date: a.date, row: ActivityRow(activity: a, dense: true)),
+    ]..sort((x, y) => y.date.compareTo(x.date));
+    final recent = entries.take(5).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeader(title: 'Recent', onAction: onSeeAll),
+        const SizedBox(height: 14),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              children: [
+                for (var i = 0; i < recent.length; i++) ...[
+                  if (i > 0) Divider(indent: 52, color: context.hairline),
+                  recent[i].row,
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1075,12 +1123,10 @@ class _Snapshot {
 /// prior month to compare against), so the row never shows an empty or
 /// meaningless card.
 List<_Snapshot> _snapshotsFor(BuildContext context, AppState state) {
-  final top = state.topCategoryThisMonth;
-  final biggest = state.biggestExpenseThisMonth;
-  final income = state.incomeThisMonth;
-  final lastMonth = state.spentLastMonth;
-  // Every badge tint is drawn from the validated palette or a semantic token,
-  // so nothing escapes the contrast-checked system.
+  // A tight glance — four figures, not a wall of stats. The rest (top category,
+  // biggest, counts) live in the Analytics tab. Every badge tint is drawn from
+  // the validated palette or a semantic token, so nothing escapes the
+  // contrast-checked system.
   final brightness = Theme.of(context).brightness;
 
   return [
@@ -1109,41 +1155,6 @@ List<_Snapshot> _snapshotsFor(BuildContext context, AppState state) {
       value: Money.compact(state.projectedThisMonth),
       accent: context.caution,
     ),
-    _Snapshot(
-      icon: PhosphorR.receipt,
-      label: 'Entries',
-      value: '${state.expenseCountThisMonth}',
-      accent: Palette.color(2, brightness), // pink
-    ),
-    if (top != null)
-      _Snapshot(
-        icon: top.category.icon,
-        label: 'Top: ${top.category.name}',
-        value: Money.compact(top.total),
-        accent: top.category.of(context),
-      ),
-    if (biggest != null)
-      _Snapshot(
-        icon: PhosphorR.fire,
-        label: 'Biggest',
-        value: Money.compact(biggest.amount),
-        accent: context.warn,
-      ),
-    if (income > 0)
-      _Snapshot(
-        icon: PhosphorR.arrowDownLeft,
-        label: 'Income',
-        // Income is money in — green reads correctly as positive here.
-        value: Money.compact(income),
-        accent: context.good,
-      ),
-    if (lastMonth > 0)
-      _Snapshot(
-        icon: PhosphorR.clockCounterClockwise,
-        label: 'Last month',
-        value: Money.compact(lastMonth),
-        accent: context.muted,
-      ),
   ];
 }
 

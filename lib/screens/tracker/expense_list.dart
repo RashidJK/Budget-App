@@ -456,20 +456,18 @@ class ExpenseRow extends StatelessWidget {
 /// green with a leading `+`, outflows and loans out are neutral with `−`, and
 /// transfers are neutral (money that only moved, not spent).
 class ActivityRow extends StatelessWidget {
-  const ActivityRow({super.key, required this.activity});
+  const ActivityRow({super.key, required this.activity, this.dense = false});
 
   final Activity activity;
 
+  /// Trims padding and drops the swipe action, for embedding in the
+  /// dashboard's "Recent" summary.
+  final bool dense;
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final (icon, color) = _iconFor(context, activity.type);
-    final amount = Money.format(activity.amount);
-    final signed = activity.type.isInflow
-        ? '+$amount'
-        : activity.type == ActivityType.transfer
-        ? amount
-        : '−$amount';
+    final row = _content(context);
+    if (dense) return row;
 
     return Dismissible(
       key: ValueKey('activity-${activity.id}'),
@@ -503,52 +501,68 @@ class ActivityRow extends StatelessWidget {
           ),
         );
       },
-      child: InkWell(
-        onTap: () => ActivityEditSheet.show(context, activity),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              BadgeIcon(icon: icon, accent: color),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      activity.description.isEmpty
-                          ? activity.type.label
-                          : activity.description,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+      child: row,
+    );
+  }
+
+  Widget _content(BuildContext context) {
+    final theme = Theme.of(context);
+    final (icon, color) = _iconFor(context, activity.type);
+    final amount = Money.format(activity.amount);
+    final signed = activity.type.isInflow
+        ? '+$amount'
+        : activity.type == ActivityType.transfer
+        ? amount
+        : '−$amount';
+
+    return InkWell(
+      onTap: () => ActivityEditSheet.show(context, activity),
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: dense ? 0 : 16,
+          vertical: dense ? 10 : 14,
+        ),
+        child: Row(
+          children: [
+            BadgeIcon(icon: icon, accent: color),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    activity.description.isEmpty
+                        ? activity.type.label
+                        : activity.description,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _subtitle(),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: context.muted,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _subtitle(),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: context.muted,
                     ),
-                  ],
-                ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Text(
-                signed,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: activity.type.isInflow ? context.good : null,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              signed,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: activity.type.isInflow ? context.good : null,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

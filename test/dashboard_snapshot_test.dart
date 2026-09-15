@@ -1,7 +1,6 @@
 import 'package:budget/models/activity.dart';
 import 'package:budget/screens/tracker/dashboard.dart';
 import 'package:budget/state/app_state.dart';
-import 'package:budget/widgets/card_stack.dart';
 import 'package:budget/services/storage.dart';
 import 'package:budget/theme.dart';
 import 'package:flutter/material.dart';
@@ -133,16 +132,14 @@ void main() {
 
       await _pumpDashboard(tester, state);
 
+      // The row is trimmed to four core figures; richer breakdowns (top
+      // category, biggest, counts) live in the Analytics tab now.
       expect(find.text('Today'), findsOneWidget);
       expect(find.text('This week'), findsOneWidget);
       expect(find.text('Daily average'), findsOneWidget);
       expect(find.text('Projected'), findsOneWidget);
-      expect(find.text('Entries'), findsOneWidget);
-      expect(find.text('Biggest'), findsOneWidget);
-      // Two expenses this month.
-      expect(find.text('2'), findsOneWidget);
-      // Fuel is the larger category, so it leads the "Top" card.
-      expect(find.text('Top: Fuel'), findsOneWidget);
+      expect(find.text('Entries'), findsNothing);
+      expect(find.text('Biggest'), findsNothing);
     });
 
     testWidgets('conditional cards stay hidden with nothing to show', (
@@ -164,47 +161,38 @@ void main() {
       expect(find.text('Last month'), findsNothing);
     });
 
-    testWidgets('the income card appears only once income is logged', (
+    testWidgets('the Recent feed lists the latest entries, newest first', (
       tester,
     ) async {
       final state = await _freshState();
+      final now = DateTime.now();
       await state.addExpense(
         title: 'Lunch',
         amount: 5000,
         categoryId: 'eating_out',
-        date: DateTime.now(),
+        date: now,
       );
-
-      // The word "Income" is ambiguous (hero toggle + hero quick-action), so
-      // the card is identified by its own figure. Before any income there is
-      // no income card, so its compact value is absent.
-      await _pumpDashboard(tester, state);
-      expect(find.text('TSh 120K'), findsNothing);
-
-      final now = DateTime.now();
       await state.addActivity(
         Activity(
           id: 'inc-1',
           type: ActivityType.income,
           amount: 120000,
-          date: now,
+          date: now.add(const Duration(minutes: 1)),
           updatedAt: now,
         ),
       );
-      await tester.pumpAndSettle(const Duration(milliseconds: 600));
 
-      // The income snapshot card now shows its figure. The deck's account cards
-      // echo the same amount as their "In", so count only the one outside the
-      // deck — the snapshot card.
-      final figures = find.text('TSh 120K');
-      final inDeck = find.descendant(
-        of: find.byType(CardStack),
-        matching: find.text('TSh 120K'),
-      );
-      expect(
-        tester.widgetList(figures).length - tester.widgetList(inDeck).length,
-        1,
-      );
+      await _pumpDashboard(tester, state);
+
+      // The Recent section sits well down the page; scroll it into view.
+      final list = find.byType(Scrollable).first;
+      await tester.scrollUntilVisible(find.text('Lunch'), 400, scrollable: list);
+
+      // Expenses and activities interleave in one feed: the expense by title,
+      // the income activity with its leading + and full figure.
+      expect(find.text('Recent'), findsOneWidget);
+      expect(find.text('Lunch'), findsOneWidget);
+      expect(find.text('+TSh 120,000'), findsOneWidget);
     });
 
     testWidgets('the row is absent before any spend', (tester) async {
