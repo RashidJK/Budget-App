@@ -23,9 +23,9 @@ import 'expense_list.dart';
 
 /// Opens the full history list.
 void _openHistory(BuildContext context) {
-  Navigator.of(context).push(
-    MaterialPageRoute<void>(builder: (_) => const ExpenseListScreen()),
-  );
+  Navigator.of(
+    context,
+  ).push(MaterialPageRoute<void>(builder: (_) => const ExpenseListScreen()));
 }
 
 /// The tracker's overview.
@@ -86,106 +86,119 @@ class DashboardScreen extends StatelessWidget {
             ListView(
               padding: const EdgeInsets.only(bottom: 120),
               children: [
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [blue, blue, blue.withValues(alpha: 0)],
-                        stops: const [0.0, 0.62, 0.96],
-                      ),
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(16, 8 + topInset, 16, 4),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                  _TopBar(),
-                  const SizedBox(height: 18),
-                  // A stacked deck: the month-to-date flow card on top, the
-                  // balance card peeking behind it. Swipe up to swap.
-                  CardStack(
-                    height: 250,
-                    peek: 26,
-                    notchFront: true,
-                    cards: [
-                      _HeroCard(
-                        spent: state.spentThisMonth,
-                        spentPrevious: state.spentLastMonth,
-                        income: state.incomeThisMonth,
-                        incomePrevious: state.incomeLastMonth,
-                        onAdd: () => CommandBar.show(context),
-                        onIncome: () =>
-                            CommandBar.show(context, initialText: 'Received '),
-                        onTransfer: () =>
-                            CommandBar.show(context, initialText: 'Transfer '),
-                        onHistory: () => _openHistory(context),
-                      ),
-                      _BalanceCard(
-                        total: state.totalBalance,
-                        accounts: state.accountBalances,
-                        onAdd: () => CommandBar.show(context),
-                        onIncome: () =>
-                            CommandBar.show(context, initialText: 'Received '),
-                        onTransfer: () =>
-                            CommandBar.show(context, initialText: 'Transfer '),
-                        onHistory: () => _openHistory(context),
-                        onManageAccounts: () => AccountsScreen.open(context),
-                        onOpenAccount: (id) =>
-                            AccountDetailScreen.open(context, id),
-                      ),
-                      // One card per account, largest balance first.
-                      for (final ab in state.accountBalances)
-                        _AccountCard(
-                          balance: ab,
-                          flow: state.accountFlow(
-                            ab.account.id,
-                            DateTime.now(),
-                          ),
-                          onOpen: () =>
-                              AccountDetailScreen.open(context, ab.account.id),
-                        ),
-                    ],
-                  ),
-                  // Horizontal snapshot cards — a quick sideways-scrolling read of
-                  // recent spending, shown only once there is data to summarise.
-                  if (state.spentThisMonth > 0) ...[
-                    const SizedBox(height: 28),
-                    const SectionHeader(title: 'This month'),
-                    const SizedBox(height: 14),
-                    _SnapshotRow(snapshots: _snapshotsFor(context, state)),
-                  ],
-                        ],
-                      ),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [blue, blue, blue.withValues(alpha: 0)],
+                      stops: const [0.0, 0.42, 0.78],
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(16, 8 + topInset, 16, 4),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                  const SizedBox(height: 28),
-                  if (budgets.isNotEmpty)
-                    _BudgetSection(
-                      budgets: budgets,
-                      daysLeft: state.daysLeftThisMonth,
-                    )
-                  else
-                    _BudgetEmpty(
-                      hasExpenses: state.spentThisMonth > 0,
-                      onManage: () => ManageScreen.open(context),
-                    ),
-                  if (state.outstandingBalances.isNotEmpty) ...[
-                    const SizedBox(height: 28),
-                    _BalancesSection(balances: state.outstandingBalances),
-                  ],
-                  const SizedBox(height: 28),
-                  _PlannerSection(onSeeAll: onSeePlanner),
+                        _TopBar(),
+                        const SizedBox(height: 18),
+                        // A stacked deck: the month-to-date flow card on top, the
+                        // balance card peeking behind it. Swipe up to swap.
+                        CardStack(
+                          height: 250,
+                          peek: 26,
+                          notchFront: true,
+                          cards: [
+                            _HeroCard(
+                              spent: state.spentThisMonth,
+                              spentPrevious: state.spentLastMonth,
+                              income: state.incomeThisMonth,
+                              incomePrevious: state.incomeLastMonth,
+                              onAdd: () => CommandBar.show(context),
+                              onIncome: () => CommandBar.show(
+                                context,
+                                initialText: 'Received ',
+                              ),
+                              onTransfer: () => CommandBar.show(
+                                context,
+                                initialText: 'Transfer ',
+                              ),
+                              onHistory: () => _openHistory(context),
+                            ),
+                            _BalanceCard(
+                              total: state.totalBalance,
+                              accounts: state.accountBalances,
+                              onAdd: () => CommandBar.show(context),
+                              onIncome: () => CommandBar.show(
+                                context,
+                                initialText: 'Received ',
+                              ),
+                              onTransfer: () => CommandBar.show(
+                                context,
+                                initialText: 'Transfer ',
+                              ),
+                              onHistory: () => _openHistory(context),
+                              onManageAccounts: () =>
+                                  AccountsScreen.open(context),
+                              onOpenAccount: (id) =>
+                                  AccountDetailScreen.open(context, id),
+                            ),
+                            // One card per account, largest balance first.
+                            for (final ab in state.accountBalances)
+                              _AccountCard(
+                                balance: ab,
+                                flow: state.accountFlow(
+                                  ab.account.id,
+                                  DateTime.now(),
+                                ),
+                                onOpen: () => AccountDetailScreen.open(
+                                  context,
+                                  ab.account.id,
+                                ),
+                              ),
+                          ],
+                        ),
+                        // Horizontal snapshot cards — a quick sideways-scrolling read of
+                        // recent spending, shown only once there is data to summarise.
+                        if (state.spentThisMonth > 0) ...[
+                          const SizedBox(height: 28),
+                          const SectionHeader(title: 'This month'),
+                          const SizedBox(height: 14),
+                          _SnapshotRow(
+                            snapshots: _snapshotsFor(context, state),
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                ],
-              ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 28),
+                      if (budgets.isNotEmpty)
+                        _BudgetSection(
+                          budgets: budgets,
+                          daysLeft: state.daysLeftThisMonth,
+                        )
+                      else
+                        _BudgetEmpty(
+                          hasExpenses: state.spentThisMonth > 0,
+                          onManage: () => ManageScreen.open(context),
+                        ),
+                      if (state.outstandingBalances.isNotEmpty) ...[
+                        const SizedBox(height: 28),
+                        _BalancesSection(balances: state.outstandingBalances),
+                      ],
+                      const SizedBox(height: 28),
+                      _PlannerSection(onSeeAll: onSeePlanner),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -412,10 +425,7 @@ class _TopBar extends StatelessWidget {
           ],
         ),
         const Spacer(),
-        if (hasProfiles) ...[
-          const _ProfilePill(),
-          const SizedBox(width: 8),
-        ],
+        if (hasProfiles) ...[const _ProfilePill(), const SizedBox(width: 8)],
         IconButton(
           onPressed: () => ManageScreen.open(context),
           tooltip: 'Categories, budgets & profiles',
@@ -805,9 +815,7 @@ class _AccountCard extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
-          label == 'In'
-              ? Icons.south_west_rounded
-              : Icons.north_east_rounded,
+          label == 'In' ? Icons.south_west_rounded : Icons.north_east_rounded,
           size: 15,
           color: c,
         ),
