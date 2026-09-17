@@ -10,7 +10,6 @@ import '../../models/person.dart';
 import '../../services/format.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
-import '../../widgets/app_background.dart';
 import '../../widgets/badge_icon.dart';
 import '../../widgets/card_stack.dart';
 import '../../widgets/section_header.dart';
@@ -35,179 +34,300 @@ void _openHistory(BuildContext context) {
 /// brief pointed at. Where that reference shows progress toward a savings
 /// target, this shows progress toward a monthly budget: the honest analogue
 /// for money going out rather than in.
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key, this.onSeePlanner});
 
   /// Jump to the Planner tab, wired by the nav shell.
   final VoidCallback? onSeePlanner;
 
   @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen>
+    with SingleTickerProviderStateMixin {
+  // 0 = collapsed (just the Total figure), 1 = expanded (the stacked cards).
+  // The blue band grows from the height of the single figure to the full deck,
+  // and the white sheet below rides down with it.
+  late final AnimationController _reveal = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 380),
+  );
+
+  static const double _collapsedBand = 60;
+  static const double _expandedBand = 334; // deck 250 + peek 52 + dots ~32
+
+  double get _range => _expandedBand - _collapsedBand;
+
+  @override
+  void dispose() {
+    _reveal.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    if (_reveal.value < 0.5) {
+      _reveal.animateTo(1, curve: Curves.easeOutCubic);
+    } else {
+      _reveal.animateBack(0, curve: Curves.easeOutCubic);
+    }
+  }
+
+  // Dragging the handle down grows the band (reveal); up shrinks it.
+  void _onDragUpdate(DragUpdateDetails d) {
+    _reveal.value = (_reveal.value + (d.primaryDelta ?? 0) / _range).clamp(
+      0.0,
+      1.0,
+    );
+  }
+
+  void _onDragEnd(DragEndDetails d) {
+    final v = d.primaryVelocity ?? 0;
+    if (v > 320) {
+      _reveal.animateTo(1, curve: Curves.easeOutCubic);
+    } else if (v < -320) {
+      _reveal.animateBack(0, curve: Curves.easeOutCubic);
+    } else if (_reveal.value >= 0.5) {
+      _reveal.animateTo(1, curve: Curves.easeOutCubic);
+    } else {
+      _reveal.animateBack(0, curve: Curves.easeOutCubic);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final budgets = state.budgetProgress();
-    // Blue wash for the top of the screen — behind the header and hero deck —
-    // fading out right at the "Your budgets" heading.
     final blue = context.isDark
         ? const Color(0xFF20418C)
         : const Color(0xFF2F62E0);
-    // Status-bar height: the wash bleeds all the way up behind it, so this is
-    // added to the header's top padding rather than clipped away by a SafeArea.
     final topInset = MediaQuery.paddingOf(context).top;
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      // The graded wash carried by every tab, so the whole app reads as one
-      // continuous lit canvas.
-      body: AppBackground(
-        child: Stack(
-          children: [
-            // A single soft brand bloom — light spilling from where the hero
-            // sits, so the canvas reads as lit rather than flat.
-            Positioned.fill(
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: const Alignment(-0.15, -0.85),
-                      radius: 1.1,
-                      colors: [
-                        (context.isDark
-                                ? const Color(0xFF3CA98B)
-                                : AppTheme.brandGreen)
-                            .withValues(alpha: context.isDark ? 0.13 : 0.07),
-                        Colors.transparent,
-                      ],
-                      stops: const [0.0, 0.55],
+      backgroundColor: blue,
+      body: AnimatedBuilder(
+        animation: _reveal,
+        builder: (context, _) {
+          final t = _reveal.value;
+          final bandHeight = _collapsedBand + _range * t;
+          return Column(
+            children: [
+              // ---- Blue hero: greeting, the Total, and the morphing band ----
+              Padding(
+                padding: EdgeInsets.fromLTRB(20, topInset + 8, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _TopBar(),
+                    const SizedBox(height: 18),
+                    Text(
+                      'Total',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.72),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 4),
+                    // The morph: the single Total figure fades out as the stacked
+                    // cards fade in, and the band grows to make room for them.
+                    ClipRect(
+                      child: SizedBox(
+                        height: bandHeight,
+                        width: double.infinity,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Opacity(
+                              opacity: (1 - t * 1.8).clamp(0.0, 1.0),
+                              child: Text(
+                                Money.format(state.totalBalance),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 44,
+                                  fontWeight: FontWeight.w800,
+                                  height: 1.1,
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              height: _expandedBand,
+                              child: Opacity(
+                                opacity: (t * 1.8 - 0.8).clamp(0.0, 1.0),
+                                child: IgnorePointer(
+                                  ignoring: t < 0.98,
+                                  child: _deck(context, state),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // ---- White sheet: handle to reveal/hide, content scrolls ----
+              Expanded(
+                child: _HeroSheet(
+                  onToggle: _toggle,
+                  onDragUpdate: _onDragUpdate,
+                  onDragEnd: _onDragEnd,
+                  child: _content(context, state),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// The stacked deck revealed on expand: total-balance card, then one card per
+  /// account, with the month-to-date flow card leading.
+  Widget _deck(BuildContext context, AppState state) {
+    return CardStack(
+      height: 250,
+      peek: 26,
+      notchFront: true,
+      cards: [
+        _HeroCard(
+          spent: state.spentThisMonth,
+          spentPrevious: state.spentLastMonth,
+          income: state.incomeThisMonth,
+          incomePrevious: state.incomeLastMonth,
+          onAdd: () => CommandBar.show(context),
+          onIncome: () => CommandBar.show(context, initialText: 'Received '),
+          onTransfer: () => CommandBar.show(context, initialText: 'Transfer '),
+          onHistory: () => _openHistory(context),
+        ),
+        _BalanceCard(
+          total: state.totalBalance,
+          accounts: state.accountBalances,
+          onAdd: () => CommandBar.show(context),
+          onIncome: () => CommandBar.show(context, initialText: 'Received '),
+          onTransfer: () => CommandBar.show(context, initialText: 'Transfer '),
+          onHistory: () => _openHistory(context),
+          onManageAccounts: () => AccountsScreen.open(context),
+          onOpenAccount: (id) => AccountDetailScreen.open(context, id),
+        ),
+        // One card per account, largest balance first.
+        for (final ab in state.accountBalances)
+          _AccountCard(
+            balance: ab,
+            flow: state.accountFlow(ab.account.id, DateTime.now()),
+            onOpen: () => AccountDetailScreen.open(context, ab.account.id),
+          ),
+      ],
+    );
+  }
+
+  /// The scrollable body inside the white sheet.
+  Widget _content(BuildContext context, AppState state) {
+    final budgets = state.budgetProgress();
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
+      children: [
+        // Horizontal snapshot cards — a quick sideways-scrolling read of recent
+        // spending, shown only once there is data to summarise.
+        if (state.spentThisMonth > 0) ...[
+          const SectionHeader(title: 'This month'),
+          const SizedBox(height: 14),
+          _SnapshotRow(snapshots: _snapshotsFor(context, state)),
+          const SizedBox(height: 28),
+        ],
+        if (budgets.isNotEmpty)
+          _BudgetSection(budgets: budgets, daysLeft: state.daysLeftThisMonth)
+        else
+          _BudgetEmpty(
+            hasExpenses: state.spentThisMonth > 0,
+            onManage: () => ManageScreen.open(context),
+          ),
+        if (state.scopedExpenses.isNotEmpty ||
+            state.scopedActivities.isNotEmpty) ...[
+          const SizedBox(height: 28),
+          _RecentSection(onSeeAll: () => _openHistory(context)),
+        ],
+        if (state.outstandingBalances.isNotEmpty) ...[
+          const SizedBox(height: 28),
+          _BalancesSection(balances: state.outstandingBalances),
+        ],
+        const SizedBox(height: 28),
+        _PlannerSection(onSeeAll: widget.onSeePlanner),
+      ],
+    );
+  }
+}
+
+/// The white sheet under the hero. A grabber at the top reveals or hides the
+/// stacked cards — tap to toggle, drag to scrub — while the body scrolls.
+class _HeroSheet extends StatelessWidget {
+  const _HeroSheet({
+    required this.child,
+    required this.onToggle,
+    required this.onDragUpdate,
+    required this.onDragEnd,
+  });
+
+  final Widget child;
+  final VoidCallback onToggle;
+  final GestureDragUpdateCallback onDragUpdate;
+  final GestureDragEndCallback onDragEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final surface = context.isDark
+        ? const Color(0xFF15161A)
+        : const Color(0xFFEFEFEA);
+    return Container(
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 24,
+            offset: const Offset(0, -6),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          GestureDetector(
+            key: const ValueKey('hero-handle'),
+            behavior: HitTestBehavior.opaque,
+            onTap: onToggle,
+            onVerticalDragUpdate: onDragUpdate,
+            onVerticalDragEnd: onDragEnd,
+            child: SizedBox(
+              height: 32,
+              width: double.infinity,
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (var i = 0; i < 3; i++)
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                        width: 13,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: context.scheme.onSurface.withValues(
+                            alpha: 0.55,
+                          ),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
-            ListView(
-              padding: const EdgeInsets.only(bottom: 120),
-              children: [
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [blue, blue, blue.withValues(alpha: 0)],
-                      stops: const [0.0, 0.55, 1.0],
-                    ),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(16, 8 + topInset, 16, 4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _TopBar(),
-                        const SizedBox(height: 18),
-                        // A stacked deck: the month-to-date flow card on top, the
-                        // balance card peeking behind it. Swipe up to swap.
-                        CardStack(
-                          height: 250,
-                          peek: 26,
-                          notchFront: true,
-                          cards: [
-                            _HeroCard(
-                              spent: state.spentThisMonth,
-                              spentPrevious: state.spentLastMonth,
-                              income: state.incomeThisMonth,
-                              incomePrevious: state.incomeLastMonth,
-                              onAdd: () => CommandBar.show(context),
-                              onIncome: () => CommandBar.show(
-                                context,
-                                initialText: 'Received ',
-                              ),
-                              onTransfer: () => CommandBar.show(
-                                context,
-                                initialText: 'Transfer ',
-                              ),
-                              onHistory: () => _openHistory(context),
-                            ),
-                            _BalanceCard(
-                              total: state.totalBalance,
-                              accounts: state.accountBalances,
-                              onAdd: () => CommandBar.show(context),
-                              onIncome: () => CommandBar.show(
-                                context,
-                                initialText: 'Received ',
-                              ),
-                              onTransfer: () => CommandBar.show(
-                                context,
-                                initialText: 'Transfer ',
-                              ),
-                              onHistory: () => _openHistory(context),
-                              onManageAccounts: () =>
-                                  AccountsScreen.open(context),
-                              onOpenAccount: (id) =>
-                                  AccountDetailScreen.open(context, id),
-                            ),
-                            // One card per account, largest balance first.
-                            for (final ab in state.accountBalances)
-                              _AccountCard(
-                                balance: ab,
-                                flow: state.accountFlow(
-                                  ab.account.id,
-                                  DateTime.now(),
-                                ),
-                                onOpen: () => AccountDetailScreen.open(
-                                  context,
-                                  ab.account.id,
-                                ),
-                              ),
-                          ],
-                        ),
-                        // Horizontal snapshot cards — a quick sideways-scrolling read of
-                        // recent spending, shown only once there is data to summarise.
-                        if (state.spentThisMonth > 0) ...[
-                          const SizedBox(height: 28),
-                          const SectionHeader(title: 'This month'),
-                          const SizedBox(height: 14),
-                          _SnapshotRow(
-                            snapshots: _snapshotsFor(context, state),
-                          ),
-                        ],
-                        // Carry the wash a little past the deck so it fades out
-                        // right at the "Your budgets" heading below.
-                        const SizedBox(height: 28),
-                      ],
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (budgets.isNotEmpty)
-                        _BudgetSection(
-                          budgets: budgets,
-                          daysLeft: state.daysLeftThisMonth,
-                        )
-                      else
-                        _BudgetEmpty(
-                          hasExpenses: state.spentThisMonth > 0,
-                          onManage: () => ManageScreen.open(context),
-                        ),
-                      if (state.scopedExpenses.isNotEmpty ||
-                          state.scopedActivities.isNotEmpty) ...[
-                        const SizedBox(height: 28),
-                        _RecentSection(onSeeAll: () => _openHistory(context)),
-                      ],
-                      if (state.outstandingBalances.isNotEmpty) ...[
-                        const SizedBox(height: 28),
-                        _BalancesSection(balances: state.outstandingBalances),
-                      ],
-                      const SizedBox(height: 28),
-                      _PlannerSection(onSeeAll: onSeePlanner),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
+          Expanded(child: child),
+        ],
       ),
     );
   }
@@ -456,26 +576,20 @@ class _TopBar extends StatelessWidget {
 
     return Row(
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _greeting(),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: Colors.white.withValues(alpha: 0.72),
-              ),
+        // Just the greeting now — the headline is the Total figure below it.
+        Expanded(
+          child: Text(
+            _greeting(),
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
             ),
-            Text(
-              'Your money',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
-          ],
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
-        const Spacer(),
         if (hasProfiles) ...[const _ProfilePill(), const SizedBox(width: 8)],
+        // Avatar-style entry to categories, budgets & profiles.
         IconButton(
           onPressed: () => ManageScreen.open(context),
           tooltip: 'Categories, budgets & profiles',
@@ -483,9 +597,10 @@ class _TopBar extends StatelessWidget {
             backgroundColor: context.isDark
                 ? const Color(0xFF232322)
                 : Colors.white,
+            shape: const CircleBorder(),
             side: BorderSide(color: context.hairline),
           ),
-          icon: const Icon(PhosphorR.slidersHorizontal, size: 20),
+          icon: const Icon(Icons.person_rounded, size: 20),
         ),
       ],
     );

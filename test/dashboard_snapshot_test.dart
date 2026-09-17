@@ -234,6 +234,11 @@ void main() {
 
       await _pumpDashboard(tester, state);
 
+      // The deck is collapsed behind the Total figure by default; tap the handle
+      // to reveal it so its toggle is interactive.
+      await tester.tap(find.byKey(const ValueKey('hero-handle')));
+      await tester.pumpAndSettle(const Duration(milliseconds: 600));
+
       // The snapshot cards echo the same figures, so target the hero's number
       // by its distinctive display-token size (40px).
       Finder heroFigure(String text) => find.byWidgetPredicate(
@@ -253,6 +258,27 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('metric-net')));
       await tester.pumpAndSettle(const Duration(milliseconds: 600));
       expect(heroFigure('TSh 60,000'), findsOneWidget);
+    });
+  });
+
+  group('collapsible hero', () {
+    testWidgets('shows the Total collapsed, with a handle to reveal the deck', (
+      tester,
+    ) async {
+      final state = await _freshState();
+      await state.updateAccount(
+        state.accounts.single.copyWith(openingBalance: 250000),
+      );
+
+      await _pumpDashboard(tester, state);
+
+      // Collapsed by default: the single Total figure (44px) shows the balance,
+      // and the grabber that reveals the stacked cards is present.
+      final total = find.byWidgetPredicate(
+        (w) => w is Text && w.data == 'TSh 250,000' && w.style?.fontSize == 44,
+      );
+      expect(total, findsOneWidget);
+      expect(find.byKey(const ValueKey('hero-handle')), findsOneWidget);
     });
   });
 }
