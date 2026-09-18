@@ -297,12 +297,24 @@ class _HeroSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surface = context.isDark
-        ? const Color(0xFF15161A)
-        : const Color(0xFFEFEFEA);
+    // A faint celadon at the top — catching the hero's pale seam — dissolving
+    // into the neutral surface by ~45% so the white cards still read as raised.
+    final sheetGradient = context.isDark
+        ? const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF141F19), Color(0xFF141518)],
+            stops: [0.0, 0.45],
+          )
+        : const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFE7F1EB), Color(0xFFEFEFEA)],
+            stops: [0.0, 0.45],
+          );
     return Container(
       decoration: BoxDecoration(
-        color: surface,
+        gradient: sheetGradient,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         boxShadow: [
           BoxShadow(
