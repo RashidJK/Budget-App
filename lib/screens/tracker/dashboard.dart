@@ -97,28 +97,29 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    // Brand green — a deep emerald in the mark's green-teal hue, dark enough to
-    // carry the white Total figure. Runs top → deep so the hero reads as a
-    // gradient, not a flat fill.
-    final greenTop = context.isDark
-        ? const Color(0xFF0C6B45)
-        : const Color(0xFF0E8A57);
-    final greenDeep = context.isDark
-        ? const Color(0xFF073B28)
-        : const Color(0xFF0A5A3C);
+    // A misty "celadon → pine" wash: deep pine at the top so the white greeting
+    // and Total stay legible, easing down through sage to a pale celadon right
+    // where the white sheet emerges. The dark top holds through the collapsed
+    // header, and the pale tail lands near the expanded deck's sheet seam; the
+    // sheet covers whatever celadon runs on below. One look on both themes.
     final topInset = MediaQuery.paddingOf(context).top;
 
     return Scaffold(
-      backgroundColor: greenTop,
+      backgroundColor: const Color(0xFF1E3327),
       body: DecoratedBox(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [greenTop, greenDeep],
-            // Reach the deep tone by mid-screen so the hero shows the full
-            // gradient; the sheet covers everything below.
-            stops: const [0.0, 0.55],
+            colors: [
+              Color(0xFF1E3327), // pine
+              Color(0xFF2A4433),
+              Color(0xFF3E5A48),
+              Color(0xFF5B7B60),
+              Color(0xFF97B189), // sage
+              Color(0xFFC7DAAD), // celadon
+            ],
+            stops: [0.0, 0.12, 0.26, 0.40, 0.50, 0.58],
           ),
         ),
         child: AnimatedBuilder(
