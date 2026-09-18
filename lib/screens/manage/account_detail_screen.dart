@@ -104,9 +104,9 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
                   ),
                   Text(
                     account.type.label,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: context.muted,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: context.muted),
                   ),
                 ],
               ),
@@ -117,10 +117,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
       body: AppBackground(
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 220),
-          child: KeyedSubtree(
-            key: ValueKey(_tab),
-            child: tabs[_tab],
-          ),
+          child: KeyedSubtree(key: ValueKey(_tab), child: tabs[_tab]),
         ),
       ),
       bottomNavigationBar: MorphNavBar(
@@ -128,7 +125,11 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         onSelect: _select,
         onCapture: (text) => captureFromText(context, text),
         onScan: () => CommandBar.show(context, startScan: true),
-        onBriefing: () => showBriefing(context),
+        onBriefing: () => showBriefing(
+          context,
+          kind: BriefingKind.account,
+          accountId: widget.accountId,
+        ),
         items: const [
           MorphNavItem(
             icon: PhosphorR.squaresFour,
@@ -366,11 +367,7 @@ class _MovementTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          BadgeIcon(
-            icon: movement.icon,
-            accent: color,
-            size: BadgeSize.sm,
-          ),
+          BadgeIcon(icon: movement.icon, accent: color, size: BadgeSize.sm),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -507,7 +504,11 @@ class _InsightsTab extends StatelessWidget {
 }
 
 class _FlowBars extends StatelessWidget {
-  const _FlowBars({required this.label, required this.flow, required this.peak});
+  const _FlowBars({
+    required this.label,
+    required this.flow,
+    required this.peak,
+  });
 
   final String label;
   final AccountFlow flow;
@@ -560,7 +561,10 @@ class _Bar extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         // A hairline stub even at zero, so an empty month still reads as a row.
-        final width = (constraints.maxWidth * fraction).clamp(3.0, double.infinity);
+        final width = (constraints.maxWidth * fraction).clamp(
+          3.0,
+          double.infinity,
+        );
         return Align(
           alignment: Alignment.centerLeft,
           child: Container(
@@ -598,9 +602,9 @@ class _Legend extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: context.muted,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: context.muted),
         ),
       ],
     );

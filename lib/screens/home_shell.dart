@@ -39,6 +39,14 @@ class _HomeShellState extends State<HomeShell> {
 
   void _select(int index) => setState(() => _index = index);
 
+  // The briefing summarises whichever tab is showing.
+  BriefingKind get _briefingKind => switch (_index) {
+    1 => BriefingKind.expenses,
+    2 => BriefingKind.analytics,
+    3 => BriefingKind.planner,
+    _ => BriefingKind.home,
+  };
+
   @override
   void initState() {
     super.initState();
@@ -112,7 +120,8 @@ class _HomeShellState extends State<HomeShell> {
         onSelect: _select,
         onCapture: (text) => captureFromText(context, text),
         onScan: () => CommandBar.show(context, startScan: true),
-        onBriefing: () => showBriefing(context),
+        // The ✨ briefs on wherever you are — each tab gets its own summary.
+        onBriefing: () => showBriefing(context, kind: _briefingKind),
         items: const [
           MorphNavItem(
             icon: PhosphorR.squaresFour,
