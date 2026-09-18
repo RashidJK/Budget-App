@@ -66,7 +66,7 @@ class AppTheme {
     final base = ThemeData(
       colorScheme: scheme,
       useMaterial3: true,
-      fontFamily: 'Inter',
+      fontFamily: 'PlusJakartaSans',
     );
 
     return base.copyWith(

@@ -1,18 +1,14 @@
 import 'package:flutter/material.dart';
 
-import '../theme.dart';
-
 /// The size steps a [BadgeIcon] comes in.
 enum BadgeSize { sm, md, lg }
 
-/// The app's signature tinted rounded-square "coin" — one component for every
-/// category / insight / snapshot icon, so a badge tweak is a single-file edit
-/// and every badge reads as the same designed chip rather than a hand-rolled
-/// container.
-///
-/// A faint vertical gradient tint gives it a little enamel depth; the glyph
-/// stays single-tone accent for contrast. The hero's circular quick actions
-/// are a deliberately different treatment and don't use this.
+/// A category / insight / snapshot icon, drawn as a single accent-tone glyph —
+/// one component for every such icon, so a tweak is a single-file edit and every
+/// one reads the same. It keeps a fixed footprint per size so rows and cards
+/// stay aligned now that the glyph is background-free (was a tinted "coin"). The
+/// hero's circular quick actions are a deliberately different treatment and
+/// don't use this.
 class BadgeIcon extends StatelessWidget {
   const BadgeIcon({
     super.key,
@@ -31,36 +27,20 @@ class BadgeIcon extends StatelessWidget {
     BadgeSize.lg => 48,
   };
 
-  double get _radius => switch (size) {
-    BadgeSize.sm => 11,
-    BadgeSize.md => 12,
-    BadgeSize.lg => 14,
-  };
-
+  // A touch larger than the old glyph, since a bare icon needs to fill the
+  // footprint the tinted square used to hold.
   double get _glyph => switch (size) {
-    BadgeSize.sm => 18,
-    BadgeSize.md => 20,
-    BadgeSize.lg => 24,
+    BadgeSize.sm => 22,
+    BadgeSize.md => 26,
+    BadgeSize.lg => 30,
   };
 
   @override
   Widget build(BuildContext context) {
-    final dark = context.isDark;
-    return Container(
+    return SizedBox(
       width: _box,
       height: _box,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            accent.withValues(alpha: dark ? 0.30 : 0.16),
-            accent.withValues(alpha: dark ? 0.20 : 0.09),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(_radius),
-      ),
-      child: Icon(icon, size: _glyph, color: accent),
+      child: Center(child: Icon(icon, size: _glyph, color: accent)),
     );
   }
 }

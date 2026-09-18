@@ -76,20 +76,21 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # Inter, bundled as a local asset (network google_fonts is blocked here) so
-  # both platforms render the same face. One variable file, mapped per weight.
+  # Plus Jakarta Sans, bundled as a local asset (network google_fonts is blocked
+  # here) so both platforms render the same face. One variable file, mapped per
+  # weight.
   fonts:
-    - family: Inter
+    - family: PlusJakartaSans
       fonts:
-        - asset: assets/fonts/Inter.ttf
+        - asset: assets/fonts/PlusJakartaSans.ttf
           weight: 400
-        - asset: assets/fonts/Inter.ttf
+        - asset: assets/fonts/PlusJakartaSans.ttf
           weight: 500
-        - asset: assets/fonts/Inter.ttf
+        - asset: assets/fonts/PlusJakartaSans.ttf
           weight: 600
-        - asset: assets/fonts/Inter.ttf
+        - asset: assets/fonts/PlusJakartaSans.ttf
           weight: 700
-        - asset: assets/fonts/Inter.ttf
+        - asset: assets/fonts/PlusJakartaSans.ttf
           weight: 800
 
   # To add assets to your application, add an assets section, like this:
