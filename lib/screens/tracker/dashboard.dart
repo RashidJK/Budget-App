@@ -47,7 +47,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen>
     with SingleTickerProviderStateMixin {
   // 0 = collapsed (just the Total figure), 1 = expanded (the stacked cards).
-  // The blue band grows from the height of the single figure to the full deck,
+  // The green band grows from the height of the single figure to the full deck,
   // and the white sheet below rides down with it.
   late final AnimationController _reveal = AnimationController(
     vsync: this,
@@ -97,90 +97,108 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final blue = context.isDark
-        ? const Color(0xFF20418C)
-        : const Color(0xFF2F62E0);
+    // Brand green — a deep emerald in the mark's green-teal hue, dark enough to
+    // carry the white Total figure. Runs top → deep so the hero reads as a
+    // gradient, not a flat fill.
+    final greenTop = context.isDark
+        ? const Color(0xFF0C6B45)
+        : const Color(0xFF0E8A57);
+    final greenDeep = context.isDark
+        ? const Color(0xFF073B28)
+        : const Color(0xFF0A5A3C);
     final topInset = MediaQuery.paddingOf(context).top;
 
     return Scaffold(
-      backgroundColor: blue,
-      body: AnimatedBuilder(
-        animation: _reveal,
-        builder: (context, _) {
-          final t = _reveal.value;
-          final bandHeight = _collapsedBand + _range * t;
-          return Column(
-            children: [
-              // ---- Blue hero: greeting, the Total, and the morphing band ----
-              Padding(
-                padding: EdgeInsets.fromLTRB(20, topInset + 8, 20, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _TopBar(),
-                    const SizedBox(height: 18),
-                    Text(
-                      'Total',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.72),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    // The morph: the single Total figure fades out as the stacked
-                    // cards fade in, and the band grows to make room for them.
-                    ClipRect(
-                      child: SizedBox(
-                        height: bandHeight,
-                        width: double.infinity,
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Opacity(
-                              opacity: (1 - t * 1.8).clamp(0.0, 1.0),
-                              child: Text(
-                                Money.format(state.totalBalance),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 44,
-                                  fontWeight: FontWeight.w800,
-                                  height: 1.1,
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              top: 0,
-                              left: 0,
-                              right: 0,
-                              height: _expandedBand,
-                              child: Opacity(
-                                opacity: (t * 1.8 - 0.8).clamp(0.0, 1.0),
-                                child: IgnorePointer(
-                                  ignoring: t < 0.98,
-                                  child: _deck(context, state),
-                                ),
-                              ),
-                            ),
-                          ],
+      backgroundColor: greenTop,
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [greenTop, greenDeep],
+            // Reach the deep tone by mid-screen so the hero shows the full
+            // gradient; the sheet covers everything below.
+            stops: const [0.0, 0.55],
+          ),
+        ),
+        child: AnimatedBuilder(
+          animation: _reveal,
+          builder: (context, _) {
+            final t = _reveal.value;
+            final bandHeight = _collapsedBand + _range * t;
+            return Column(
+              children: [
+                // ---- Green hero: greeting, the Total, and the morphing band ----
+                Padding(
+                  padding: EdgeInsets.fromLTRB(20, topInset + 8, 20, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _TopBar(),
+                      const SizedBox(height: 18),
+                      Text(
+                        'Total',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.72),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      // The morph: the single Total figure fades out as the stacked
+                      // cards fade in, and the band grows to make room for them.
+                      ClipRect(
+                        child: SizedBox(
+                          height: bandHeight,
+                          width: double.infinity,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Opacity(
+                                opacity: (1 - t * 1.8).clamp(0.0, 1.0),
+                                child: Text(
+                                  Money.format(state.totalBalance),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 44,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.1,
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                height: _expandedBand,
+                                child: Opacity(
+                                  opacity: (t * 1.8 - 0.8).clamp(0.0, 1.0),
+                                  child: IgnorePointer(
+                                    ignoring: t < 0.98,
+                                    child: _deck(context, state),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              // ---- White sheet: handle to reveal/hide, content scrolls ----
-              Expanded(
-                child: _HeroSheet(
-                  onToggle: _toggle,
-                  onDragUpdate: _onDragUpdate,
-                  onDragEnd: _onDragEnd,
-                  child: _content(context, state),
+                // ---- White sheet: handle to reveal/hide, content scrolls ----
+                Expanded(
+                  child: _HeroSheet(
+                    onToggle: _toggle,
+                    onDragUpdate: _onDragUpdate,
+                    onDragEnd: _onDragEnd,
+                    child: _content(context, state),
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }

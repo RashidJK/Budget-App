@@ -109,17 +109,19 @@ class _BriefingCard extends StatelessWidget {
           // Content clears the notch, but the blue fills right up to y=0.
           padding: EdgeInsets.fromLTRB(22, topInset + 20, 22, 22),
           decoration: BoxDecoration(
+            // Brand green — a deep emerald in the mark's green-teal hue, dark
+            // enough to carry the white text.
             gradient: const LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFF2F62E0), Color(0xFF1E45C0), Color(0xFF122E86)],
+              colors: [Color(0xFF0E8A57), Color(0xFF0B6644), Color(0xFF084A32)],
             ),
             borderRadius: const BorderRadius.vertical(
               bottom: Radius.circular(30),
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF122E86).withValues(alpha: 0.45),
+                color: const Color(0xFF084A32).withValues(alpha: 0.45),
                 blurRadius: 34,
                 offset: const Offset(0, 16),
               ),
