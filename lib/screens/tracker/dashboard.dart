@@ -12,6 +12,7 @@ import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/badge_icon.dart';
 import '../../widgets/card_stack.dart';
+import '../../widgets/frosted_card.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/stat.dart';
 import '../manage/account_detail_screen.dart';
@@ -389,7 +390,7 @@ class _RecentSection extends StatelessWidget {
       children: [
         SectionHeader(title: 'Recent', onAction: onSeeAll),
         const SizedBox(height: 14),
-        Card(
+        FrostedCard(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
@@ -1354,10 +1355,9 @@ class _SnapshotCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
+    return FrostedCard(
       width: 150,
       padding: const EdgeInsets.all(16),
-      decoration: context.cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1543,9 +1543,8 @@ class _BudgetCard extends StatelessWidget {
         ? context.caution
         : color;
 
-    return Container(
+    return FrostedCard(
       padding: const EdgeInsets.all(16),
-      decoration: context.cardDecoration(),
       child: Column(
         children: [
           Row(
@@ -1643,10 +1642,9 @@ class _BudgetEmpty extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
+    return FrostedCard(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
-      decoration: context.cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
