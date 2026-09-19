@@ -58,9 +58,6 @@ class FrostedCard extends StatelessWidget {
                     : const [Color(0xA6E9F5EE), Color(0x8CD6ECDE)],
               ),
               borderRadius: r,
-              border: Border.all(
-                color: dark ? const Color(0x2696C8AA) : const Color(0x330E8A57),
-              ),
             ),
             child: child,
           ),
