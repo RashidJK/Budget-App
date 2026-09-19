@@ -298,20 +298,21 @@ class _HeroSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // A faint celadon at the top — catching the hero's pale seam — dissolving
-    // into the neutral surface by ~45% so the white cards still read as raised.
+    // A soft mint ground — deeper at the top where it catches the hero's pale
+    // seam, easing to a lighter mint. Greener than the old near-neutral so the
+    // frosted glass cards have something to sit on and read as raised.
     final sheetGradient = context.isDark
         ? const LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF141F19), Color(0xFF141518)],
-            stops: [0.0, 0.45],
+            colors: [Color(0xFF12211A), Color(0xFF0F1713)],
+            stops: [0.0, 0.5],
           )
         : const LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFFE7F1EB), Color(0xFFEFEFEA)],
-            stops: [0.0, 0.45],
+            colors: [Color(0xFFD6E7DC), Color(0xFFE4EFE7)],
+            stops: [0.0, 0.5],
           );
     return Container(
       decoration: BoxDecoration(
