@@ -612,20 +612,7 @@ class _TopBar extends StatelessWidget {
 
     return Row(
       children: [
-        // Just the greeting now — the headline is the Total figure below it.
-        Expanded(
-          child: Text(
-            _greeting(),
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        if (hasProfiles) ...[const _ProfilePill(), const SizedBox(width: 8)],
-        // Avatar-style entry to categories, budgets & profiles.
+        // Avatar-style entry to categories, budgets & profiles — leads the row.
         IconButton(
           onPressed: () => ManageScreen.open(context),
           tooltip: 'Categories, budgets & profiles',
@@ -638,6 +625,20 @@ class _TopBar extends StatelessWidget {
           ),
           icon: const Icon(Icons.person_rounded, size: 20),
         ),
+        const SizedBox(width: 12),
+        // The greeting — the headline is the Total figure below it.
+        Expanded(
+          child: Text(
+            _greeting(),
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        if (hasProfiles) const _ProfilePill(),
       ],
     );
   }
