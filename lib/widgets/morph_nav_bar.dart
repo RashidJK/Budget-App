@@ -765,7 +765,7 @@ class _MorphTab extends StatelessWidget {
             duration: const Duration(milliseconds: 260),
             curve: Curves.easeOutCubic,
             padding: EdgeInsets.symmetric(
-              horizontal: selected ? 13 : 9,
+              horizontal: selected ? 11 : 8,
               vertical: 9,
             ),
             decoration: BoxDecoration(

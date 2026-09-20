@@ -76,7 +76,11 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     ];
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      // A pushed route, so a transparent Scaffold falls through to black behind
+      // the app bar — back it with the wash's top tone so that band matches.
+      backgroundColor: context.isDark
+          ? const Color(0xFF1D1D1C)
+          : const Color(0xFFFFFFFF),
       extendBody: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -252,13 +256,16 @@ class _BalanceHeader extends StatelessWidget {
         children: [
           Text(
             'Balance',
-            style: theme.textTheme.bodyMedium?.copyWith(color: context.muted),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: Colors.white.withValues(alpha: 0.72),
+            ),
           ),
           const SizedBox(height: 6),
           Text(
             Money.format(balance),
             style: theme.textTheme.displaySmall?.copyWith(
               fontWeight: FontWeight.w800,
+              color: Colors.white,
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
