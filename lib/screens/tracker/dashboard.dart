@@ -19,6 +19,7 @@ import '../manage/account_detail_screen.dart';
 import '../manage/accounts_screen.dart';
 import '../manage/manage_screen.dart';
 import '../planner/planner_home.dart';
+import 'accounts_spread.dart';
 import 'expense_list.dart';
 
 /// Opens the full history list.
@@ -212,6 +213,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       height: 250,
       peek: 26,
       notchFront: true,
+      // Pinch the deck in to fan every account out into a full spread.
+      onPinch: () => showAccountsSpread(context),
       cards: [
         _HeroCard(
           spent: state.spentThisMonth,

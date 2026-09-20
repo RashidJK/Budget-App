@@ -7,7 +7,8 @@ import 'package:flutter/material.dart';
 /// to jump straight to that card.
 ///
 /// The front card is fully interactive — taps on its buttons pass straight
-/// through; only a deliberate vertical fling changes the card.
+/// through; only a deliberate vertical fling changes the card. Pinching the
+/// deck in (two fingers) fires [onPinch], used to fan it out into a spread.
 class CardStack extends StatefulWidget {
   const CardStack({
     super.key,
@@ -16,11 +17,16 @@ class CardStack extends StatefulWidget {
     this.peek = 12,
     this.initialIndex = 0,
     this.notchFront = false,
+    this.onPinch,
   });
 
   /// Cut a concave "wallet pocket" notch into the top of the front card, so the
   /// card behind shows through it — the layered-wallet look.
   final bool notchFront;
+
+  /// Fired when the deck is pinched in (two fingers together) — used to fan the
+  /// stack out into a full spread. Single-finger swipes still page the deck.
+  final VoidCallback? onPinch;
 
   /// Front-first: the first entry starts on top.
   final List<Widget> cards;
@@ -41,6 +47,12 @@ class CardStack extends StatefulWidget {
 
 class _CardStackState extends State<CardStack> {
   late int _front = widget.initialIndex;
+
+  // The front card uses one scale recognizer for both the single-finger paging
+  // fling and the two-finger pinch, so they never fight in the gesture arena.
+  // This latches true once a pinch has opened the spread, so the gesture's end
+  // doesn't then also page the deck.
+  bool _pinched = false;
 
   void _advance(int direction) {
     final n = widget.cards.length;
@@ -86,11 +98,24 @@ class _CardStackState extends State<CardStack> {
     }
 
     if (entry.depth == 0) {
-      // Front card: swipe to change, buttons still tappable.
+      // Front card: one scale recognizer handles both a single-finger paging
+      // fling and a two-finger pinch; buttons still tap straight through.
       return GestureDetector(
         behavior: HitTestBehavior.deferToChild,
-        onVerticalDragEnd: (details) {
-          final v = details.primaryVelocity ?? 0;
+        onScaleStart: (_) => _pinched = false,
+        onScaleUpdate: (d) {
+          // Fire once as soon as a two-finger pinch-in crosses the threshold.
+          if (d.pointerCount >= 2 &&
+              !_pinched &&
+              d.scale < 0.82 &&
+              widget.onPinch != null) {
+            _pinched = true;
+            widget.onPinch!();
+          }
+        },
+        onScaleEnd: (d) {
+          if (_pinched) return; // the pinch already opened the spread
+          final v = d.velocity.pixelsPerSecond.dy;
           if (v < -200) {
             _advance(1); // fling up → next
           } else if (v > 200) {
