@@ -5,6 +5,7 @@ import '../../models/category.dart';
 import '../../models/profile.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
+import 'airtel_connect_screen.dart';
 import 'category_editor.dart';
 import 'profile_editor.dart';
 
@@ -31,6 +32,14 @@ class ManageScreen extends StatelessWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Manage'),
+          actions: [
+            IconButton(
+              onPressed: () => AirtelConnectScreen.open(context),
+              tooltip: 'Connect Airtel Money',
+              icon: const Icon(Icons.link_rounded),
+            ),
+            const SizedBox(width: 4),
+          ],
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Categories'),
