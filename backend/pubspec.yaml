@@ -1,0 +1,18 @@
+name: airtel_proxy
+description: >-
+  A tiny OAuth2 proxy for the Airtel Money Transactions-Summary API. Holds the
+  Airtel client credentials, mints and caches a bearer token, and exposes one
+  endpoint the Budget app syncs from. Deploy this; never put the secrets in the
+  app.
+publish_to: none
+
+environment:
+  sdk: ^3.4.0
+
+dependencies:
+  shelf: ^1.4.1
+  shelf_router: ^1.1.4
+  http: ^1.2.2
+
+dev_dependencies:
+  lints: ^4.0.0
