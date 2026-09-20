@@ -201,10 +201,11 @@ class _AirtelConnectScreenState extends State<AirtelConnectScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'This pulls sample Airtel Money transactions so the flow works '
-                  'end to end. Connecting your real account needs a small backend '
-                  'that holds the Airtel API credentials and returns your '
-                  'transactions — the app then syncs from it exactly like this.',
+                  'This runs sample data through the real Airtel '
+                  'Transactions-Summary parser, so the flow works end to end. '
+                  'Going live needs a small backend that holds the Airtel API '
+                  'credentials and returns /merchant/v1/transactions — the app '
+                  'then syncs from it exactly like this.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: context.muted,
                     height: 1.4,

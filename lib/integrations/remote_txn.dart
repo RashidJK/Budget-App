@@ -82,4 +82,96 @@ class RemoteTxn {
       balanceAfter: (json['balanceAfter'] as num?)?.toDouble(),
     );
   }
+
+  /// Parse the `data.transactions` list of an Airtel "Transactions Summary"
+  /// response (`GET /merchant/v1/transactions`) into normalized transactions.
+  ///
+  /// [userMsisdn] — your wallet's number, no country code — sets the direction:
+  /// you as the payee is money in, you as the payer is money out. Only
+  /// successful transactions come through; failed/in-progress ones (status TF /
+  /// TIP) are dropped.
+  static List<RemoteTxn> parseAirtelSummary(
+    Map<String, dynamic> json, {
+    String? userMsisdn,
+  }) {
+    final data = json['data'];
+    if (data is! Map) return const [];
+    final raw = data['transactions'];
+    final items = raw is List ? raw : (raw is Map ? [raw] : const <dynamic>[]);
+    final out = <RemoteTxn>[];
+    for (final item in items) {
+      if (item is! Map) continue;
+      final txn = _fromAirtel(item.cast<String, dynamic>(), userMsisdn);
+      if (txn != null) out.add(txn);
+    }
+    return out;
+  }
+
+  static RemoteTxn? _fromAirtel(Map<String, dynamic> item, String? userMsisdn) {
+    final t =
+        (item['transaction'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final status = t['status']?.toString().toUpperCase();
+    if (status == 'TF' || status == 'TIP') return null; // only successful (TS)
+
+    final service =
+        (item['service'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final payer = (item['payer'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final payee = (item['payee'] as Map?)?.cast<String, dynamic>() ?? const {};
+
+    final reference =
+        (t['airtel_money_id'] ?? t['reference_number'] ?? t['id'] ?? '')
+            .toString();
+    if (reference.isEmpty) return null;
+
+    final amount = double.tryParse((t['amount'] ?? '0').toString()) ?? 0;
+    final createdAt = t['created_at'];
+    final timestamp = createdAt is num
+        ? DateTime.fromMillisecondsSinceEpoch(_toMillis(createdAt))
+        : DateTime.now();
+
+    final serviceType = (service['type'] ?? '').toString().toUpperCase();
+    final payerMsisdn = payer['msisdn']?.toString();
+    final payeeMsisdn = payee['msisdn']?.toString();
+
+    // You as the payer → money left your wallet; as the payee → money came in.
+    // With no configured number, a merchant feed defaults to money received.
+    final direction = (userMsisdn != null && payerMsisdn == userMsisdn)
+        ? TxnDirection.outbound
+        : (userMsisdn != null && payeeMsisdn == userMsisdn)
+        ? TxnDirection.inbound
+        : TxnDirection.inbound;
+
+    final type = switch (serviceType) {
+      'CASHIN' => RemoteTxnType.bankToWallet,
+      'MERCHPAY' =>
+        direction == TxnDirection.outbound
+            ? RemoteTxnType.billPay
+            : RemoteTxnType.receiveMoney,
+      _ =>
+        direction == TxnDirection.outbound
+            ? RemoteTxnType.sendMoney
+            : RemoteTxnType.receiveMoney,
+    };
+
+    final counterparty = direction == TxnDirection.outbound
+        ? payee['name'] as String?
+        : payer['name'] as String?;
+
+    return RemoteTxn(
+      reference: reference,
+      amount: amount,
+      direction: direction,
+      type: type,
+      timestamp: timestamp,
+      counterparty: counterparty,
+      description: serviceType,
+    );
+  }
+
+  /// Airtel `created_at` is normally epoch milliseconds; treat small (10-digit)
+  /// values as seconds.
+  static int _toMillis(num epoch) {
+    final value = epoch.toInt();
+    return value > 100000000000 ? value : value * 1000;
+  }
 }
