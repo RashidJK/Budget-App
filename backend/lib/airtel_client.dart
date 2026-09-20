@@ -58,7 +58,11 @@ class AirtelClient {
     if (fresh == null) {
       throw Exception('Airtel token response had no access_token: ${res.body}');
     }
-    final expiresIn = (json['expires_in'] as num?)?.toInt() ?? 3600;
+    // Airtel documents expires_in as a string ("3600"); accept a number too.
+    final rawExpiry = json['expires_in'];
+    final expiresIn = rawExpiry is num
+        ? rawExpiry.toInt()
+        : int.tryParse('${rawExpiry ?? ''}') ?? 3600;
     _token = fresh;
     _expiry = DateTime.now().add(Duration(seconds: expiresIn - 60));
     return fresh;
