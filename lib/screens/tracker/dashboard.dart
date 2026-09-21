@@ -1518,21 +1518,30 @@ class _BudgetSection extends StatelessWidget {
           },
         ),
         const SizedBox(height: 14),
-        for (final budget in budgets)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _BudgetCard(progress: budget, daysLeft: daysLeft),
+        FrostedCard(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            children: [
+              for (var i = 0; i < budgets.length; i++) ...[
+                if (i > 0)
+                  Divider(height: 1, indent: 48, color: context.hairline),
+                _BudgetRow(progress: budgets[i]),
+              ],
+            ],
           ),
+        ),
       ],
     );
   }
 }
 
-class _BudgetCard extends StatelessWidget {
-  const _BudgetCard({required this.progress, required this.daysLeft});
+/// One budget as a compact row: icon, name and figure across the top, a thin
+/// progress bar with its percent underneath. Slimmer than a full card, so a
+/// handful stack in one grouped card.
+class _BudgetRow extends StatelessWidget {
+  const _BudgetRow({required this.progress});
 
   final BudgetProgress progress;
-  final int daysLeft;
 
   @override
   Widget build(BuildContext context) {
@@ -1540,95 +1549,86 @@ class _BudgetCard extends StatelessWidget {
     final category = progress.category;
     final color = category.of(context);
 
-    // The bar goes amber as it nears the limit and red once over, so a glance
-    // reads status without parsing numbers.
+    // Amber as it nears the limit, red once over — status at a glance.
     final barColor = progress.isOver
         ? context.warn
         : progress.fraction >= 0.85
         ? context.caution
         : color;
 
-    return FrostedCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
         children: [
-          Row(
-            children: [
-              BadgeIcon(icon: category.icon, accent: color),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  category.name,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+          BadgeIcon(icon: category.icon, accent: color, size: BadgeSize.sm),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        category.name,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      Money.compact(progress.spent),
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                    Text(
+                      ' / ${Money.compact(progress.budget)}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: context.muted,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              Icon(Icons.chevron_right_rounded, size: 20, color: context.muted),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                Money.format(progress.spent),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+                const SizedBox(height: 9),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: progress.barFraction,
+                          minHeight: 7,
+                          backgroundColor: barColor.withValues(
+                            alpha: context.isDark ? 0.16 : 0.10,
+                          ),
+                          valueColor: AlwaysStoppedAnimation(barColor),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 40,
+                      child: Text(
+                        Money.percent(progress.fraction),
+                        textAlign: TextAlign.end,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: barColor,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              Text(
-                '  / ${Money.format(progress.budget)}',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: context.muted,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                Money.percent(progress.fraction),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: barColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            // Half the bar height, so the caps are true pills.
-            borderRadius: BorderRadius.circular(5),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0, end: progress.barFraction),
-              duration: const Duration(milliseconds: 500),
-              curve: Curves.easeOutCubic,
-              builder: (context, value, _) => LinearProgressIndicator(
-                value: value,
-                minHeight: 10,
-                // A faint tinted rail previews the fill's hue, instead of an
-                // empty grey gutter.
-                backgroundColor: barColor.withValues(
-                  alpha: context.isDark ? 0.16 : 0.10,
-                ),
-                valueColor: AlwaysStoppedAnimation(barColor),
-              ),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              progress.isOver
-                  ? 'Over by ${Money.format(progress.spent - progress.budget)}'
-                  : '${Money.format(progress.remaining)} left',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: progress.isOver ? context.warn : context.muted,
-                fontWeight: progress.isOver ? FontWeight.w600 : null,
-              ),
-            ),
-          ),
+          const SizedBox(width: 6),
+          Icon(Icons.chevron_right_rounded, size: 18, color: context.muted),
         ],
       ),
     );
