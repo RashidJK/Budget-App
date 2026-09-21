@@ -111,8 +111,8 @@ void main() {
     });
   });
 
-  group('snapshot row', () {
-    testWidgets('renders the always-on insight cards once there is spend', (
+  group('month summary', () {
+    testWidgets('renders the month summary once there is spend', (
       tester,
     ) async {
       final state = await _freshState();
@@ -132,11 +132,11 @@ void main() {
 
       await _pumpDashboard(tester, state);
 
-      // The row is trimmed to four core figures; richer breakdowns (top
-      // category, biggest, counts) live in the Analytics tab now.
+      // One summary card: the spend headline plus the four sub-stats.
+      expect(find.text('Spent this month'), findsOneWidget);
       expect(find.text('Today'), findsOneWidget);
       expect(find.text('This week'), findsOneWidget);
-      expect(find.text('Daily average'), findsOneWidget);
+      expect(find.text('Avg/day'), findsOneWidget);
       expect(find.text('Projected'), findsOneWidget);
       expect(find.text('Entries'), findsNothing);
       expect(find.text('Biggest'), findsNothing);
@@ -195,13 +195,13 @@ void main() {
       expect(find.text('+TSh 120,000'), findsOneWidget);
     });
 
-    testWidgets('the row is absent before any spend', (tester) async {
+    testWidgets('the summary is absent before any spend', (tester) async {
       final state = await _freshState();
 
       await _pumpDashboard(tester, state);
 
+      expect(find.text('Spent this month'), findsNothing);
       expect(find.text('Today'), findsNothing);
-      expect(find.text('Daily average'), findsNothing);
     });
   });
 

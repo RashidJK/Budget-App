@@ -253,12 +253,13 @@ class _DashboardScreenState extends State<DashboardScreen>
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
       children: [
-        // Horizontal snapshot cards — a quick sideways-scrolling read of recent
-        // spending, shown only once there is data to summarise.
+        // A summary of the month's spend — the headline figure, its trend, how
+        // far it is toward the projected total, and the sub-stats. Shown once
+        // there's something to summarise.
         if (state.spentThisMonth > 0) ...[
           const SectionHeader(title: 'This month'),
           const SizedBox(height: 14),
-          _SnapshotRow(snapshots: _snapshotsFor(context, state)),
+          _MonthSummaryCard(state: state),
           const SizedBox(height: 28),
         ],
         if (budgets.isNotEmpty)
@@ -1253,132 +1254,156 @@ class _HeroAction extends StatelessWidget {
   }
 }
 
-/// One card's worth of the snapshot row — a single at-a-glance figure.
-class _Snapshot {
-  const _Snapshot({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.accent,
-  });
+/// The month at a glance: the spend headline with its trend versus last month,
+/// how far it is toward the projected total, and the four sub-stats as a strip.
+class _MonthSummaryCard extends StatelessWidget {
+  const _MonthSummaryCard({required this.state});
 
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color accent;
-}
-
-/// The snapshot cards shown under the hero, left to right.
-///
-/// The first block is always present once there's any spend; the rest appear
-/// only when they have something to say (a top category, income logged, a
-/// prior month to compare against), so the row never shows an empty or
-/// meaningless card.
-List<_Snapshot> _snapshotsFor(BuildContext context, AppState state) {
-  // A tight glance — four figures, not a wall of stats. The rest (top category,
-  // biggest, counts) live in the Analytics tab. Every badge tint is drawn from
-  // the validated palette or a semantic token, so nothing escapes the
-  // contrast-checked system.
-  final brightness = Theme.of(context).brightness;
-
-  return [
-    _Snapshot(
-      icon: PhosphorR.calendarBlank,
-      label: 'Today',
-      value: Money.compact(state.spentToday),
-      accent: context.scheme.primary,
-    ),
-    _Snapshot(
-      icon: PhosphorR.calendarDots,
-      label: 'This week',
-      value: Money.compact(state.spentInLastDays(7)),
-      accent: Palette.color(6, brightness), // violet
-    ),
-    _Snapshot(
-      icon: PhosphorR.trendUp,
-      label: 'Daily average',
-      // A daily average is neutral — green stays reserved for good/positive.
-      value: Money.compact(state.dailyAverageThisMonth),
-      accent: Palette.color(4, brightness), // teal
-    ),
-    _Snapshot(
-      icon: PhosphorR.chartLineUp,
-      label: 'Projected',
-      value: Money.compact(state.projectedThisMonth),
-      accent: context.caution,
-    ),
-  ];
-}
-
-/// A sideways-scrolling row of quick-read snapshot cards.
-///
-/// The cards overflow a phone's width on purpose, so the last one peeks off the
-/// right edge — the cue that the row scrolls. It sits inside the parent list's
-/// horizontal padding, so no extra padding of its own.
-class _SnapshotRow extends StatelessWidget {
-  const _SnapshotRow({required this.snapshots});
-
-  final List<_Snapshot> snapshots;
+  final AppState state;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 126,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.zero,
-        itemCount: snapshots.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          final snapshot = snapshots[index];
-          return _SnapshotCard(
-            icon: snapshot.icon,
-            label: snapshot.label,
-            value: snapshot.value,
-            accent: snapshot.accent,
-          );
-        },
+    final theme = Theme.of(context);
+    final spent = state.spentThisMonth;
+    final lastMonth = state.spentLastMonth;
+    final projected = state.projectedThisMonth;
+    final primary = context.scheme.primary;
+
+    final hasComparison = lastMonth > 0;
+    final up = spent > lastMonth;
+    final pct = hasComparison
+        ? ((spent - lastMonth).abs() / lastMonth * 100).round()
+        : 0;
+    // For spending, a fall is the good direction.
+    final trendColor = up ? context.warn : context.good;
+
+    final fraction = projected > 0 ? (spent / projected).clamp(0.0, 1.0) : 0.0;
+
+    return FrostedCard(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Spent this month',
+            style: theme.textTheme.bodySmall?.copyWith(color: context.muted),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  Money.format(spent),
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (hasComparison) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: trendColor.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        up
+                            ? Icons.arrow_upward_rounded
+                            : Icons.arrow_downward_rounded,
+                        size: 13,
+                        color: trendColor,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        '$pct% vs last',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: trendColor,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(5),
+            child: LinearProgressIndicator(
+              value: fraction,
+              minHeight: 8,
+              backgroundColor: primary.withValues(
+                alpha: context.isDark ? 0.16 : 0.10,
+              ),
+              valueColor: AlwaysStoppedAnimation(primary),
+            ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            'of ${Money.compact(projected)} projected by month-end',
+            style: theme.textTheme.bodySmall?.copyWith(color: context.muted),
+          ),
+          const SizedBox(height: 16),
+          Divider(height: 1, color: context.hairline),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _MonthStat(
+                label: 'Today',
+                value: Money.compact(state.spentToday),
+              ),
+              _MonthStat(
+                label: 'This week',
+                value: Money.compact(state.spentInLastDays(7)),
+              ),
+              _MonthStat(
+                label: 'Avg/day',
+                value: Money.compact(state.dailyAverageThisMonth),
+              ),
+              _MonthStat(label: 'Projected', value: Money.compact(projected)),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-class _SnapshotCard extends StatelessWidget {
-  const _SnapshotCard({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.accent,
-  });
+/// One figure-over-label cell in the month summary's stat strip.
+class _MonthStat extends StatelessWidget {
+  const _MonthStat({required this.label, required this.value});
 
-  final IconData icon;
   final String label;
   final String value;
-  final Color accent;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    return FrostedCard(
-      width: 150,
-      padding: const EdgeInsets.all(16),
+    return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          BadgeIcon(icon: icon, accent: accent, size: BadgeSize.sm),
-          const SizedBox(height: 10),
-          // The figure leads; the word is the caption beneath it.
           Text(
             value,
-            style: theme.textTheme.titleLarge?.copyWith(
+            style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w700,
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
+          const SizedBox(height: 2),
           Text(
             label,
             style: theme.textTheme.bodySmall?.copyWith(color: context.muted),
