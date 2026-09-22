@@ -530,8 +530,11 @@ class _MorphNavBarState extends State<MorphNavBar>
   Widget _chatboxBackdrop(double f, Widget child) {
     if (f <= 0) return child;
     final dark = context.isDark;
-    final top = dark ? const Color(0xFF17281E) : const Color(0xFFC4E6D3);
-    final bottom = dark ? const Color(0xFF11201A) : const Color(0xFF93CFB2);
+    // A light, airy panel defined by a crisp brand-green outline — matching the
+    // reference chatbox, where the green lives in the border, not a saturated
+    // fill, so the white pills and prompt bar read cleanly inside it.
+    final top = dark ? const Color(0xFF1B2E23) : const Color(0xFFF1F8F4);
+    final bottom = dark ? const Color(0xFF13221B) : const Color(0xFFDDEFE6);
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -543,14 +546,19 @@ class _MorphNavBarState extends State<MorphNavBar>
           ],
         ),
         borderRadius: BorderRadius.circular(30),
-        // A tight, downward drop shadow lifts the panel off the sheet without a
-        // hazy glow, so the rectangle keeps clean, crisp edges. A shadow (not a
-        // border) also avoids insetting the content and fighting the bar width.
+        // A crisp green stroke frames the panel. A DecoratedBox paints its border
+        // over the box edges without insetting the child, so it doesn't shrink
+        // the width the bar lays out into — no overflow, unlike a Container.
+        border: Border.all(
+          color: AppTheme.brandGreen.withValues(alpha: 0.60 * f),
+          width: 1.6,
+        ),
+        // A whisper of a drop shadow lifts the panel; the edge itself stays crisp.
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.10 * f),
+            color: Colors.black.withValues(alpha: 0.05 * f),
             blurRadius: 10 * f,
-            offset: Offset(0, 6 * f),
+            offset: Offset(0, 5 * f),
           ),
         ],
       ),
@@ -970,8 +978,9 @@ class _StrokePainter extends CustomPainter {
       );
     }
 
-    glow(16, 24, 5);
-    glow(8, 11, 2);
+    // A tight, subtle sheen — no broad bloom — so the prompt reads clean-edged
+    // like the reference, letting the crisp foreground stroke carry the accent.
+    glow(5, 5, 1);
   }
 
   @override
