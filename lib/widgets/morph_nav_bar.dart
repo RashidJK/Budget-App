@@ -153,9 +153,7 @@ class _MorphNavBarState extends State<MorphNavBar>
     final overlay = Overlay.maybeOf(context);
     if (overlay == null) return;
     late final OverlayEntry entry;
-    entry = OverlayEntry(
-      builder: (_) => _SiriRipple(onDone: entry.remove),
-    );
+    entry = OverlayEntry(builder: (_) => _SiriRipple(onDone: entry.remove));
     overlay.insert(entry);
   }
 
@@ -194,10 +192,8 @@ class _MorphNavBarState extends State<MorphNavBar>
     final insets = _mode == _Mode.add
         ? MediaQuery.viewInsetsOf(context).bottom
         : 0.0;
-    final active = widget.items[widget.activeIndex.clamp(
-      0,
-      widget.items.length - 1,
-    )];
+    final active =
+        widget.items[widget.activeIndex.clamp(0, widget.items.length - 1)];
 
     return SafeArea(
       top: false,
@@ -205,64 +201,79 @@ class _MorphNavBarState extends State<MorphNavBar>
         padding: EdgeInsets.fromLTRB(16, 0, 16, 12 + insets),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final w = constraints.maxWidth;
+            final fullW = constraints.maxWidth;
             return AnimatedBuilder(
               animation: _morph,
               builder: (context, _) {
                 final t = Curves.easeInOutCubic.transform(_morph.value);
                 final animating = _morph.value < 1;
+                final addness = _presence(_Mode.add, t).clamp(0.0, 1.0);
+                // In add mode the chatbox backdrop pads the content in by 14 on
+                // each side, so the bar lays out into a correspondingly narrower
+                // width — otherwise the fixed slots overflow the padded panel.
+                final w = fullW - 28 * addness;
                 final a = _layout(_prev, w);
                 final b = _layout(_mode, w);
                 double at(int i) => lerpDouble(a[i], b[i], t)!;
-                final w0 = at(0), g0 = at(1), w1 = at(2), g1 = at(3), w2 = at(3 + 1);
-
-                final addness = _presence(_Mode.add, t).clamp(0.0, 1.0);
+                final w0 = at(0),
+                    g0 = at(1),
+                    w1 = at(2),
+                    g1 = at(3),
+                    w2 = at(3 + 1);
                 return GestureDetector(
                   behavior: HitTestBehavior.translucent,
                   onVerticalDragEnd: _onSwipe,
-                  child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _pillsBlock(addness),
-                    SizedBox(
-                  height: 60,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      // The grouped pill behind the + and ⋯, only at rest.
-                      Positioned(
-                        left: w0 + g0,
-                        top: 0,
-                        bottom: 0,
-                        width: w1 + g1 + w2,
-                        child: Opacity(
-                          opacity: _presence(_Mode.rest, t).clamp(0.0, 1.0),
-                          child: const IgnorePointer(child: _GlassSurface()),
+                  child: _chatboxBackdrop(
+                    addness,
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _pillsBlock(addness),
+                        SizedBox(
+                          height: 60,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              // The grouped pill behind the + and ⋯, only at rest.
+                              Positioned(
+                                left: w0 + g0,
+                                top: 0,
+                                bottom: 0,
+                                width: w1 + g1 + w2,
+                                child: Opacity(
+                                  opacity: _presence(
+                                    _Mode.rest,
+                                    t,
+                                  ).clamp(0.0, 1.0),
+                                  child: const IgnorePointer(
+                                    child: _GlassSurface(),
+                                  ),
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  SizedBox(
+                                    width: w0,
+                                    child: _navSlot(active, w, t, animating),
+                                  ),
+                                  SizedBox(width: g0),
+                                  SizedBox(
+                                    width: w1,
+                                    child: _captureSlot(w, t, animating),
+                                  ),
+                                  SizedBox(width: g1),
+                                  SizedBox(
+                                    width: w2,
+                                    child: _auxSlot(active, w, t, animating),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: w0,
-                            child: _navSlot(active, w, t, animating),
-                          ),
-                          SizedBox(width: g0),
-                          SizedBox(
-                            width: w1,
-                            child: _captureSlot(w, t, animating),
-                          ),
-                          SizedBox(width: g1),
-                          SizedBox(
-                            width: w2,
-                            child: _auxSlot(active, w, t, animating),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                      ],
                     ),
-                  ],
                   ),
                 );
               },
@@ -298,7 +309,11 @@ class _MorphNavBarState extends State<MorphNavBar>
       // The prompt's Siri glow blooms ~30px past the pill; give it room.
       clipMargin: 34,
       contentFor: (m) => switch (m) {
-        _Mode.rest => (_AddCircle(onTap: _toAdd, size: 46), 46.0, Alignment.center),
+        _Mode.rest => (
+          _AddCircle(onTap: _toAdd, size: 46),
+          46.0,
+          Alignment.center,
+        ),
         _Mode.add => (_prompt(), w - 96, Alignment.centerLeft),
         _Mode.fn => (_AddCircle(onTap: _toAdd), 60.0, Alignment.center),
       },
@@ -508,6 +523,40 @@ class _MorphNavBarState extends State<MorphNavBar>
 
   /// Rises into view above the prompt as you enter capture; collapses away
   /// otherwise. [f] is how "present" the add state is (0..1).
+  /// A larger rounded backdrop behind the whole chatbox — the quick-action
+  /// pills and the prompt bar — in our green. It fades in with the add-mode
+  /// presence [f] (nothing at rest, so the resting bar is untouched) and pads
+  /// the content in as it grows, so the bar and pills sit inside one panel.
+  Widget _chatboxBackdrop(double f, Widget child) {
+    if (f <= 0) return child;
+    final dark = context.isDark;
+    final top = dark ? const Color(0xFF17281E) : const Color(0xFFC4E6D3);
+    final bottom = dark ? const Color(0xFF11201A) : const Color(0xFF93CFB2);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            top.withValues(alpha: f),
+            bottom.withValues(alpha: f),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(30),
+        // A soft green glow for the edge — a shadow, not a border, so it doesn't
+        // inset the content (which would fight the width the bar lays out into).
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.brandGreen.withValues(alpha: 0.30 * f),
+            blurRadius: 18 * f,
+            spreadRadius: f,
+          ),
+        ],
+      ),
+      child: Padding(padding: EdgeInsets.all(14 * f), child: child),
+    );
+  }
+
   Widget _pillsBlock(double f) {
     return ClipRect(
       child: Align(
@@ -949,12 +998,13 @@ class _SiriRippleState extends State<_SiriRipple>
   @override
   void initState() {
     super.initState();
-    _c = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..addStatusListener((s) {
-      if (s == AnimationStatus.completed) widget.onDone();
-    });
+    _c =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 1200),
+        )..addStatusListener((s) {
+          if (s == AnimationStatus.completed) widget.onDone();
+        });
     _c.forward();
   }
 
