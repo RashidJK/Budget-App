@@ -7,9 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Tapping "+" opens the capture prompt in place and the right circle becomes a
-/// "back to the tab" button. The prompt wears a repeating Siri-style stroke, so
-/// once it's open we pump fixed frames rather than settling (which never ends).
+/// Tapping "+" opens the capture prompt in place — it spans the full panel and
+/// a "Close" ✕ appears in the quick-action row above it. The prompt wears a
+/// repeating Siri-style stroke, so once it's open we pump fixed frames rather
+/// than settling (which never ends).
 void main() {
   testWidgets('the + opens a prompt that records an expense', (tester) async {
     SharedPreferences.setMockInitialValues({});
@@ -27,12 +28,12 @@ void main() {
     expect(state.expenses, isEmpty);
     expect(find.byType(TextField), findsNothing);
 
-    // Press "+": the prompt and the "back" button appear.
+    // Press "+": the prompt and the "Close" button appear.
     await tester.tap(find.bySemanticsLabel('Add or capture'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(TextField), findsOneWidget);
-    expect(find.bySemanticsLabel('Back to Home'), findsOneWidget);
+    expect(find.bySemanticsLabel('Close'), findsOneWidget);
 
     // Type an expense and submit it.
     await tester.enterText(find.byType(TextField), '5000 lunch');
@@ -46,7 +47,9 @@ void main() {
     expect(find.byType(TextField), findsNothing);
   });
 
-  testWidgets('the back circle exits capture without recording', (tester) async {
+  testWidgets('the Close button exits capture without recording', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({});
     final state = AppState(await Storage.open());
     addTearDown(state.dispose);
@@ -65,8 +68,8 @@ void main() {
     await tester.enterText(find.byType(TextField), '5000 lunch');
     await tester.pump();
 
-    // Tap the "back to Home" circle — nothing recorded, prompt closed.
-    await tester.tap(find.bySemanticsLabel('Back to Home'));
+    // Tap the "Close" ✕ — nothing recorded, prompt closed.
+    await tester.tap(find.bySemanticsLabel('Close'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 

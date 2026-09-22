@@ -178,7 +178,10 @@ class _MorphNavBarState extends State<MorphNavBar>
       case _Mode.rest:
         return [w - 120, 12, 52, 4, 52];
       case _Mode.add:
-        return [0, 12, w - 96, 12, 72];
+        // The prompt fills the whole panel width — its close moved up to the
+        // pills row (a ✕), matching the reference — so it spans edge to edge
+        // with only the panel's thin padding as a gap.
+        return [0, 0, w, 0, 0];
       case _Mode.fn:
         return [72, 12, 72, 12, w - 168];
     }
@@ -314,7 +317,7 @@ class _MorphNavBarState extends State<MorphNavBar>
           46.0,
           Alignment.center,
         ),
-        _Mode.add => (_prompt(), w - 96, Alignment.centerLeft),
+        _Mode.add => (_prompt(), w, Alignment.centerLeft),
         _Mode.fn => (_AddCircle(onTap: _toAdd), 60.0, Alignment.center),
       },
     );
@@ -332,7 +335,7 @@ class _MorphNavBarState extends State<MorphNavBar>
           52.0,
           Alignment.center,
         ),
-        _Mode.add => (_tabDot(active), 60.0, Alignment.center),
+        _Mode.add => (const SizedBox.shrink(), 0.0, Alignment.center),
         _Mode.fn => (_functionsIsland(), w - 168, Alignment.centerLeft),
       },
     );
@@ -586,8 +589,9 @@ class _MorphNavBarState extends State<MorphNavBar>
   }
 
   Widget _pillsRow() {
+    // Full width: quick-action pills on the left, a close ✕ pinned to the right
+    // (like the reference), so the prompt below can run edge to edge.
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
         _pill(Icons.south_west_rounded, 'Income', context.good, 'Received '),
         const SizedBox(width: 8),
@@ -604,7 +608,36 @@ class _MorphNavBarState extends State<MorphNavBar>
           context.scheme.primary,
           'Lent ',
         ),
+        const Spacer(),
+        _closePill(),
       ],
+    );
+  }
+
+  Widget _closePill() {
+    final dark = context.isDark;
+    return Semantics(
+      button: true,
+      label: 'Close',
+      child: GestureDetector(
+        onTap: _toRest,
+        child: Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: dark
+                ? const Color(0xFF232322).withValues(alpha: 0.72)
+                : Colors.white.withValues(alpha: 0.86),
+            shape: BoxShape.circle,
+            border: Border.all(color: context.hairline),
+          ),
+          child: Icon(
+            Icons.close_rounded,
+            size: 18,
+            color: context.muted,
+          ),
+        ),
+      ),
     );
   }
 
