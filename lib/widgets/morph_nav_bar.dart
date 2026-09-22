@@ -543,13 +543,14 @@ class _MorphNavBarState extends State<MorphNavBar>
           ],
         ),
         borderRadius: BorderRadius.circular(30),
-        // A soft green glow for the edge — a shadow, not a border, so it doesn't
-        // inset the content (which would fight the width the bar lays out into).
+        // A tight, downward drop shadow lifts the panel off the sheet without a
+        // hazy glow, so the rectangle keeps clean, crisp edges. A shadow (not a
+        // border) also avoids insetting the content and fighting the bar width.
         boxShadow: [
           BoxShadow(
-            color: AppTheme.brandGreen.withValues(alpha: 0.30 * f),
-            blurRadius: 18 * f,
-            spreadRadius: f,
+            color: Colors.black.withValues(alpha: 0.10 * f),
+            blurRadius: 10 * f,
+            offset: Offset(0, 6 * f),
           ),
         ],
       ),
