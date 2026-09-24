@@ -54,6 +54,35 @@ void main() {
     expect(reloaded.items.single.done, isTrue);
   });
 
+  test('resurfaced surfaces aged notes/links, not tasks, pinned or recent', () async {
+    final brain = BrainState(await _storage());
+    await brain.capture(BrainKind.note, 'old idea');
+    await brain.capture(BrainKind.task, 'a task'); // excluded: task
+    await brain.capture(BrainKind.link, 'https://a.co');
+    final pinned = await brain.capture(BrainKind.note, 'pinned one');
+    await brain.togglePinned(pinned.id); // excluded: pinned
+
+    // Ten days on, the notes/links have aged into resurface candidates.
+    final future = DateTime.now().add(const Duration(days: 10));
+    final surfaced = brain.resurfaced(now: future).map((i) => i.text).toList();
+    expect(surfaced, containsAll(['old idea', 'https://a.co']));
+    expect(surfaced, isNot(contains('a task')));
+    expect(surfaced, isNot(contains('pinned one')));
+
+    // Freshly captured items are too recent to resurface.
+    expect(brain.resurfaced().isEmpty, isTrue);
+  });
+
+  test('dismissResurface hides an item for the day', () async {
+    final brain = BrainState(await _storage());
+    final note = await brain.capture(BrainKind.note, 'surface me');
+    final future = DateTime.now().add(const Duration(days: 10));
+    expect(brain.resurfaced(now: future).single.id, note.id);
+
+    await brain.dismissResurface(note.id);
+    expect(brain.resurfaced(now: future).isEmpty, isTrue);
+  });
+
   test('remove tombstones, restore brings it back', () async {
     final brain = BrainState(await _storage());
     final item = await brain.capture(BrainKind.link, 'https://example.com');

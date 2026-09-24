@@ -13,15 +13,38 @@ const _uuid = Uuid();
 class BrainState extends ChangeNotifier {
   BrainState(this._storage) {
     _load();
+    _loadDismissed();
   }
 
   final Storage _storage;
 
   List<BrainItem> _items = [];
 
+  /// Ids the user dismissed from the resurface strip today.
+  Set<String> _dismissedToday = {};
+
+  // An item is a resurface candidate once it's at least this old and hasn't
+  // been pinned, deleted or dismissed. Tasks are excluded — due dates surface
+  // those. Up to [_resurfaceMax] show at once.
+  static const _resurfaceMinAgeDays = 5;
+  static const _resurfaceMax = 3;
+
   void _load() {
     _items = _storage.readBrainItems().map(BrainItem.fromJson).toList();
   }
+
+  void _loadDismissed() {
+    final raw = _storage.readResurfaceDismissed();
+    if (raw['date'] == _dayKey(DateTime.now())) {
+      _dismissedToday =
+          (raw['ids'] as List?)?.map((e) => '$e').toSet() ?? <String>{};
+    } else {
+      _dismissedToday = {};
+    }
+  }
+
+  String _dayKey(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   /// Every live item, pinned first, then newest capture first.
   List<BrainItem> get items {
@@ -41,6 +64,50 @@ class BrainState extends ChangeNotifier {
       _items.where((i) => !i.isDeleted && i.kind == kind).length;
 
   bool get isEmpty => items.isEmpty;
+
+  /// A small, stable-for-the-day set of older captures "worth another look":
+  /// on-this-day matches first, then the oldest un-pinned notes, journals and
+  /// links. Tasks are left to their due dates. Empty until items age in.
+  List<BrainItem> resurfaced({DateTime? now}) {
+    final today = now ?? DateTime.now();
+    final start = DateTime(today.year, today.month, today.day);
+    int ageDays(BrainItem i) => start
+        .difference(DateTime(i.createdAt.year, i.createdAt.month, i.createdAt.day))
+        .inDays;
+
+    final candidates = _items
+        .where(
+          (i) =>
+              !i.isDeleted &&
+              !i.pinned &&
+              i.kind != BrainKind.task &&
+              !_dismissedToday.contains(i.id) &&
+              ageDays(i) >= _resurfaceMinAgeDays,
+        )
+        .toList();
+    if (candidates.isEmpty) return const [];
+
+    bool onThisDay(BrainItem i) =>
+        (i.createdAt.month == today.month && i.createdAt.day == today.day) ||
+        i.createdAt.day == today.day;
+
+    candidates.sort((a, b) {
+      final byDay = (onThisDay(b) ? 1 : 0) - (onThisDay(a) ? 1 : 0);
+      if (byDay != 0) return byDay;
+      return a.createdAt.compareTo(b.createdAt); // oldest first
+    });
+    return candidates.take(_resurfaceMax).toList();
+  }
+
+  /// Hides a resurfaced item for the rest of the day.
+  Future<void> dismissResurface(String id) async {
+    _dismissedToday.add(id);
+    await _storage.writeResurfaceDismissed({
+      'date': _dayKey(DateTime.now()),
+      'ids': _dismissedToday.toList(),
+    });
+    notifyListeners();
+  }
 
   /// Records a new capture and returns it.
   Future<BrainItem> capture(

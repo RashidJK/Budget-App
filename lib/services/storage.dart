@@ -23,6 +23,7 @@ class Storage {
   static const _peopleKey = 'budget.people.v1';
   static const _merchantCategoryKey = 'budget.merchantCategory.v1';
   static const _brainItemsKey = 'brain.items.v1';
+  static const _resurfaceDismissedKey = 'brain.resurfaceDismissed.v1';
 
   static Future<Storage> open() async =>
       Storage(await SharedPreferences.getInstance());
@@ -51,6 +52,22 @@ class Storage {
 
   Future<void> writeBrainItems(List<Map<String, dynamic>> items) =>
       _writeList(_brainItemsKey, items);
+
+  /// Which resurfaced items were dismissed, and on which day — a dismissal only
+  /// lasts for that day. Shape: {"date": "2026-01-14", "ids": [...]}.
+  Map<String, dynamic> readResurfaceDismissed() {
+    final raw = _prefs.getString(_resurfaceDismissedKey);
+    if (raw == null || raw.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw);
+      return decoded is Map ? Map<String, dynamic>.from(decoded) : {};
+    } on FormatException {
+      return {};
+    }
+  }
+
+  Future<void> writeResurfaceDismissed(Map<String, dynamic> data) =>
+      _prefs.setString(_resurfaceDismissedKey, jsonEncode(data));
 
   List<Map<String, dynamic>> readScenarios() => _readList(_scenariosKey);
 
