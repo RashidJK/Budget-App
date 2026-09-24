@@ -159,13 +159,26 @@ class _DashboardScreenState extends State<DashboardScreen>
                             children: [
                               Opacity(
                                 opacity: (1 - t * 1.8).clamp(0.0, 1.0),
-                                child: Text(
-                                  Money.format(state.totalBalance),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 44,
-                                    fontWeight: FontWeight.w800,
-                                    height: 1.1,
+                                // Scale a large total down to one line rather
+                                // than letting it wrap and slip behind the sheet
+                                // — big balances (tens of millions) overflow the
+                                // 44px figure on narrower phones otherwise.
+                                child: SizedBox(
+                                  width: double.infinity,
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      Money.format(state.totalBalance),
+                                      maxLines: 1,
+                                      softWrap: false,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 44,
+                                        fontWeight: FontWeight.w800,
+                                        height: 1.1,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
