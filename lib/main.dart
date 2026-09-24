@@ -7,6 +7,7 @@ import 'services/home_widget_bridge.dart';
 import 'spaces/spaces_shell.dart';
 import 'services/storage.dart';
 import 'state/app_state.dart';
+import 'state/brain_state.dart';
 import 'theme.dart';
 
 Future<void> main() async {
@@ -27,18 +28,29 @@ Future<void> main() async {
   // Keep the iOS home-screen widget in step with the latest figures.
   HomeWidgetBridge.attach(appState);
 
-  runApp(BudgetApp(appState: appState));
+  // The second brain's captures live in their own store, alongside the budget.
+  final brainState = BrainState(storage);
+
+  runApp(BudgetApp(appState: appState, brainState: brainState));
 }
 
 class BudgetApp extends StatelessWidget {
-  const BudgetApp({super.key, required this.appState});
+  const BudgetApp({
+    super.key,
+    required this.appState,
+    required this.brainState,
+  });
 
   final AppState appState;
+  final BrainState brainState;
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<AppState>.value(
-      value: appState,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AppState>.value(value: appState),
+        ChangeNotifierProvider<BrainState>.value(value: brainState),
+      ],
       child: MaterialApp(
         title: 'Budget',
         debugShowCheckedModeBanner: false,

@@ -22,6 +22,7 @@ class Storage {
   static const _activitiesKey = 'budget.activities.v1';
   static const _peopleKey = 'budget.people.v1';
   static const _merchantCategoryKey = 'budget.merchantCategory.v1';
+  static const _brainItemsKey = 'brain.items.v1';
 
   static Future<Storage> open() async =>
       Storage(await SharedPreferences.getInstance());
@@ -44,6 +45,12 @@ class Storage {
 
   Future<void> writePeople(List<Map<String, dynamic>> people) =>
       _writeList(_peopleKey, people);
+
+  /// Second-brain captures — notes, tasks, journal entries and links.
+  List<Map<String, dynamic>> readBrainItems() => _readList(_brainItemsKey);
+
+  Future<void> writeBrainItems(List<Map<String, dynamic>> items) =>
+      _writeList(_brainItemsKey, items);
 
   List<Map<String, dynamic>> readScenarios() => _readList(_scenariosKey);
 
