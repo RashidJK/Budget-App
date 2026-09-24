@@ -84,9 +84,10 @@ class _BrainCommandBarState extends State<BrainCommandBar> {
     final kind = _forced ?? parsed.kind;
     await context.read<BrainState>().capture(
       kind,
-      kind == BrainKind.link ? parsed.text : parsed.text,
+      parsed.text,
       url: kind == BrainKind.link ? (parsed.url ?? parsed.text) : null,
       dueDate: kind == BrainKind.task ? parsed.dueDate : null,
+      tags: parsed.tags,
     );
 
     _controller.clear();

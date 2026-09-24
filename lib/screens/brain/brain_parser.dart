@@ -2,12 +2,19 @@ import '../../models/brain_item.dart';
 
 /// The result of interpreting a free-typed capture.
 class BrainCapture {
-  const BrainCapture(this.kind, this.text, {this.url, this.dueDate});
+  const BrainCapture(
+    this.kind,
+    this.text, {
+    this.url,
+    this.dueDate,
+    this.tags = const [],
+  });
 
   final BrainKind kind;
   final String text;
   final String? url;
   final DateTime? dueDate;
+  final List<String> tags;
 }
 
 /// Turns a line of free text into a typed capture, the way the budget's command
@@ -42,11 +49,24 @@ class BrainParser {
     'remind me ',
   ];
 
+  static final _tag = RegExp(r'(?:^|\s)#([\w-]+)');
+
   /// Full interpretation. [now] lets tests pin relative dates.
   static BrainCapture parse(String raw, {DateTime? now}) {
     final today = now ?? DateTime.now();
-    final text = raw.trim();
+    var text = raw.trim();
     if (text.isEmpty) return const BrainCapture(BrainKind.note, '');
+
+    // Pull #tags out first, so they don't skew kind detection or clutter text.
+    final tags = _tag
+        .allMatches(text)
+        .map((m) => m.group(1)!.toLowerCase())
+        .toSet()
+        .toList();
+    if (tags.isNotEmpty) {
+      text = text.replaceAll(_tag, ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+    }
+    if (text.isEmpty) return BrainCapture(BrainKind.note, raw.trim(), tags: tags);
 
     // Link — contains a URL, or the whole thing is a bare domain.
     final urlMatch = _url.firstMatch(text);
@@ -55,21 +75,24 @@ class BrainParser {
         BrainKind.link,
         text,
         url: urlMatch?.group(0) ?? text,
+        tags: tags,
       );
     }
 
     // Journal.
     final journal = _stripPrefix(text, _journalPrefixes);
-    if (journal != null) return BrainCapture(BrainKind.journal, journal);
+    if (journal != null) {
+      return BrainCapture(BrainKind.journal, journal, tags: tags);
+    }
 
     // Task, with an optional due date pulled from the text.
     final task = _stripPrefix(text, _taskPrefixes);
     if (task != null) {
       final (cleaned, due) = _extractDue(task, today);
-      return BrainCapture(BrainKind.task, cleaned, dueDate: due);
+      return BrainCapture(BrainKind.task, cleaned, dueDate: due, tags: tags);
     }
 
-    return BrainCapture(BrainKind.note, text);
+    return BrainCapture(BrainKind.note, text, tags: tags);
   }
 
   /// Kind only — cheap enough to run on every keystroke for live highlighting.

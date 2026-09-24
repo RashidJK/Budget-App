@@ -49,6 +49,18 @@ void main() {
     expect(BrainParser.parse('Great weather today').kind, BrainKind.note);
   });
 
+  test('#tags are pulled out of the body into tags', () {
+    final t = BrainParser.parse('todo email the team #work #urgent');
+    expect(t.kind, BrainKind.task);
+    expect(t.text, 'email the team');
+    expect(t.tags, containsAll(['work', 'urgent']));
+
+    final n = BrainParser.parse('cool idea #ideas');
+    expect(n.kind, BrainKind.note);
+    expect(n.text, 'cool idea');
+    expect(n.tags, ['ideas']);
+  });
+
   test('detect is the kind of a full parse', () {
     expect(BrainParser.detect('todo x'), BrainKind.task);
     expect(BrainParser.detect('https://a.co'), BrainKind.link);

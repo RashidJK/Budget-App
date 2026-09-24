@@ -161,7 +161,13 @@ class _BrainShellState extends State<BrainShell> {
                   : ListView.builder(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                       itemCount: items.length,
-                      itemBuilder: (context, i) => _BrainTile(item: items[i]),
+                      itemBuilder: (context, i) => _BrainTile(
+                        item: items[i],
+                        onTag: (t) => setState(() {
+                          _searching = true;
+                          _searchCtrl.text = t;
+                        }),
+                      ),
                     ),
             ),
             const BrainCommandBar(),
@@ -266,17 +272,35 @@ class _FilterBar extends StatelessWidget {
 // --- one item ---------------------------------------------------------------
 
 class _BrainTile extends StatelessWidget {
-  const _BrainTile({required this.item});
+  const _BrainTile({required this.item, this.onTag});
 
   final BrainItem item;
+  final ValueChanged<String>? onTag;
 
   @override
   Widget build(BuildContext context) {
     final brain = context.read<BrainState>();
+    final isTask = item.kind == BrainKind.task;
+    final keepColor = isTask ? brainKindColor(BrainKind.task) : BrainShell.accent;
     return Dismissible(
       key: ValueKey(item.id),
-      direction: DismissDirection.endToStart,
+      direction: DismissDirection.horizontal,
+      // Swipe right: complete a task, or pin anything else.
       background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 24),
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: keepColor.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Icon(
+          isTask ? Icons.check_circle_rounded : Icons.push_pin_rounded,
+          color: keepColor,
+        ),
+      ),
+      // Swipe left: delete.
+      secondaryBackground: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 24),
         margin: const EdgeInsets.only(bottom: 10),
@@ -286,6 +310,14 @@ class _BrainTile extends StatelessWidget {
         ),
         child: Icon(Icons.delete_outline_rounded, color: context.warn),
       ),
+      confirmDismiss: (dir) async {
+        if (dir == DismissDirection.startToEnd) {
+          HapticFeedback.selectionClick();
+          isTask ? brain.toggleDone(item.id) : brain.togglePinned(item.id);
+          return false; // keep the row; the swipe was an action, not a delete
+        }
+        return true;
+      },
       onDismissed: (_) {
         brain.remove(item.id);
         ScaffoldMessenger.of(context)
@@ -391,7 +423,48 @@ class _BrainTile extends StatelessWidget {
           const SizedBox(height: 6),
           _DueChip(due: item.dueDate!),
         ],
+        if (item.tags.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              for (final t in item.tags)
+                _TagChip(tag: t, onTap: onTag == null ? null : () => onTag!(t)),
+            ],
+          ),
+        ],
       ],
+    );
+  }
+}
+
+class _TagChip extends StatelessWidget {
+  const _TagChip({required this.tag, this.onTap});
+
+  final String tag;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = BrainShell.accent;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: context.isDark ? 0.22 : 0.10),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          '#$tag',
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+      ),
     );
   }
 }

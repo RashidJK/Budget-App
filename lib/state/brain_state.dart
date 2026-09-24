@@ -115,6 +115,7 @@ class BrainState extends ChangeNotifier {
     String text, {
     String? url,
     DateTime? dueDate,
+    List<String> tags = const [],
   }) async {
     final now = DateTime.now();
     final item = BrainItem(
@@ -125,6 +126,7 @@ class BrainState extends ChangeNotifier {
       updatedAt: now,
       url: url,
       dueDate: dueDate,
+      tags: tags,
     );
     _items = [item, ..._items];
     await _persist();
