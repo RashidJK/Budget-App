@@ -3,8 +3,8 @@ import 'package:provider/provider.dart';
 
 import 'command/mlkit_receipt_scanner.dart';
 import 'command/receipt_scanner.dart';
-import 'screens/home_shell.dart';
 import 'services/home_widget_bridge.dart';
+import 'spaces/spaces_shell.dart';
 import 'services/storage.dart';
 import 'state/app_state.dart';
 import 'theme.dart';
@@ -45,7 +45,7 @@ class BudgetApp extends StatelessWidget {
         theme: AppTheme.light(),
         darkTheme: AppTheme.dark(),
         themeMode: ThemeMode.system,
-        home: const HomeShell(),
+        home: const SpacesShell(),
       ),
     );
   }
