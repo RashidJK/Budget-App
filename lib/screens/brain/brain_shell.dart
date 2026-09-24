@@ -5,10 +5,11 @@ import 'package:provider/provider.dart';
 import '../../models/brain_item.dart';
 import '../../state/brain_state.dart';
 import '../../theme.dart';
+import 'brain_command_bar.dart';
 
 /// The Second Brain — a capture-first inbox for notes, tasks, journal entries
 /// and links. One feed interleaves every kind, newest first; the chips filter
-/// it; the bar at the bottom captures a new thought.
+/// it; the ✨ command bar at the bottom captures and routes a new thought.
 class BrainShell extends StatefulWidget {
   const BrainShell({super.key});
 
@@ -65,9 +66,7 @@ class _BrainShellState extends State<BrainShell> {
             const SizedBox(height: 16),
             _FilterBar(
               selected: _filter,
-              counts: {
-                for (final k in BrainKind.values) k: brain.countOf(k),
-              },
+              counts: {for (final k in BrainKind.values) k: brain.countOf(k)},
               onSelect: (k) => setState(() => _filter = k),
             ),
             const SizedBox(height: 8),
@@ -77,37 +76,18 @@ class _BrainShellState extends State<BrainShell> {
                   : items.isEmpty
                   ? _EmptyFilter(kind: _filter!)
                   : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                       itemCount: items.length,
                       itemBuilder: (context, i) => _BrainTile(item: items[i]),
                     ),
             ),
+            const BrainCommandBar(),
           ],
         ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: _CaptureBar(
-        onTap: () => _openCompose(context, _filter ?? BrainKind.note),
       ),
     );
   }
 }
-
-// --- kind visuals -----------------------------------------------------------
-
-IconData _iconFor(BrainKind k) => switch (k) {
-  BrainKind.note => Icons.sticky_note_2_outlined,
-  BrainKind.task => Icons.check_circle_outline,
-  BrainKind.journal => Icons.menu_book_outlined,
-  BrainKind.link => Icons.link_rounded,
-};
-
-Color _colorFor(BrainKind k) => switch (k) {
-  BrainKind.note => BrainShell.accent,
-  BrainKind.task => const Color(0xFF2AA783),
-  BrainKind.journal => const Color(0xFFCC8A2E),
-  BrainKind.link => const Color(0xFF3B82D6),
-};
 
 // --- filter chips -----------------------------------------------------------
 
@@ -137,7 +117,7 @@ class _FilterBar extends StatelessWidget {
               context,
               label: '${k.label}s',
               count: counts[k] ?? 0,
-              color: _colorFor(k),
+              color: brainKindColor(k),
               active: selected == k,
               onTap: () => onSelect(k),
             ),
@@ -260,7 +240,7 @@ class _BrainTile extends StatelessWidget {
   }
 
   Widget _leading(BuildContext context, BrainState brain) {
-    final color = _colorFor(item.kind);
+    final color = brainKindColor(item.kind);
     if (item.kind == BrainKind.task) {
       return GestureDetector(
         onTap: () {
@@ -288,7 +268,7 @@ class _BrainTile extends StatelessWidget {
         color: color.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(9),
       ),
-      child: Icon(_iconFor(item.kind), size: 17, color: color),
+      child: Icon(brainKindIcon(item.kind), size: 17, color: color),
     );
   }
 
@@ -339,7 +319,7 @@ class _DueChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final overdue = due.isBefore(DateTime(now.year, now.month, now.day));
-    final color = overdue ? context.warn : _colorFor(BrainKind.task);
+    final color = overdue ? context.warn : brainKindColor(BrainKind.task);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -360,242 +340,6 @@ class _DueChip extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// --- capture bar + compose --------------------------------------------------
-
-class _CaptureBar extends StatelessWidget {
-  const _CaptureBar({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          height: 52,
-          width: MediaQuery.of(context).size.width - 40,
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          decoration: BoxDecoration(
-            color: BrainShell.accent,
-            borderRadius: BorderRadius.circular(26),
-            boxShadow: [
-              BoxShadow(
-                color: BrainShell.accent.withValues(alpha: 0.4),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Row(
-            children: const [
-              Icon(Icons.add_rounded, color: Colors.white),
-              SizedBox(width: 10),
-              Text(
-                'Capture a thought…',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              Spacer(),
-              Icon(Icons.auto_awesome, color: Colors.white70, size: 20),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-Future<void> _openCompose(BuildContext context, BrainKind initial) async {
-  HapticFeedback.lightImpact();
-  final brain = context.read<BrainState>();
-  await showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => ChangeNotifierProvider<BrainState>.value(
-      value: brain,
-      child: _ComposeSheet(initial: initial),
-    ),
-  );
-}
-
-class _ComposeSheet extends StatefulWidget {
-  const _ComposeSheet({required this.initial});
-
-  final BrainKind initial;
-
-  @override
-  State<_ComposeSheet> createState() => _ComposeSheetState();
-}
-
-class _ComposeSheetState extends State<_ComposeSheet> {
-  late BrainKind _kind = widget.initial;
-  final _controller = TextEditingController();
-  final _focus = FocusNode();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    _focus.dispose();
-    super.dispose();
-  }
-
-  String get _hint => switch (_kind) {
-    BrainKind.note => 'Jot a note…',
-    BrainKind.task => 'What needs doing?',
-    BrainKind.journal => "What's on your mind today?",
-    BrainKind.link => 'Paste a link…',
-  };
-
-  Future<void> _submit() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
-    final brain = context.read<BrainState>();
-    await brain.capture(
-      _kind,
-      text,
-      url: _kind == BrainKind.link ? text : null,
-    );
-    if (mounted) Navigator.of(context).pop();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final dark = context.isDark;
-    final inset = MediaQuery.of(context).viewInsets.bottom;
-    return Padding(
-      padding: EdgeInsets.only(bottom: inset),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-        decoration: BoxDecoration(
-          color: dark ? const Color(0xFF1B1A24) : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: context.hairline,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final k in BrainKind.values)
-                  _KindPick(
-                    kind: k,
-                    selected: _kind == k,
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      setState(() => _kind = k);
-                    },
-                  ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _controller,
-              focusNode: _focus,
-              autofocus: true,
-              minLines: 1,
-              maxLines: 5,
-              textCapitalization: _kind == BrainKind.link
-                  ? TextCapitalization.none
-                  : TextCapitalization.sentences,
-              keyboardType: _kind == BrainKind.link
-                  ? TextInputType.url
-                  : TextInputType.multiline,
-              onSubmitted: (_) => _submit(),
-              decoration: InputDecoration(
-                hintText: _hint,
-                filled: true,
-                fillColor: dark ? const Color(0xFF232232) : const Color(0xFFF3F2FA),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _submit,
-                style: FilledButton.styleFrom(
-                  backgroundColor: _colorFor(_kind),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: Text('Add ${_kind.label.toLowerCase()}'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _KindPick extends StatelessWidget {
-  const _KindPick({
-    required this.kind,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final BrainKind kind;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _colorFor(kind);
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.16) : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected ? color.withValues(alpha: 0.6) : context.hairline,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(_iconFor(kind), size: 16, color: selected ? color : context.muted),
-            const SizedBox(width: 6),
-            Text(
-              kind.label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: selected ? color : context.scheme.onSurface,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -630,7 +374,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'Capture a note, task, journal entry or link\nwith the bar below.',
+              'Type a thought below — a link, "todo …", "journal: …"\nor anything else — and it files itself.',
               textAlign: TextAlign.center,
               style: TextStyle(color: context.muted, fontSize: 14, height: 1.35),
             ),
@@ -652,7 +396,7 @@ class _EmptyFilter extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(_iconFor(kind), size: 34, color: context.muted),
+          Icon(brainKindIcon(kind), size: 34, color: context.muted),
           const SizedBox(height: 10),
           Text(
             'No ${kind.label.toLowerCase()}s yet',
