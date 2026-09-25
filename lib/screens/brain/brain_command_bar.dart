@@ -102,14 +102,24 @@ class _BrainCommandBarState extends State<BrainCommandBar> {
     final color = brainKindColor(_activeKind);
     final safeBottom = MediaQuery.paddingOf(context).bottom;
 
-    return Container(
-      padding: EdgeInsets.fromLTRB(16, 10, 16, (safeBottom > 0 ? safeBottom : 12)),
-      decoration: BoxDecoration(
-        color: dark ? const Color(0xFF14131C) : const Color(0xFFF4F3FB),
-        border: Border(top: BorderSide(color: context.hairline)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    return Padding(
+      padding: EdgeInsets.fromLTRB(14, 6, 14, (safeBottom > 0 ? safeBottom : 12)),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: dark ? const Color(0xFF201F2B) : Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: context.hairline),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: dark ? 0.34 : 0.08),
+              blurRadius: 22,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
         children: [
           AnimatedSize(
             duration: const Duration(milliseconds: 180),
@@ -203,6 +213,7 @@ class _BrainCommandBarState extends State<BrainCommandBar> {
             ],
           ),
         ],
+        ),
       ),
     );
   }
