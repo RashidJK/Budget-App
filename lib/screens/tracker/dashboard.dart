@@ -1,16 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import '../../models/phosphor.dart';
 import 'package:provider/provider.dart';
 
+import '../../command/command_bar.dart';
+import '../../models/account.dart';
 import '../../models/palette.dart';
 import '../../models/person.dart';
 import '../../services/format.dart';
 import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/badge_icon.dart';
+import '../../widgets/card_stack.dart';
 import '../../widgets/frosted_card.dart';
 import '../../widgets/section_header.dart';
-import '../../widgets/week_calendar.dart';
+import '../../widgets/stat.dart';
+import '../manage/account_detail_screen.dart';
+import '../manage/accounts_screen.dart';
 import '../manage/manage_screen.dart';
 import '../planner/planner_home.dart';
 import 'accounts_spread.dart';
@@ -40,200 +46,338 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
-  // A chosen calendar day, or null for the full overview.
-  DateTime? _dayFilter;
+class _DashboardScreenState extends State<DashboardScreen>
+    with SingleTickerProviderStateMixin {
+  // 0 = collapsed (just the Total figure), 1 = expanded (the stacked cards).
+  // The green band grows from the height of the single figure to the full deck,
+  // and the white sheet below rides down with it.
+  late final AnimationController _reveal = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 380),
+  );
 
-  // The budget's identity green, for the island accents.
-  static const _accent = Color(0xFF2E9E6B);
+  static const double _collapsedBand = 60;
+  static const double _expandedBand = 334; // deck 250 + peek 52 + dots ~32
+
+  double get _range => _expandedBand - _collapsedBand;
+
+  @override
+  void dispose() {
+    _reveal.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    if (_reveal.value < 0.5) {
+      _reveal.animateTo(1, curve: Curves.easeOutCubic);
+    } else {
+      _reveal.animateBack(0, curve: Curves.easeOutCubic);
+    }
+  }
+
+  // Dragging the handle down grows the band (reveal); up shrinks it.
+  void _onDragUpdate(DragUpdateDetails d) {
+    _reveal.value = (_reveal.value + (d.primaryDelta ?? 0) / _range).clamp(
+      0.0,
+      1.0,
+    );
+  }
+
+  void _onDragEnd(DragEndDetails d) {
+    final v = d.primaryVelocity ?? 0;
+    if (v > 320) {
+      _reveal.animateTo(1, curve: Curves.easeOutCubic);
+    } else if (v < -320) {
+      _reveal.animateBack(0, curve: Curves.easeOutCubic);
+    } else if (_reveal.value >= 0.5) {
+      _reveal.animateTo(1, curve: Curves.easeOutCubic);
+    } else {
+      _reveal.animateBack(0, curve: Curves.easeOutCubic);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    final dark = context.isDark;
-    final bg = dark ? const Color(0xFF12211A) : const Color(0xFFEFF4F0);
-    final budgets = state.budgetProgress();
-    final hasHistory =
-        state.scopedExpenses.isNotEmpty || state.scopedActivities.isNotEmpty;
+    // A misty "celadon → pine" wash: deep pine at the top so the white greeting
+    // and Total stay legible, easing down through sage to a pale celadon right
+    // where the white sheet emerges. The dark top holds through the collapsed
+    // header, and the pale tail lands near the expanded deck's sheet seam; the
+    // sheet covers whatever celadon runs on below. One look on both themes.
+    final topInset = MediaQuery.paddingOf(context).top;
 
     return Scaffold(
-      backgroundColor: bg,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _DashIsland(
-              child: Column(
-                children: [
-                  _TopBar(),
-                  const SizedBox(height: 12),
-                  WeekCalendar(
-                    selected: _dayFilter,
-                    accent: _accent,
-                    onSelect: (d) => setState(() => _dayFilter = d),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 120),
-                children: [
-                  _TotalCard(
-                    total: state.totalBalance,
-                    onTap: () => showAccountsSpread(context),
-                  ),
-                  const SizedBox(height: 22),
-                  if (_dayFilter != null)
-                    _RecentSection(
-                      day: _dayFilter,
-                      onSeeAll: () => _openHistory(context),
-                    )
-                  else ...[
-                    if (state.spentThisMonth > 0) ...[
-                      const SectionHeader(title: 'This month'),
-                      const SizedBox(height: 14),
-                      _MonthSummaryCard(state: state),
-                      const SizedBox(height: 28),
-                    ],
-                    if (budgets.isNotEmpty)
-                      _BudgetSection(
-                        budgets: budgets,
-                        daysLeft: state.daysLeftThisMonth,
-                      )
-                    else
-                      _BudgetEmpty(
-                        hasExpenses: state.spentThisMonth > 0,
-                        onManage: () => ManageScreen.open(context),
+      backgroundColor: const Color(0xFF1E3327),
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF1E3327), // pine
+              Color(0xFF2A4433),
+              Color(0xFF3E5A48),
+              Color(0xFF5B7B60),
+              Color(0xFF97B189), // sage
+              Color(0xFFC7DAAD), // celadon
+            ],
+            stops: [0.0, 0.12, 0.26, 0.40, 0.50, 0.58],
+          ),
+        ),
+        child: AnimatedBuilder(
+          animation: _reveal,
+          builder: (context, _) {
+            final t = _reveal.value;
+            final bandHeight = _collapsedBand + _range * t;
+            return Column(
+              children: [
+                // ---- Green hero: greeting, the Total, and the morphing band ----
+                Padding(
+                  padding: EdgeInsets.fromLTRB(20, topInset + 8, 20, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _TopBar(),
+                      const SizedBox(height: 18),
+                      Text(
+                        'Total',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.72),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    if (hasHistory) ...[
-                      const SizedBox(height: 28),
-                      _RecentSection(onSeeAll: () => _openHistory(context)),
+                      const SizedBox(height: 4),
+                      // The morph: the single Total figure fades out as the stacked
+                      // cards fade in, and the band grows to make room for them.
+                      ClipRect(
+                        child: SizedBox(
+                          height: bandHeight,
+                          width: double.infinity,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Opacity(
+                                opacity: (1 - t * 1.8).clamp(0.0, 1.0),
+                                // Scale a large total down to one line rather
+                                // than letting it wrap and slip behind the sheet
+                                // — big balances (tens of millions) overflow the
+                                // 44px figure on narrower phones otherwise.
+                                child: SizedBox(
+                                  width: double.infinity,
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      Money.format(state.totalBalance),
+                                      maxLines: 1,
+                                      softWrap: false,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 44,
+                                        fontWeight: FontWeight.w800,
+                                        height: 1.1,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                height: _expandedBand,
+                                child: Opacity(
+                                  opacity: (t * 1.8 - 0.8).clamp(0.0, 1.0),
+                                  child: IgnorePointer(
+                                    ignoring: t < 0.98,
+                                    child: _deck(context, state),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
-                    if (state.outstandingBalances.isNotEmpty) ...[
-                      const SizedBox(height: 28),
-                      _BalancesSection(balances: state.outstandingBalances),
-                    ],
-                    const SizedBox(height: 28),
-                    _PlannerSection(onSeeAll: widget.onSeePlanner),
-                  ],
-                ],
-              ),
-            ),
-          ],
+                  ),
+                ),
+                // ---- White sheet: handle to reveal/hide, content scrolls ----
+                Expanded(
+                  child: _HeroSheet(
+                    onToggle: _toggle,
+                    onDragUpdate: _onDragUpdate,
+                    onDragEnd: _onDragEnd,
+                    child: _content(context, state),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
+
+  /// The stacked deck revealed on expand: total-balance card, then one card per
+  /// account, with the month-to-date flow card leading.
+  Widget _deck(BuildContext context, AppState state) {
+    return CardStack(
+      height: 250,
+      peek: 26,
+      notchFront: true,
+      // Pinch the deck in to fan every account out into a full spread.
+      onPinch: () => showAccountsSpread(context),
+      cards: [
+        _HeroCard(
+          spent: state.spentThisMonth,
+          spentPrevious: state.spentLastMonth,
+          income: state.incomeThisMonth,
+          incomePrevious: state.incomeLastMonth,
+          onAdd: () => CommandBar.show(context),
+          onIncome: () => CommandBar.show(context, initialText: 'Received '),
+          onTransfer: () => CommandBar.show(context, initialText: 'Transfer '),
+          onHistory: () => _openHistory(context),
+        ),
+        _BalanceCard(
+          total: state.totalBalance,
+          accounts: state.accountBalances,
+          onAdd: () => CommandBar.show(context),
+          onIncome: () => CommandBar.show(context, initialText: 'Received '),
+          onTransfer: () => CommandBar.show(context, initialText: 'Transfer '),
+          onHistory: () => _openHistory(context),
+          onManageAccounts: () => AccountsScreen.open(context),
+          onOpenAccount: (id) => AccountDetailScreen.open(context, id),
+        ),
+        // One card per account, largest balance first.
+        for (final ab in state.accountBalances)
+          _AccountCard(
+            balance: ab,
+            flow: state.accountFlow(ab.account.id, DateTime.now()),
+            onOpen: () => AccountDetailScreen.open(context, ab.account.id),
+          ),
+      ],
+    );
+  }
+
+  /// The scrollable body inside the white sheet.
+  Widget _content(BuildContext context, AppState state) {
+    final budgets = state.budgetProgress();
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
+      children: [
+        // A summary of the month's spend — the headline figure, its trend, how
+        // far it is toward the projected total, and the sub-stats. Shown once
+        // there's something to summarise.
+        if (state.spentThisMonth > 0) ...[
+          const SectionHeader(title: 'This month'),
+          const SizedBox(height: 14),
+          _MonthSummaryCard(state: state),
+          const SizedBox(height: 28),
+        ],
+        if (budgets.isNotEmpty)
+          _BudgetSection(budgets: budgets, daysLeft: state.daysLeftThisMonth)
+        else
+          _BudgetEmpty(
+            hasExpenses: state.spentThisMonth > 0,
+            onManage: () => ManageScreen.open(context),
+          ),
+        if (state.scopedExpenses.isNotEmpty ||
+            state.scopedActivities.isNotEmpty) ...[
+          const SizedBox(height: 28),
+          _RecentSection(onSeeAll: () => _openHistory(context)),
+        ],
+        if (state.outstandingBalances.isNotEmpty) ...[
+          const SizedBox(height: 28),
+          _BalancesSection(balances: state.outstandingBalances),
+        ],
+        const SizedBox(height: 28),
+        _PlannerSection(onSeeAll: widget.onSeePlanner),
+      ],
+    );
+  }
 }
 
-/// The rounded header island: the top bar and the week calendar, on a raised
-/// card — the budget's take on the Second Brain's island header.
-class _DashIsland extends StatelessWidget {
-  const _DashIsland({required this.child});
+/// The white sheet under the hero. A grabber at the top reveals or hides the
+/// stacked cards — tap to toggle, drag to scrub — while the body scrolls.
+class _HeroSheet extends StatelessWidget {
+  const _HeroSheet({
+    required this.child,
+    required this.onToggle,
+    required this.onDragUpdate,
+    required this.onDragEnd,
+  });
 
   final Widget child;
+  final VoidCallback onToggle;
+  final GestureDragUpdateCallback onDragUpdate;
+  final GestureDragEndCallback onDragEnd;
 
   @override
   Widget build(BuildContext context) {
-    final dark = context.isDark;
+    // A soft mint ground — deeper at the top where it catches the hero's pale
+    // seam, easing to a lighter mint. Greener than the old near-neutral so the
+    // frosted glass cards have something to sit on and read as raised.
+    final sheetGradient = context.isDark
+        ? const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF12211A), Color(0xFF0F1713)],
+            stops: [0.0, 0.5],
+          )
+        : const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFD6E7DC), Color(0xFFE4EFE7)],
+            stops: [0.0, 0.5],
+          );
     return Container(
-      margin: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: dark ? const Color(0xFF1B2A22) : Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: context.hairline),
+        gradient: sheetGradient,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: dark ? 0.30 : 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 24,
+            offset: const Offset(0, -6),
           ),
         ],
       ),
-      child: child,
-    );
-  }
-}
-
-/// The headline balance, as a green card. Tapping it fans out the accounts —
-/// the deck's spread, now reachable from a single card.
-class _TotalCard extends StatelessWidget {
-  const _TotalCard({required this.total, required this.onTap});
-
-  final double total;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF2E9E6B), Color(0xFF1E7A50)],
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          GestureDetector(
+            key: const ValueKey('hero-handle'),
+            behavior: HitTestBehavior.opaque,
+            onTap: onToggle,
+            onVerticalDragUpdate: onDragUpdate,
+            onVerticalDragEnd: onDragEnd,
+            child: SizedBox(
+              height: 32,
+              width: double.infinity,
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (var i = 0; i < 3; i++)
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                        width: 13,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: context.scheme.onSurface.withValues(
+                            alpha: 0.55,
+                          ),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF2E9E6B).withValues(alpha: 0.32),
-              blurRadius: 24,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  'Total balance',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.82),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Spacer(),
-                Icon(
-                  Icons.grid_view_rounded,
-                  size: 18,
-                  color: Colors.white.withValues(alpha: 0.82),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                Money.format(total),
-                maxLines: 1,
-                softWrap: false,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 40,
-                  fontWeight: FontWeight.w800,
-                  height: 1.1,
-                ),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Tap to see your accounts',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.72),
-                fontSize: 12.5,
-              ),
-            ),
-          ],
-        ),
+          Expanded(child: child),
+        ],
       ),
     );
   }
@@ -243,61 +387,26 @@ class _TotalCard extends StatelessWidget {
 /// recency — as a compact peek. "See all" opens the full history; the rows are
 /// dense (no swipe) so this stays a glance, not a place to manage from.
 class _RecentSection extends StatelessWidget {
-  const _RecentSection({required this.onSeeAll, this.day});
+  const _RecentSection({required this.onSeeAll});
 
   final VoidCallback onSeeAll;
-
-  /// When set, show only that day's entries (and all of them, not just five).
-  final DateTime? day;
-
-  bool _sameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     // Merge the two ledgers into one recency-sorted feed, newest first.
-    var entries = <({DateTime date, Widget row})>[
+    final entries = <({DateTime date, Widget row})>[
       for (final e in state.scopedExpenses)
         (date: e.date, row: ExpenseRow(expense: e, dense: true)),
       for (final a in state.scopedActivities)
         (date: a.date, row: ActivityRow(activity: a, dense: true)),
     ]..sort((x, y) => y.date.compareTo(x.date));
-    if (day != null) {
-      entries = entries.where((e) => _sameDay(e.date, day!)).toList();
-    }
-    final recent = day != null ? entries : entries.take(5).toList();
-
-    if (day != null && recent.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 40),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.event_available_rounded,
-                size: 34,
-                color: context.muted,
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Nothing on this day',
-                style: TextStyle(color: context.muted, fontSize: 15),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    final recent = entries.take(5).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(
-          title: day != null ? 'That day' : 'Recent',
-          onAction: onSeeAll,
-        ),
+        SectionHeader(title: 'Recent', onAction: onSeeAll),
         const SizedBox(height: 14),
         FrostedCard(
           child: Padding(
@@ -536,8 +645,8 @@ class _TopBar extends StatelessWidget {
           child: Text(
             _greeting(),
             style: theme.textTheme.titleMedium?.copyWith(
-              color: context.scheme.onSurface,
-              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -553,6 +662,608 @@ class _TopBar extends StatelessWidget {
     if (hour < 12) return 'Good morning';
     if (hour < 17) return 'Good afternoon';
     return 'Good evening';
+  }
+}
+
+/// Which figure the hero card is showing.
+enum _HeroMetric {
+  spent('Spent'),
+  income('Income'),
+  net('Net');
+
+  const _HeroMetric(this.label);
+  final String label;
+}
+
+/// The dark headline card: a month-to-date figure the user can toggle between
+/// Spent, Income and Net, its month-on-month trend, and the quick actions.
+class _HeroCard extends StatefulWidget {
+  const _HeroCard({
+    required this.spent,
+    required this.spentPrevious,
+    required this.income,
+    required this.incomePrevious,
+    required this.onAdd,
+    required this.onIncome,
+    required this.onTransfer,
+    required this.onHistory,
+  });
+
+  final double spent;
+  final double spentPrevious;
+  final double income;
+  final double incomePrevious;
+  final VoidCallback onAdd;
+  final VoidCallback onIncome;
+  final VoidCallback onTransfer;
+  final VoidCallback onHistory;
+
+  @override
+  State<_HeroCard> createState() => _HeroCardState();
+}
+
+class _HeroCardState extends State<_HeroCard> {
+  _HeroMetric _metric = _HeroMetric.spent;
+
+  double get _value => switch (_metric) {
+    _HeroMetric.spent => widget.spent,
+    _HeroMetric.income => widget.income,
+    _HeroMetric.net => widget.income - widget.spent,
+  };
+
+  double get _previous => switch (_metric) {
+    _HeroMetric.spent => widget.spentPrevious,
+    _HeroMetric.income => widget.incomePrevious,
+    _HeroMetric.net => widget.incomePrevious - widget.spentPrevious,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final value = _value;
+    final previous = _previous;
+    final difference = value - previous;
+    final hasComparison = previous.abs() > 0;
+    final up = difference > 0;
+    // For spending, a rise is bad; for income and net, a rise is good — so the
+    // trend chip's colour flips with the metric.
+    final good = _metric == _HeroMetric.spent ? !up : up;
+    final trendColor = good ? AppTheme.goodDark : AppTheme.warnDark;
+    final pct = previous.abs() > 0 ? (difference.abs() / previous.abs()) : 0.0;
+
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: heroCardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _MetricToggle(
+                selected: _metric,
+                onChanged: (m) {
+                  HapticFeedback.selectionClick();
+                  setState(() => _metric = m);
+                },
+              ),
+              const Spacer(),
+              if (hasComparison)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: trendColor.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        up
+                            ? Icons.arrow_upward_rounded
+                            : Icons.arrow_downward_rounded,
+                        size: 13,
+                        color: trendColor,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        Money.percent(pct),
+                        style: TextStyle(
+                          color: trendColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Scale a large figure down rather than letting it ellipsize — this
+          // is the app's headline number, so a partial one would mislead.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: AnimatedMoney(
+              value: value,
+              // The single heaviest token in the app — the one headline figure.
+              style: Theme.of(
+                context,
+              ).textTheme.displayLarge?.copyWith(color: Colors.white),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            hasComparison
+                ? '${up ? 'Up' : 'Down'} ${Money.format(difference.abs())} '
+                      'from last month'
+                : 'Nothing to compare yet',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.5),
+              fontSize: 12.5,
+            ),
+          ),
+          const Spacer(),
+          _HeroActionRow(
+            onAdd: widget.onAdd,
+            onIncome: widget.onIncome,
+            onTransfer: widget.onTransfer,
+            onHistory: widget.onHistory,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The dark card's shared surface — gradient, top rim-light, layered shadow and
+/// brand under-glow — used by every card in the hero deck so they read as one
+/// stack.
+/// The balance card in the hero deck — how much money there is and where it
+/// sits, across every account.
+class _BalanceCard extends StatelessWidget {
+  const _BalanceCard({
+    required this.total,
+    required this.accounts,
+    required this.onAdd,
+    required this.onIncome,
+    required this.onTransfer,
+    required this.onHistory,
+    required this.onManageAccounts,
+    required this.onOpenAccount,
+  });
+
+  final double total;
+  final List<AccountBalance> accounts;
+  final VoidCallback onAdd;
+  final VoidCallback onIncome;
+  final VoidCallback onTransfer;
+  final VoidCallback onHistory;
+  final VoidCallback onManageAccounts;
+  final ValueChanged<String> onOpenAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: heroCardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Total balance',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: onManageAccounts,
+                behavior: HitTestBehavior.opaque,
+                child: Row(
+                  children: [
+                    Text(
+                      'Accounts',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.55),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 16,
+                      color: Colors.white.withValues(alpha: 0.55),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: AnimatedMoney(
+              value: total,
+              style: theme.textTheme.displayLarge?.copyWith(
+                color: Colors.white,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 32,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.zero,
+              itemCount: accounts.length + 1,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                if (index == accounts.length) {
+                  return _AccountChip.add(onTap: onManageAccounts);
+                }
+                return _AccountChip(
+                  balance: accounts[index],
+                  onTap: () => onOpenAccount(accounts[index].account.id),
+                );
+              },
+            ),
+          ),
+          const Spacer(),
+          _HeroActionRow(
+            onAdd: onAdd,
+            onIncome: onIncome,
+            onTransfer: onTransfer,
+            onHistory: onHistory,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One account as its own card in the hero deck — name, live balance, and this
+/// month's money in vs out. Tap to open the account.
+class _AccountCard extends StatelessWidget {
+  const _AccountCard({
+    required this.balance,
+    required this.flow,
+    required this.onOpen,
+  });
+
+  final AccountBalance balance;
+  final AccountFlow flow;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final account = balance.account;
+    final accent = account.of(context);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onOpen,
+      child: Container(
+        padding: const EdgeInsets.all(22),
+        decoration: heroCardDecoration(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                BadgeIcon(icon: account.icon, accent: accent),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        account.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        account.type.label,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.55),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.white.withValues(alpha: 0.55),
+                ),
+              ],
+            ),
+            const Spacer(),
+            Text(
+              'Balance',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 4),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                Money.format(balance.balance),
+                style: theme.textTheme.displayLarge?.copyWith(
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            const Spacer(),
+            Row(
+              children: [
+                _flowBit(context, 'In', flow.inflow, context.good),
+                const SizedBox(width: 20),
+                _flowBit(context, 'Out', flow.outflow, context.warn),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _flowBit(BuildContext context, String label, double amount, Color c) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          label == 'In' ? Icons.south_west_rounded : Icons.north_east_rounded,
+          size: 15,
+          color: c,
+        ),
+        const SizedBox(width: 5),
+        Text(
+          Money.compact(amount),
+          style: TextStyle(
+            color: c,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.5),
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A translucent wallet chip on the dark balance card.
+class _AccountChip extends StatelessWidget {
+  const _AccountChip({required this.balance, this.onTap}) : isAdd = false;
+  const _AccountChip.add({required this.onTap}) : balance = null, isAdd = true;
+
+  final AccountBalance? balance;
+  final bool isAdd;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isAdd ? Icons.add_rounded : balance!.account.icon,
+            size: 14,
+            color: Colors.white.withValues(alpha: 0.85),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            isAdd ? 'Account' : balance!.account.name,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.9),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (!isAdd) ...[
+            const SizedBox(width: 6),
+            Text(
+              Money.compact(balance!.balance),
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 12,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+    if (onTap == null) return child;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: child,
+    );
+  }
+}
+
+/// The four circular quick actions shared across the hero deck's cards.
+class _HeroActionRow extends StatelessWidget {
+  const _HeroActionRow({
+    required this.onAdd,
+    required this.onIncome,
+    required this.onTransfer,
+    required this.onHistory,
+  });
+
+  final VoidCallback onAdd;
+  final VoidCallback onIncome;
+  final VoidCallback onTransfer;
+  final VoidCallback onHistory;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _HeroAction(icon: PhosphorR.plus, label: 'Add', onTap: onAdd),
+        _HeroAction(
+          icon: PhosphorR.arrowDownLeft,
+          label: 'Income',
+          onTap: onIncome,
+        ),
+        _HeroAction(
+          icon: PhosphorR.arrowsLeftRight,
+          label: 'Transfer',
+          onTap: onTransfer,
+        ),
+        _HeroAction(
+          icon: PhosphorR.clockCounterClockwise,
+          label: 'History',
+          onTap: onHistory,
+        ),
+      ],
+    );
+  }
+}
+
+/// The Spent / Income / Net pill switcher at the top of the hero card.
+class _MetricToggle extends StatelessWidget {
+  const _MetricToggle({required this.selected, required this.onChanged});
+
+  final _HeroMetric selected;
+  final ValueChanged<_HeroMetric> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final metric in _HeroMetric.values)
+            GestureDetector(
+              key: ValueKey('metric-${metric.name}'),
+              onTap: () => onChanged(metric),
+              behavior: HitTestBehavior.opaque,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 13,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: metric == selected
+                      ? Colors.white.withValues(alpha: 0.16)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Text(
+                  metric.label,
+                  style: TextStyle(
+                    color: Colors.white.withValues(
+                      alpha: metric == selected ? 0.95 : 0.5,
+                    ),
+                    fontSize: 12.5,
+                    fontWeight: metric == selected
+                        ? FontWeight.w700
+                        : FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One circular quick action inside the hero card.
+class _HeroAction extends StatelessWidget {
+  const _HeroAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tap = onTap;
+    return Expanded(
+      // Transparent Material so the ink splash is visible on the dark hero.
+      child: Material(
+        color: Colors.transparent,
+        child: InkResponse(
+          onTap: tap == null
+              ? null
+              : () {
+                  HapticFeedback.lightImpact();
+                  tap();
+                },
+          radius: 44,
+          splashColor: Colors.white.withValues(alpha: 0.18),
+          highlightColor: Colors.white.withValues(alpha: 0.06),
+          child: Column(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: Colors.white, size: 22),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
