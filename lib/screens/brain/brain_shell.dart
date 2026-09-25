@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../models/brain_item.dart';
 import '../../state/brain_state.dart';
 import '../../theme.dart';
+import 'brain_calendar.dart';
 import 'brain_command_bar.dart';
 import 'brain_detail_sheet.dart';
 
@@ -22,8 +23,9 @@ class BrainShell extends StatefulWidget {
 }
 
 class _BrainShellState extends State<BrainShell> {
-  // null = "All".
-  BrainKind? _filter;
+  BrainKind? _filter; // null = "All"
+  DateTime? _dayFilter; // a chosen calendar day, null = the whole week
+  bool _mosaic = false; // list vs. bento mosaic feed
 
   bool _searching = false;
   final _searchCtrl = TextEditingController();
@@ -35,6 +37,16 @@ class _BrainShellState extends State<BrainShell> {
     _searchCtrl.dispose();
     super.dispose();
   }
+
+  bool _onDay(BrainItem i, DateTime d) {
+    bool eq(DateTime a) => a.year == d.year && a.month == d.month && a.day == d.day;
+    return eq(i.createdAt) || (i.dueDate != null && eq(i.dueDate!));
+  }
+
+  void _openTag(String t) => setState(() {
+    _searching = true;
+    _searchCtrl.text = t;
+  });
 
   Widget _header(BuildContext context) {
     if (_searching) {
@@ -78,8 +90,8 @@ class _BrainShellState extends State<BrainShell> {
     return Row(
       children: [
         Container(
-          width: 42,
-          height: 42,
+          width: 44,
+          height: 44,
           decoration: const BoxDecoration(
             color: BrainShell.accent,
             shape: BoxShape.circle,
@@ -91,16 +103,30 @@ class _BrainShellState extends State<BrainShell> {
           ),
         ),
         const SizedBox(width: 12),
-        const Expanded(
-          child: Text(
-            'Second Brain',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Hi there',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: context.muted,
+                ),
+              ),
+              const Text(
+                'Second Brain',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+              ),
+            ],
           ),
         ),
-        IconButton(
-          icon: const Icon(Icons.search_rounded),
-          color: context.muted,
-          onPressed: () => setState(() => _searching = true),
+        _ButtonPair(
+          mosaic: _mosaic,
+          onSearch: () => setState(() => _searching = true),
+          onToggle: () => setState(() => _mosaic = !_mosaic),
         ),
       ],
     );
@@ -111,17 +137,24 @@ class _BrainShellState extends State<BrainShell> {
     final dark = context.isDark;
     final bg = dark ? const Color(0xFF14131C) : const Color(0xFFF4F3FB);
     final brain = context.watch<BrainState>();
-    final base = brain.ofKind(_filter);
-    final items = _query.isEmpty
-        ? base
-        : base
-              .where(
-                (i) =>
-                    i.text.toLowerCase().contains(_query) ||
-                    (i.url?.toLowerCase().contains(_query) ?? false) ||
-                    i.tags.any((t) => t.toLowerCase().contains(_query)),
-              )
-              .toList();
+
+    var items = brain.ofKind(_filter);
+    if (_query.isNotEmpty) {
+      items = items
+          .where(
+            (i) =>
+                i.text.toLowerCase().contains(_query) ||
+                (i.url?.toLowerCase().contains(_query) ?? false) ||
+                i.tags.any((t) => t.toLowerCase().contains(_query)),
+          )
+          .toList();
+    }
+    if (_dayFilter != null) {
+      items = items.where((i) => _onDay(i, _dayFilter!)).toList();
+    }
+
+    final showResurface =
+        _filter == null && _query.isEmpty && _dayFilter == null;
 
     return Scaffold(
       backgroundColor: bg,
@@ -130,47 +163,276 @@ class _BrainShellState extends State<BrainShell> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              child: SizedBox(height: 46, child: _header(context)),
+            _TopIsland(
+              child: Column(
+                children: [
+                  _header(context),
+                  const SizedBox(height: 12),
+                  BrainCalendar(
+                    selected: _dayFilter,
+                    onSelect: (d) => setState(() => _dayFilter = d),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             _FilterBar(
               selected: _filter,
               counts: {for (final k in BrainKind.values) k: brain.countOf(k)},
               onSelect: (k) => setState(() => _filter = k),
             ),
             const SizedBox(height: 8),
-            if (_filter == null && _query.isEmpty) ...[
+            if (showResurface)
               Builder(
                 builder: (context) {
-                  final resurfaced = brain.resurfaced();
-                  return resurfaced.isEmpty
+                  final r = brain.resurfaced();
+                  return r.isEmpty
                       ? const SizedBox.shrink()
-                      : _ResurfaceStrip(items: resurfaced);
+                      : _ResurfaceStrip(items: r);
                 },
               ),
-            ],
-            Expanded(
-              child: brain.isEmpty
-                  ? const _EmptyState()
-                  : items.isEmpty
-                  ? (_query.isNotEmpty
-                        ? _NoMatches(query: _searchCtrl.text.trim())
-                        : _EmptyFilter(kind: _filter!))
-                  : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                      itemCount: items.length,
-                      itemBuilder: (context, i) => _BrainTile(
-                        item: items[i],
-                        onTag: (t) => setState(() {
-                          _searching = true;
-                          _searchCtrl.text = t;
-                        }),
-                      ),
-                    ),
-            ),
+            Expanded(child: _feed(context, brain, items)),
             const BrainCommandBar(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _feed(BuildContext context, BrainState brain, List<BrainItem> items) {
+    if (brain.isEmpty) return const _EmptyState();
+    if (items.isEmpty) {
+      if (_query.isNotEmpty) return _NoMatches(query: _searchCtrl.text.trim());
+      if (_dayFilter != null) return _EmptyDay(date: _dayFilter!);
+      return _EmptyFilter(kind: _filter!);
+    }
+    if (_mosaic) return _MosaicFeed(items: items, onTag: _openTag);
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      itemCount: items.length,
+      itemBuilder: (context, i) => _BrainTile(item: items[i], onTag: _openTag),
+    );
+  }
+}
+
+// --- top island + button pair -----------------------------------------------
+
+class _TopIsland extends StatelessWidget {
+  const _TopIsland({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = context.isDark;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: dark ? const Color(0xFF201F2B) : Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: context.hairline),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: dark ? 0.30 : 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+/// The paired dark buttons in the header island — search and list/mosaic view.
+class _ButtonPair extends StatelessWidget {
+  const _ButtonPair({
+    required this.mosaic,
+    required this.onSearch,
+    required this.onToggle,
+  });
+
+  final bool mosaic;
+  final VoidCallback onSearch;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final pill = context.isDark ? const Color(0xFF35333F) : const Color(0xFF1C1B24);
+    return Container(
+      decoration: BoxDecoration(
+        color: pill,
+        borderRadius: BorderRadius.circular(21),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _half(Icons.search_rounded, onSearch),
+          Container(width: 1, height: 20, color: Colors.white.withValues(alpha: 0.16)),
+          _half(mosaic ? Icons.view_agenda_outlined : Icons.grid_view_rounded, onToggle),
+        ],
+      ),
+    );
+  }
+
+  Widget _half(IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        child: Icon(icon, color: Colors.white, size: 20),
+      ),
+    );
+  }
+}
+
+// --- mosaic (bento) feed ----------------------------------------------------
+
+class _MosaicFeed extends StatelessWidget {
+  const _MosaicFeed({required this.items, required this.onTag});
+
+  final List<BrainItem> items;
+  final ValueChanged<String> onTag;
+
+  // A rough height estimate so the greedy two-column split balances.
+  double _estimate(BrainItem i) {
+    var h = 74.0;
+    h += (i.text.length / 16).ceil() * 20;
+    if (i.kind == BrainKind.link && (i.url?.isNotEmpty ?? false)) h += 20;
+    if (i.kind == BrainKind.journal) h += 18;
+    if (i.kind == BrainKind.task && i.dueDate != null) h += 26;
+    if (i.tags.isNotEmpty) h += 26;
+    return h;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final left = <Widget>[];
+    final right = <Widget>[];
+    var lh = 0.0;
+    var rh = 0.0;
+    for (final item in items) {
+      final card = Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: _MosaicCard(item: item, onTag: onTag),
+      );
+      if (lh <= rh) {
+        left.add(card);
+        lh += _estimate(item);
+      } else {
+        right.add(card);
+        rh += _estimate(item);
+      }
+    }
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: Column(children: left)),
+          const SizedBox(width: 12),
+          Expanded(child: Column(children: right)),
+        ],
+      ),
+    );
+  }
+}
+
+class _MosaicCard extends StatelessWidget {
+  const _MosaicCard({required this.item, required this.onTag});
+
+  final BrainItem item;
+  final ValueChanged<String> onTag;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = brainKindColor(item.kind);
+    final dark = context.isDark;
+    return GestureDetector(
+      onTap: () => showBrainDetail(context, item),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: dark ? 0.20 : 0.11),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withValues(alpha: 0.20)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (item.kind == BrainKind.task)
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      context.read<BrainState>().toggleDone(item.id);
+                    },
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: item.done ? color : Colors.transparent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: color, width: 2),
+                      ),
+                      child: item.done
+                          ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                          : null,
+                    ),
+                  )
+                else
+                  Icon(brainKindIcon(item.kind), size: 18, color: color),
+                const Spacer(),
+                if (item.pinned)
+                  Icon(Icons.push_pin_rounded, size: 13, color: color),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              item.text.isEmpty ? '(empty)' : item.text,
+              style: TextStyle(
+                fontSize: 14.5,
+                height: 1.3,
+                fontWeight: FontWeight.w600,
+                color: context.scheme.onSurface,
+                decoration: item.done ? TextDecoration.lineThrough : null,
+                decorationColor: context.muted,
+              ),
+            ),
+            if (item.kind == BrainKind.link && (item.url?.isNotEmpty ?? false)) ...[
+              const SizedBox(height: 6),
+              Text(
+                item.url!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, color: context.muted),
+              ),
+            ],
+            if (item.kind == BrainKind.journal) ...[
+              const SizedBox(height: 6),
+              Text(
+                _dayLabel(item.createdAt),
+                style: TextStyle(fontSize: 12, color: context.muted),
+              ),
+            ],
+            if (item.kind == BrainKind.task && item.dueDate != null) ...[
+              const SizedBox(height: 8),
+              _DueChip(due: item.dueDate!),
+            ],
+            if (item.tags.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  for (final t in item.tags)
+                    _TagChip(tag: t, onTap: () => onTag(t)),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -539,6 +801,29 @@ class _EmptyState extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _EmptyDay extends StatelessWidget {
+  const _EmptyDay({required this.date});
+
+  final DateTime date;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.event_available_rounded, size: 34, color: context.muted),
+          const SizedBox(height: 10),
+          Text(
+            'Nothing on ${_dayLabel(date)}',
+            style: TextStyle(color: context.muted, fontSize: 15),
+          ),
+        ],
       ),
     );
   }
