@@ -46,9 +46,21 @@ class BrainState extends ChangeNotifier {
   String _dayKey(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-  /// Every live item, pinned first, then newest capture first.
+  /// True while an item is snoozed for later — hidden from the feed until then.
+  bool _snoozed(BrainItem i, DateTime now) =>
+      i.surfaceAt != null && i.surfaceAt!.isAfter(now);
+
+  /// True for a short window after a snooze wakes, so it can be surfaced.
+  bool _justWoke(BrainItem i, DateTime now) =>
+      i.surfaceAt != null &&
+      !i.surfaceAt!.isAfter(now) &&
+      now.difference(i.surfaceAt!).inDays < 3;
+
+  /// Every live, un-snoozed item, pinned first, then newest capture first.
   List<BrainItem> get items {
-    final live = _items.where((i) => !i.isDeleted).toList();
+    final now = DateTime.now();
+    final live =
+        _items.where((i) => !i.isDeleted && !_snoozed(i, now)).toList();
     live.sort((a, b) {
       if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
       return b.createdAt.compareTo(a.createdAt);
@@ -60,8 +72,12 @@ class BrainState extends ChangeNotifier {
   List<BrainItem> ofKind(BrainKind? kind) =>
       kind == null ? items : items.where((i) => i.kind == kind).toList();
 
-  int countOf(BrainKind kind) =>
-      _items.where((i) => !i.isDeleted && i.kind == kind).length;
+  int countOf(BrainKind kind) {
+    final now = DateTime.now();
+    return _items
+        .where((i) => !i.isDeleted && !_snoozed(i, now) && i.kind == kind)
+        .length;
+  }
 
   bool get isEmpty => items.isEmpty;
 
@@ -80,9 +96,13 @@ class BrainState extends ChangeNotifier {
           (i) =>
               !i.isDeleted &&
               !i.pinned &&
-              i.kind != BrainKind.task &&
               !_dismissedToday.contains(i.id) &&
-              ageDays(i) >= _resurfaceMinAgeDays,
+              !_snoozed(i, today) &&
+              // A woken snooze surfaces regardless of kind or age; otherwise
+              // it's an aged note/journal/link.
+              (_justWoke(i, today) ||
+                  (i.kind != BrainKind.task &&
+                      ageDays(i) >= _resurfaceMinAgeDays)),
         )
         .toList();
     if (candidates.isEmpty) return const [];
@@ -91,12 +111,47 @@ class BrainState extends ChangeNotifier {
         (i.createdAt.month == today.month && i.createdAt.day == today.day) ||
         i.createdAt.day == today.day;
 
+    int priority(BrainItem i) =>
+        _justWoke(i, today) ? 2 : (onThisDay(i) ? 1 : 0);
+
     candidates.sort((a, b) {
+      final byPriority = priority(b) - priority(a);
+      if (byPriority != 0) return byPriority;
       final byDay = (onThisDay(b) ? 1 : 0) - (onThisDay(a) ? 1 : 0);
       if (byDay != 0) return byDay;
       return a.createdAt.compareTo(b.createdAt); // oldest first
     });
     return candidates.take(_resurfaceMax).toList();
+  }
+
+  /// Snoozes an item until [until] — it leaves the feed and floats back into
+  /// the resurface strip once that time passes.
+  Future<void> snooze(String id, DateTime until) async {
+    final index = _items.indexWhere((i) => i.id == id);
+    if (index == -1) return;
+    _items = [..._items]..[index] = _items[index].copyWith(surfaceAt: until);
+    await _persist();
+  }
+
+  /// Wakes a snoozed item now. copyWith can't null a field, so rebuild it.
+  Future<void> wake(String id) async {
+    final index = _items.indexWhere((i) => i.id == id);
+    if (index == -1) return;
+    final i = _items[index];
+    _items = [..._items]..[index] = BrainItem(
+      id: i.id,
+      kind: i.kind,
+      text: i.text,
+      createdAt: i.createdAt,
+      updatedAt: DateTime.now(),
+      done: i.done,
+      dueDate: i.dueDate,
+      url: i.url,
+      pinned: i.pinned,
+      tags: i.tags,
+      deletedAt: i.deletedAt,
+    );
+    await _persist();
   }
 
   /// Hides a resurfaced item for the rest of the day.

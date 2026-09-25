@@ -83,6 +83,34 @@ void main() {
     expect(brain.resurfaced(now: future).isEmpty, isTrue);
   });
 
+  test('snooze hides an item until it wakes, then it resurfaces', () async {
+    final brain = BrainState(await _storage());
+    final note = await brain.capture(BrainKind.note, 'later idea');
+    expect(brain.items.length, 1);
+
+    // Snoozed three days out: gone from the feed and the counts.
+    await brain.snooze(note.id, DateTime.now().add(const Duration(days: 3)));
+    expect(brain.items, isEmpty);
+    expect(brain.countOf(BrainKind.note), 0);
+    // Still asleep a day in — not resurfaced yet.
+    final dayIn = DateTime.now().add(const Duration(days: 1));
+    expect(brain.resurfaced(now: dayIn), isEmpty);
+
+    // Once its time passes it floats into the resurface strip.
+    final after = DateTime.now().add(const Duration(days: 4));
+    expect(brain.resurfaced(now: after).single.id, note.id);
+  });
+
+  test('wake un-snoozes an item back into the feed', () async {
+    final brain = BrainState(await _storage());
+    final note = await brain.capture(BrainKind.note, 'wake me');
+    await brain.snooze(note.id, DateTime.now().add(const Duration(days: 3)));
+    expect(brain.items, isEmpty);
+
+    await brain.wake(note.id);
+    expect(brain.items.single.id, note.id);
+  });
+
   test('remove tombstones, restore brings it back', () async {
     final brain = BrainState(await _storage());
     final item = await brain.capture(BrainKind.link, 'https://example.com');

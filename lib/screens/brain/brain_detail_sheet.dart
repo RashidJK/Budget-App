@@ -41,6 +41,7 @@ class _DetailSheetState extends State<_DetailSheet> {
   late BrainKind _kind = widget.item.kind;
   late DateTime? _due = widget.item.dueDate;
   late bool _pinned = widget.item.pinned;
+  late DateTime? _surfaceAt = widget.item.surfaceAt;
 
   @override
   void dispose() {
@@ -76,14 +77,116 @@ class _DetailSheetState extends State<_DetailSheet> {
           : null,
       pinned: _pinned,
       tags: widget.item.tags,
+      surfaceAt: _surfaceAt,
     );
     await context.read<BrainState>().update(updated);
     if (mounted) Navigator.of(context).pop();
   }
 
+  Future<void> _snoozeTo(DateTime until) async {
+    setState(() => _surfaceAt = until);
+    await _save();
+  }
+
+  Future<void> _pickSnooze() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: now.add(const Duration(days: 1)),
+      firstDate: now,
+      lastDate: DateTime(now.year + 5),
+    );
+    if (picked != null) await _snoozeTo(picked);
+  }
+
   Future<void> _delete() async {
     await context.read<BrainState>().remove(widget.item.id);
     if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _wake() async {
+    setState(() => _surfaceAt = null);
+    await _save();
+  }
+
+  Widget _snoozeSection(BuildContext context, Color color) {
+    final now = DateTime.now();
+    if (_surfaceAt != null && _surfaceAt!.isAfter(now)) {
+      return Row(
+        children: [
+          Icon(Icons.snooze_rounded, size: 18, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Snoozed until ${_fullDate(_surfaceAt!)}',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: context.scheme.onSurface,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: _wake,
+            style: TextButton.styleFrom(foregroundColor: color),
+            child: const Text('Wake now'),
+          ),
+        ],
+      );
+    }
+    final base = DateTime(now.year, now.month, now.day);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.snooze_rounded, size: 18, color: context.muted),
+            const SizedBox(width: 8),
+            Text(
+              'Snooze for later',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: context.scheme.onSurface,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _snoozeChip('Tomorrow', color,
+                () => _snoozeTo(base.add(const Duration(days: 1)))),
+            _snoozeChip('Next week', color,
+                () => _snoozeTo(base.add(const Duration(days: 7)))),
+            _snoozeChip('Pick date…', color, _pickSnooze),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _snoozeChip(String label, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -207,7 +310,9 @@ class _DetailSheetState extends State<_DetailSheet> {
                 ],
               ),
             ],
-            const SizedBox(height: 8),
+            const SizedBox(height: 14),
+            _snoozeSection(context, color),
+            const SizedBox(height: 12),
             Row(
               children: [
                 _ActionChip(

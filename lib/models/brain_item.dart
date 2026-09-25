@@ -36,6 +36,7 @@ class BrainItem implements SyncFields {
     this.url,
     this.pinned = false,
     this.tags = const [],
+    this.surfaceAt,
     this.deletedAt,
   });
 
@@ -54,6 +55,7 @@ class BrainItem implements SyncFields {
       url: json['url'] as String?,
       pinned: json['pinned'] as bool? ?? false,
       tags: (json['tags'] as List?)?.map((e) => '$e').toList() ?? const [],
+      surfaceAt: DateTime.tryParse(json['surfaceAt'] as String? ?? ''),
       deletedAt: DateTime.tryParse(json['deletedAt'] as String? ?? ''),
     );
   }
@@ -87,6 +89,10 @@ class BrainItem implements SyncFields {
   final bool pinned;
   final List<String> tags;
 
+  /// When set to a future time, the item is snoozed — hidden from the feed
+  /// until then, when it floats back up via the resurface strip.
+  final DateTime? surfaceAt;
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'kind': kind.name,
@@ -99,6 +105,7 @@ class BrainItem implements SyncFields {
     'url': url,
     'pinned': pinned,
     'tags': tags,
+    'surfaceAt': surfaceAt?.toIso8601String(),
   };
 
   BrainItem copyWith({
@@ -109,6 +116,7 @@ class BrainItem implements SyncFields {
     String? url,
     bool? pinned,
     List<String>? tags,
+    DateTime? surfaceAt,
     DateTime? updatedAt,
   }) {
     return BrainItem(
@@ -122,6 +130,7 @@ class BrainItem implements SyncFields {
       url: url ?? this.url,
       pinned: pinned ?? this.pinned,
       tags: tags ?? this.tags,
+      surfaceAt: surfaceAt ?? this.surfaceAt,
       deletedAt: deletedAt,
     );
   }
@@ -140,6 +149,7 @@ class BrainItem implements SyncFields {
     url: url,
     pinned: pinned,
     tags: tags,
+    surfaceAt: surfaceAt,
     deletedAt: DateTime.now(),
   );
 
@@ -156,5 +166,6 @@ class BrainItem implements SyncFields {
     url: url,
     pinned: pinned,
     tags: tags,
+    surfaceAt: surfaceAt,
   );
 }
