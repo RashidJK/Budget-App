@@ -659,9 +659,12 @@ class _TopBar extends StatelessWidget {
 
   String _greeting() {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'Morning';
-    if (hour < 17) return 'Afternoon';
-    return 'Evening';
+    final part = hour < 12
+        ? 'Morning'
+        : hour < 17
+        ? 'Afternoon'
+        : 'Evening';
+    return '$part, Rashid';
   }
 }
 
