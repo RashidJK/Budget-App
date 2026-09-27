@@ -150,7 +150,9 @@ class _BrainCommandBarState extends State<BrainCommandBar> {
           Row(
             children: [
               Expanded(
-                child: Container(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
                   decoration: BoxDecoration(
                     color: dark ? const Color(0xFF201F2B) : Colors.white,
                     borderRadius: BorderRadius.circular(24),
@@ -189,26 +191,37 @@ class _BrainCommandBarState extends State<BrainCommandBar> {
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
-              GestureDetector(
-                onTap: _submit,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 160),
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: _controller.text.trim().isEmpty
-                        ? context.hairline
-                        : color,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.arrow_upward_rounded,
-                    color: _controller.text.trim().isEmpty
-                        ? context.muted
-                        : Colors.white,
-                  ),
-                ),
+              // The send button folds away when the prompt is collapsed, so at
+              // rest the bar is just a compact "capture" pill; it slides back in
+              // as the prompt expands on focus.
+              AnimatedSize(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
+                child: _open
+                    ? Padding(
+                        padding: const EdgeInsets.only(left: 10),
+                        child: GestureDetector(
+                          onTap: _submit,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(
+                              color: _controller.text.trim().isEmpty
+                                  ? context.hairline
+                                  : color,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.arrow_upward_rounded,
+                              color: _controller.text.trim().isEmpty
+                                  ? context.muted
+                                  : Colors.white,
+                            ),
+                          ),
+                        ),
+                      )
+                    : const SizedBox(height: 46),
               ),
             ],
           ),
