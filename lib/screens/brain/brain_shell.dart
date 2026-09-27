@@ -25,7 +25,7 @@ class BrainShell extends StatefulWidget {
 class _BrainShellState extends State<BrainShell> {
   BrainKind? _filter; // null = "All"
   DateTime? _dayFilter; // a chosen calendar day, null = the whole week
-  bool _mosaic = false; // list vs. bento mosaic feed
+  bool _mosaic = true; // bento mosaic feed by default; ⊞ toggles the list
 
   bool _searching = false;
   final _searchCtrl = TextEditingController();
