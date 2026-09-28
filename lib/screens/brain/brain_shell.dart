@@ -383,6 +383,9 @@ class _MosaicCard extends StatelessWidget {
                           : null,
                     ),
                   )
+                else if (item.kind == BrainKind.link &&
+                    (item.url?.isNotEmpty ?? false))
+                  _LinkFavicon(url: item.url!, size: 22, fallback: color)
                 else
                   Icon(brainKindIcon(item.kind), size: 18, color: color),
                 const Spacer(),
@@ -405,10 +408,14 @@ class _MosaicCard extends StatelessWidget {
             if (item.kind == BrainKind.link && (item.url?.isNotEmpty ?? false)) ...[
               const SizedBox(height: 6),
               Text(
-                item.url!,
+                _domainOf(item.url!) ?? item.url!,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, color: context.muted),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: context.muted,
+                ),
               ),
             ],
             if (item.kind == BrainKind.journal) ...[
@@ -641,21 +648,25 @@ class _BrainTile extends StatelessWidget {
         ),
       );
     }
+    final isLink = item.kind == BrainKind.link && (item.url?.isNotEmpty ?? false);
     return Container(
       width: 30,
       height: 30,
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(9),
       ),
-      child: Icon(brainKindIcon(item.kind), size: 17, color: color),
+      child: isLink
+          ? _LinkFavicon(url: item.url!, size: 18, fallback: color)
+          : Icon(brainKindIcon(item.kind), size: 17, color: color),
     );
   }
 
   Widget _body(BuildContext context) {
     final muted = context.muted;
     final subtitle = switch (item.kind) {
-      BrainKind.link => item.url,
+      BrainKind.link => _domainOf(item.url ?? '') ?? item.url,
       BrainKind.journal => _dayLabel(item.createdAt),
       _ => null,
     };
@@ -981,6 +992,61 @@ class _ResurfaceRow extends StatelessWidget {
       onPressed: onTap,
       icon: Icon(icon),
     );
+  }
+}
+
+/// A small preview of a link: the site's favicon, falling back to a link icon
+/// while it loads or if the fetch fails (offline, unknown site). Uses an icon
+/// service, so no metadata-scraping package is needed.
+class _LinkFavicon extends StatelessWidget {
+  const _LinkFavicon({
+    required this.url,
+    required this.size,
+    required this.fallback,
+  });
+
+  final String url;
+  final double size;
+  final Color fallback;
+
+  @override
+  Widget build(BuildContext context) {
+    final fallbackIcon = SizedBox(
+      width: size,
+      height: size,
+      child: Center(
+        child: Icon(Icons.link_rounded, size: size * 0.82, color: fallback),
+      ),
+    );
+    final domain = _domainOf(url);
+    if (domain == null) return fallbackIcon;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: Image.network(
+        'https://icons.duckduckgo.com/ip3/$domain.ico',
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (context, error, stack) => fallbackIcon,
+        loadingBuilder: (context, child, progress) =>
+            progress == null ? child : fallbackIcon,
+      ),
+    );
+  }
+}
+
+/// The bare host of a URL (www stripped), or null if it can't be parsed.
+String? _domainOf(String url) {
+  var u = url.trim();
+  if (!RegExp(r'^https?://', caseSensitive: false).hasMatch(u)) {
+    u = 'https://$u';
+  }
+  try {
+    final host = Uri.parse(u).host;
+    return host.isEmpty ? null : host.replaceFirst(RegExp(r'^www\.'), '');
+  } catch (_) {
+    return null;
   }
 }
 
