@@ -301,6 +301,7 @@ class _MosaicFeed extends StatelessWidget {
     var h = 74.0;
     h += (i.text.length / 16).ceil() * 20;
     if (i.kind == BrainKind.link && (i.url?.isNotEmpty ?? false)) h += 20;
+    if (i.previewImage != null) h += 130;
     if (i.kind == BrainKind.journal) h += 18;
     if (i.kind == BrainKind.task && i.dueDate != null) h += 26;
     if (i.tags.isNotEmpty) h += 26;
@@ -340,16 +341,45 @@ class _MosaicFeed extends StatelessWidget {
   }
 }
 
-class _MosaicCard extends StatelessWidget {
+class _MosaicCard extends StatefulWidget {
   const _MosaicCard({required this.item, required this.onTag});
 
   final BrainItem item;
   final ValueChanged<String> onTag;
 
   @override
+  State<_MosaicCard> createState() => _MosaicCardState();
+}
+
+class _MosaicCardState extends State<_MosaicCard> {
+  @override
+  void initState() {
+    super.initState();
+    final item = widget.item;
+    if (item.kind == BrainKind.link &&
+        (item.url?.isNotEmpty ?? false) &&
+        item.previewTitle == null &&
+        item.previewImage == null) {
+      context.read<BrainState>().enrichLink(item.id);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final item = widget.item;
+    final onTag = widget.onTag;
     final color = brainKindColor(item.kind);
     final dark = context.isDark;
+    final isLink =
+        item.kind == BrainKind.link && (item.url?.isNotEmpty ?? false);
+    // A pasted link (text == url) shows its fetched page title; a labelled one
+    // keeps the label.
+    final titleText =
+        (isLink &&
+            item.previewTitle != null &&
+            (item.text.isEmpty || item.text == item.url))
+        ? item.previewTitle!
+        : (item.text.isEmpty ? '(empty)' : item.text);
     return GestureDetector(
       onTap: () => showBrainDetail(context, item),
       child: Container(
@@ -362,6 +392,27 @@ class _MosaicCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (isLink && item.previewImage != null) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  item.previewImage!,
+                  height: 120,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                  errorBuilder: (context, error, stack) =>
+                      const SizedBox.shrink(),
+                  loadingBuilder: (context, child, progress) => progress == null
+                      ? child
+                      : Container(
+                          height: 120,
+                          color: color.withValues(alpha: 0.12),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
             Row(
               children: [
                 if (item.kind == BrainKind.task)
@@ -395,7 +446,9 @@ class _MosaicCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              item.text.isEmpty ? '(empty)' : item.text,
+              titleText,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 14.5,
                 height: 1.3,

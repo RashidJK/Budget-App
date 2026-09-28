@@ -37,6 +37,8 @@ class BrainItem implements SyncFields {
     this.pinned = false,
     this.tags = const [],
     this.surfaceAt,
+    this.previewTitle,
+    this.previewImage,
     this.deletedAt,
   });
 
@@ -56,6 +58,8 @@ class BrainItem implements SyncFields {
       pinned: json['pinned'] as bool? ?? false,
       tags: (json['tags'] as List?)?.map((e) => '$e').toList() ?? const [],
       surfaceAt: DateTime.tryParse(json['surfaceAt'] as String? ?? ''),
+      previewTitle: json['previewTitle'] as String?,
+      previewImage: json['previewImage'] as String?,
       deletedAt: DateTime.tryParse(json['deletedAt'] as String? ?? ''),
     );
   }
@@ -93,6 +97,10 @@ class BrainItem implements SyncFields {
   /// until then, when it floats back up via the resurface strip.
   final DateTime? surfaceAt;
 
+  /// Links only: the fetched page title and cover image, cached once looked up.
+  final String? previewTitle;
+  final String? previewImage;
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'kind': kind.name,
@@ -106,6 +114,8 @@ class BrainItem implements SyncFields {
     'pinned': pinned,
     'tags': tags,
     'surfaceAt': surfaceAt?.toIso8601String(),
+    'previewTitle': previewTitle,
+    'previewImage': previewImage,
   };
 
   BrainItem copyWith({
@@ -117,6 +127,8 @@ class BrainItem implements SyncFields {
     bool? pinned,
     List<String>? tags,
     DateTime? surfaceAt,
+    String? previewTitle,
+    String? previewImage,
     DateTime? updatedAt,
   }) {
     return BrainItem(
@@ -131,6 +143,8 @@ class BrainItem implements SyncFields {
       pinned: pinned ?? this.pinned,
       tags: tags ?? this.tags,
       surfaceAt: surfaceAt ?? this.surfaceAt,
+      previewTitle: previewTitle ?? this.previewTitle,
+      previewImage: previewImage ?? this.previewImage,
       deletedAt: deletedAt,
     );
   }
@@ -150,6 +164,8 @@ class BrainItem implements SyncFields {
     pinned: pinned,
     tags: tags,
     surfaceAt: surfaceAt,
+    previewTitle: previewTitle,
+    previewImage: previewImage,
     deletedAt: DateTime.now(),
   );
 
@@ -167,5 +183,7 @@ class BrainItem implements SyncFields {
     pinned: pinned,
     tags: tags,
     surfaceAt: surfaceAt,
+    previewTitle: previewTitle,
+    previewImage: previewImage,
   );
 }

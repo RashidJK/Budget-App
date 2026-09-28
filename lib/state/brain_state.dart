@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/brain_item.dart';
+import '../screens/brain/link_preview.dart';
 import '../services/storage.dart';
 import '../sync/merge.dart';
 
@@ -186,6 +187,30 @@ class BrainState extends ChangeNotifier {
     _items = [item, ..._items];
     await _persist();
     return item;
+  }
+
+  /// Fetches a link's title/cover image once and stores it on the item, so the
+  /// card can show a real preview. A no-op for non-links or already-enriched
+  /// items; failures are silent (the card keeps its favicon fallback).
+  Future<void> enrichLink(String id) async {
+    final at = _items.indexWhere((i) => i.id == id);
+    if (at == -1) return;
+    final item = _items[at];
+    if (item.kind != BrainKind.link ||
+        (item.url?.isEmpty ?? true) ||
+        item.previewTitle != null ||
+        item.previewImage != null) {
+      return;
+    }
+    final data = await LinkPreview.fetch(item.url!);
+    if (data.isEmpty) return;
+    final index = _items.indexWhere((i) => i.id == id);
+    if (index == -1) return;
+    _items = [..._items]..[index] = _items[index].copyWith(
+      previewTitle: data.title,
+      previewImage: data.image,
+    );
+    await _persist();
   }
 
   Future<void> update(BrainItem item) async {
