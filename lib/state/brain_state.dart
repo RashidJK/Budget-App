@@ -60,8 +60,9 @@ class BrainState extends ChangeNotifier {
   /// Every live, un-snoozed item, pinned first, then newest capture first.
   List<BrainItem> get items {
     final now = DateTime.now();
-    final live =
-        _items.where((i) => !i.isDeleted && !_snoozed(i, now)).toList();
+    final live = _items
+        .where((i) => !i.isDeleted && !_snoozed(i, now))
+        .toList();
     live.sort((a, b) {
       if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
       return b.createdAt.compareTo(a.createdAt);
@@ -82,6 +83,14 @@ class BrainState extends ChangeNotifier {
 
   bool get isEmpty => items.isEmpty;
 
+  /// The live item with [id], or null if it's gone (deleted or snoozed away).
+  BrainItem? byId(String id) {
+    for (final i in items) {
+      if (i.id == id) return i;
+    }
+    return null;
+  }
+
   /// A small, stable-for-the-day set of older captures "worth another look":
   /// on-this-day matches first, then the oldest un-pinned notes, journals and
   /// links. Tasks are left to their due dates. Empty until items age in.
@@ -89,7 +98,9 @@ class BrainState extends ChangeNotifier {
     final today = now ?? DateTime.now();
     final start = DateTime(today.year, today.month, today.day);
     int ageDays(BrainItem i) => start
-        .difference(DateTime(i.createdAt.year, i.createdAt.month, i.createdAt.day))
+        .difference(
+          DateTime(i.createdAt.year, i.createdAt.month, i.createdAt.day),
+        )
         .inDays;
 
     final candidates = _items
@@ -139,19 +150,20 @@ class BrainState extends ChangeNotifier {
     final index = _items.indexWhere((i) => i.id == id);
     if (index == -1) return;
     final i = _items[index];
-    _items = [..._items]..[index] = BrainItem(
-      id: i.id,
-      kind: i.kind,
-      text: i.text,
-      createdAt: i.createdAt,
-      updatedAt: DateTime.now(),
-      done: i.done,
-      dueDate: i.dueDate,
-      url: i.url,
-      pinned: i.pinned,
-      tags: i.tags,
-      deletedAt: i.deletedAt,
-    );
+    _items = [..._items]
+      ..[index] = BrainItem(
+        id: i.id,
+        kind: i.kind,
+        text: i.text,
+        createdAt: i.createdAt,
+        updatedAt: DateTime.now(),
+        done: i.done,
+        dueDate: i.dueDate,
+        url: i.url,
+        pinned: i.pinned,
+        tags: i.tags,
+        deletedAt: i.deletedAt,
+      );
     await _persist();
   }
 
@@ -206,10 +218,11 @@ class BrainState extends ChangeNotifier {
     if (data.isEmpty) return;
     final index = _items.indexWhere((i) => i.id == id);
     if (index == -1) return;
-    _items = [..._items]..[index] = _items[index].copyWith(
-      previewTitle: data.title,
-      previewImage: data.image,
-    );
+    _items = [..._items]
+      ..[index] = _items[index].copyWith(
+        previewTitle: data.title,
+        previewImage: data.image,
+      );
     await _persist();
   }
 
