@@ -135,7 +135,10 @@ class _BrainShellState extends State<BrainShell> {
   @override
   Widget build(BuildContext context) {
     final dark = context.isDark;
-    final bg = dark ? const Color(0xFF14131C) : const Color(0xFFF4F3FB);
+    // The island floats on a slightly deeper backdrop; the capture pill sits on
+    // that backdrop below it.
+    final bg = dark ? const Color(0xFF0A090E) : const Color(0xFFDEDCEC);
+    final island = dark ? const Color(0xFF1A1922) : Colors.white;
     final brain = context.watch<BrainState>();
 
     var items = brain.ofKind(_filter);
@@ -161,37 +164,63 @@ class _BrainShellState extends State<BrainShell> {
       body: SafeArea(
         bottom: false,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _TopIsland(
-              child: Column(
-                children: [
-                  _header(context),
-                  const SizedBox(height: 12),
-                  BrainCalendar(
-                    selected: _dayFilter,
-                    onSelect: (d) => setState(() => _dayFilter = d),
-                  ),
-                ],
+            // One big island holds the header, calendar, chips and feed.
+            Expanded(
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: island,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: context.hairline),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: dark ? 0.34 : 0.07),
+                      blurRadius: 26,
+                      offset: const Offset(0, 12),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 16, 14, 0),
+                      child: _header(context),
+                    ),
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: BrainCalendar(
+                        selected: _dayFilter,
+                        onSelect: (d) => setState(() => _dayFilter = d),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _FilterBar(
+                      selected: _filter,
+                      counts: {
+                        for (final k in BrainKind.values) k: brain.countOf(k),
+                      },
+                      onSelect: (k) => setState(() => _filter = k),
+                    ),
+                    const SizedBox(height: 8),
+                    if (showResurface)
+                      Builder(
+                        builder: (context) {
+                          final r = brain.resurfaced();
+                          return r.isEmpty
+                              ? const SizedBox.shrink()
+                              : _ResurfaceStrip(items: r);
+                        },
+                      ),
+                    Expanded(child: _feed(context, brain, items)),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 12),
-            _FilterBar(
-              selected: _filter,
-              counts: {for (final k in BrainKind.values) k: brain.countOf(k)},
-              onSelect: (k) => setState(() => _filter = k),
-            ),
-            const SizedBox(height: 8),
-            if (showResurface)
-              Builder(
-                builder: (context) {
-                  final r = brain.resurfaced();
-                  return r.isEmpty
-                      ? const SizedBox.shrink()
-                      : _ResurfaceStrip(items: r);
-                },
-              ),
-            Expanded(child: _feed(context, brain, items)),
+            // The capture pill sits below, outside the island.
             const BrainCommandBar(),
           ],
         ),
@@ -215,35 +244,7 @@ class _BrainShellState extends State<BrainShell> {
   }
 }
 
-// --- top island + button pair -----------------------------------------------
-
-class _TopIsland extends StatelessWidget {
-  const _TopIsland({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final dark = context.isDark;
-    return Container(
-      margin: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: dark ? const Color(0xFF201F2B) : Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: context.hairline),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: dark ? 0.30 : 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
-}
+// --- button pair ------------------------------------------------------------
 
 /// The paired dark buttons in the header island — search and list/mosaic view.
 class _ButtonPair extends StatelessWidget {
