@@ -113,12 +113,17 @@ class _BrainCommandBarState extends State<BrainCommandBar> {
         _open ? 14 : 44,
         safeBottom > 0 ? safeBottom : 12,
       ),
-      child: Container(
-        padding: const EdgeInsets.all(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.fromLTRB(18, 8, 8, 8),
         decoration: BoxDecoration(
           color: dark ? const Color(0xFF201F2B) : Colors.white,
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: context.hairline),
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(
+            color: _open ? color.withValues(alpha: 0.6) : context.hairline,
+            width: _open ? 1.5 : 1,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: dark ? 0.34 : 0.08),
@@ -158,45 +163,28 @@ class _BrainCommandBarState extends State<BrainCommandBar> {
           ),
           Row(
             children: [
+              // The sparkle sits inline with the hint — one pill, not a separate
+              // icon beside a nested field.
+              Icon(
+                _open ? brainKindIcon(_activeKind) : Icons.auto_awesome,
+                size: 18,
+                color: _open ? color : context.muted,
+              ),
+              const SizedBox(width: 10),
               Expanded(
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOut,
-                  decoration: BoxDecoration(
-                    color: dark ? const Color(0xFF201F2B) : Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: _open ? color.withValues(alpha: 0.6) : context.hairline,
-                      width: _open ? 1.5 : 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 16),
-                      Icon(
-                        _open ? brainKindIcon(_activeKind) : Icons.auto_awesome,
-                        size: 18,
-                        color: _open ? color : context.muted,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: _controller,
-                          focusNode: _focus,
-                          minLines: 1,
-                          maxLines: 4,
-                          textCapitalization: TextCapitalization.sentences,
-                          textInputAction: TextInputAction.done,
-                          onSubmitted: (_) => _submit(),
-                          decoration: InputDecoration(
-                            isDense: true,
-                            border: InputBorder.none,
-                            hintText: _hint,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
-                      ),
-                    ],
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _focus,
+                  minLines: 1,
+                  maxLines: 4,
+                  textCapitalization: TextCapitalization.sentences,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _submit(),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    border: InputBorder.none,
+                    hintText: _hint,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
               ),
