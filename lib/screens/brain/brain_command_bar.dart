@@ -102,8 +102,17 @@ class _BrainCommandBarState extends State<BrainCommandBar> {
     final color = brainKindColor(_activeKind);
     final safeBottom = MediaQuery.paddingOf(context).bottom;
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(14, 6, 14, (safeBottom > 0 ? safeBottom : 12)),
+    // Collapsed, the island pulls in to a compact "capture" pill; expanded, it
+    // grows to full width to make room for the kind pills and the send button.
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.fromLTRB(
+        _open ? 14 : 44,
+        6,
+        _open ? 14 : 44,
+        safeBottom > 0 ? safeBottom : 12,
+      ),
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
