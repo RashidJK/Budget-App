@@ -76,7 +76,7 @@ void main() {
     final state = await _freshState();
     await state.addExpense(
       title: 'Rent',
-      amount: 40000,
+      amount: 400000,
       categoryId: 'housing',
       date: DateTime.now(),
     );
