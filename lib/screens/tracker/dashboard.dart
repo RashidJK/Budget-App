@@ -1283,6 +1283,7 @@ class _MonthSummaryCard extends StatelessWidget {
     final spent = state.spentThisMonth;
     final lastMonth = state.spentLastMonth;
     final projected = state.projectedThisMonth;
+    final budgetSummary = state.budgetSummary();
     final primary = context.scheme.primary;
 
     final hasComparison = lastMonth > 0;
@@ -1370,6 +1371,45 @@ class _MonthSummaryCard extends StatelessWidget {
             'of ${Money.compact(projected)} projected by month-end',
             style: theme.textTheme.bodySmall?.copyWith(color: context.muted),
           ),
+          if (budgetSummary.budgetedCategoryCount > 0) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: budgetSummary.isOverBudget
+                    ? context.warn.withValues(alpha: 0.12)
+                    : context.good.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      budgetSummary.isOverBudget
+                          ? '${budgetSummary.overBudgetCount} budget${budgetSummary.overBudgetCount == 1 ? '' : 's'} over ${Money.compact(budgetSummary.remaining.abs())}'
+                          : '${Money.compact(budgetSummary.remaining)} left of ${Money.compact(budgetSummary.totalBudget)} budget',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: budgetSummary.isOverBudget
+                            ? context.warn
+                            : context.good,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${(budgetSummary.utilization * 100).round()}% used',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: context.muted,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           Divider(height: 1, color: context.hairline),
           const SizedBox(height: 14),
@@ -1387,7 +1427,14 @@ class _MonthSummaryCard extends StatelessWidget {
                 label: 'Avg/day',
                 value: Money.compact(state.dailyAverageThisMonth),
               ),
-              _MonthStat(label: 'Projected', value: Money.compact(projected)),
+              _MonthStat(
+                label: 'Budget',
+                value: Money.compact(budgetSummary.totalBudget),
+              ),
+              _MonthStat(
+                label: 'Left',
+                value: Money.compact(budgetSummary.remaining),
+              ),
             ],
           ),
         ],
