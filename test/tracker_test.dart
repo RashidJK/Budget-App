@@ -348,6 +348,59 @@ void main() {
       expect(progress.remaining, -30000);
     });
 
+    test('budget summary totals actual spend against the monthly budget',
+        () async {
+      final state = await _freshState();
+      final eatingOut = state.categories.firstWhere(
+        (c) => c.id == 'eating_out',
+      );
+      final fuel = state.categories.firstWhere((c) => c.id == 'fuel');
+      await state.updateCategory(eatingOut.copyWith(monthlyBudget: 100000));
+      await state.updateCategory(fuel.copyWith(monthlyBudget: 50000));
+
+      await state.addExpense(
+        title: 'Lunch',
+        amount: 30000,
+        categoryId: 'eating_out',
+        date: DateTime.now(),
+      );
+      await state.addExpense(
+        title: 'Petrol',
+        amount: 25000,
+        categoryId: 'fuel',
+        date: DateTime.now(),
+      );
+
+      final summary = state.budgetSummary();
+      expect(summary.totalBudget, 150000);
+      expect(summary.actualSpend, 55000);
+      expect(summary.remaining, 95000);
+      expect(summary.overBudgetCount, 0);
+      expect(summary.isOverBudget, isFalse);
+      expect(summary.utilization, closeTo(0.3667, 0.001));
+    });
+
+    test('budget summary flags categories that are over budget', () async {
+      final state = await _freshState();
+      final fuel = state.categories.firstWhere((c) => c.id == 'fuel');
+      await state.updateCategory(fuel.copyWith(monthlyBudget: 50000));
+
+      await state.addExpense(
+        title: 'Petrol',
+        amount: 75000,
+        categoryId: 'fuel',
+        date: DateTime.now(),
+      );
+
+      final summary = state.budgetSummary();
+      expect(summary.totalBudget, 50000);
+      expect(summary.actualSpend, 75000);
+      expect(summary.remaining, -25000);
+      expect(summary.overBudgetCount, 1);
+      expect(summary.isOverBudget, isTrue);
+      expect(summary.utilization, 1.5);
+    });
+
     test('clearing a budget removes the card', () async {
       final state = await _freshState();
       final fuel = state.categories.firstWhere((c) => c.id == 'fuel');

@@ -656,6 +656,29 @@ class AppState extends ChangeNotifier {
     return result;
   }
 
+  /// Aggregates every budgeted category into one monthly snapshot so the UI can
+  /// show a simple "budget vs actual" headline without re-summing in each view.
+  BudgetSummary budgetSummary([DateTime? month]) {
+    final progress = budgetProgress(month);
+    final totalBudget = progress.fold<double>(
+      0,
+      (sum, item) => sum + item.budget,
+    );
+    final actualSpend = progress.fold<double>(
+      0,
+      (sum, item) => sum + item.spent,
+    );
+
+    return BudgetSummary(
+      totalBudget: totalBudget,
+      actualSpend: actualSpend,
+      remaining: totalBudget - actualSpend,
+      overBudgetCount: progress.where((item) => item.isOver).length,
+      budgetedCategoryCount: progress.length,
+      utilization: totalBudget <= 0 ? 0 : actualSpend / totalBudget,
+    );
+  }
+
   bool get hasAnyBudget => _categories.any((category) => category.hasBudget);
 
   /// Days left in the current month, for "X days to go" on budget cards.
@@ -1147,4 +1170,25 @@ class BudgetProgress {
 
   double get remaining => budget - spent;
   bool get isOver => spent > budget;
+}
+
+/// A single summary for the current month across every budgeted category.
+class BudgetSummary {
+  const BudgetSummary({
+    required this.totalBudget,
+    required this.actualSpend,
+    required this.remaining,
+    required this.overBudgetCount,
+    required this.budgetedCategoryCount,
+    required this.utilization,
+  });
+
+  final double totalBudget;
+  final double actualSpend;
+  final double remaining;
+  final int overBudgetCount;
+  final int budgetedCategoryCount;
+  final double utilization;
+
+  bool get isOverBudget => actualSpend > totalBudget;
 }
