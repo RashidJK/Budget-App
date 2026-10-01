@@ -43,7 +43,7 @@ class _SpacesShellState extends State<SpacesShell>
       tagline: 'Notes · tasks · journal',
       icon: Icons.bubble_chart_rounded,
       accent: BrainShell.accent,
-      builder: (_) => const BrainShell(),
+      builder: (_) => BrainShell(onSelectApp: _enter),
     ),
   ];
 
@@ -210,17 +210,98 @@ class _SpacesShellState extends State<SpacesShell>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'Spaces',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 30,
-                    fontWeight: FontWeight.w700,
-                  ),
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'Spaces',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 30,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    PopupMenuButton<int>(
+                      initialValue: _activeIndex,
+                      tooltip: 'Switch app',
+                      position: PopupMenuPosition.under,
+                      color: Colors.white.withValues(alpha: 0.12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.14),
+                        ),
+                      ),
+                      onSelected: (index) {
+                        if (index != _activeIndex) {
+                          setState(() => _activeIndex = index);
+                          _zoom.animateTo(0, curve: Curves.easeOutCubic);
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.14),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _apps[_activeIndex].icon,
+                              color: Colors.white,
+                              size: 15,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _apps[_activeIndex].name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: Colors.white70,
+                              size: 18,
+                            ),
+                          ],
+                        ),
+                      ),
+                      itemBuilder: (context) => [
+                        for (var i = 0; i < _apps.length; i++)
+                          PopupMenuItem<int>(
+                            value: i,
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _apps[i].icon,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  _apps[i].name,
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
-                SizedBox(height: 4),
-                Text(
+                const SizedBox(height: 4),
+                const Text(
                   'Pinch to switch apps',
                   style: TextStyle(color: Colors.white54, fontSize: 14),
                 ),

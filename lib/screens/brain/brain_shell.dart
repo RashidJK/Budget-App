@@ -13,7 +13,12 @@ import 'brain_modal.dart';
 /// and links. One feed interleaves every kind, newest first; the chips filter
 /// it; the ✨ command bar at the bottom captures and routes a new thought.
 class BrainShell extends StatefulWidget {
-  const BrainShell({super.key});
+  const BrainShell({
+    super.key,
+    this.onSelectApp,
+  });
+
+  final void Function(int index)? onSelectApp;
 
   /// The brain's identity colour — a violet, distinct from the budget green.
   static const accent = Color(0xFF6D5DF6);
@@ -123,6 +128,12 @@ class _BrainShellState extends State<BrainShell> {
             ],
           ),
         ),
+        if (widget.onSelectApp != null)
+          _AppSelector(
+            onSelect: widget.onSelectApp!,
+            currentIndex: 1,
+          ),
+        const SizedBox(width: 10),
         _ButtonPair(
           mosaic: _mosaic,
           onSearch: () => setState(() => _searching = true),
@@ -208,6 +219,79 @@ class _BrainShellState extends State<BrainShell> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       itemCount: items.length,
       itemBuilder: (context, i) => _BrainTile(item: items[i], onTag: _openTag),
+    );
+  }
+}
+
+class _AppSelector extends StatelessWidget {
+  const _AppSelector({
+    required this.currentIndex,
+    required this.onSelect,
+  });
+
+  final int currentIndex;
+  final void Function(int index) onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    const apps = <({String label, IconData icon, int index})>[
+      (label: 'Budget', icon: Icons.account_balance_wallet_rounded, index: 0),
+      (label: 'Second Brain', icon: Icons.bubble_chart_rounded, index: 1),
+    ];
+
+    final current = apps[currentIndex];
+
+    return PopupMenuButton<int>(
+      tooltip: 'Switch app',
+      position: PopupMenuPosition.under,
+      onSelected: onSelect,
+      color: const Color(0xFF1B1B23),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.10)),
+      ),
+      itemBuilder: (context) => [
+        for (final app in apps)
+          PopupMenuItem<int>(
+            value: app.index,
+            child: Row(
+              children: [
+                Icon(app.icon, size: 18, color: Colors.white),
+                const SizedBox(width: 10),
+                Text(app.label, style: const TextStyle(color: Colors.white)),
+              ],
+            ),
+          ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(current.icon, color: Colors.white, size: 15),
+            const SizedBox(width: 6),
+            Text(
+              current.label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: Colors.white70,
+              size: 17,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
