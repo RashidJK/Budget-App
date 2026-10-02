@@ -98,7 +98,7 @@ class _BrainShellState extends State<BrainShell> {
           width: 44,
           height: 44,
           decoration: const BoxDecoration(
-            color: BrainShell.accent,
+            color: Color.fromARGB(255, 131, 246, 93),
             shape: BoxShape.circle,
           ),
           child: const Icon(
@@ -109,30 +109,19 @@ class _BrainShellState extends State<BrainShell> {
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Hi there',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: context.muted,
-                ),
-              ),
-              const Text(
-                'Second Brain',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-              ),
-            ],
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: widget.onSelectApp != null
+                ? _AppSelector(
+                    onSelect: widget.onSelectApp!,
+                    currentIndex: 1,
+                  )
+                : const Text(
+                    'Second',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  ),
           ),
         ),
-        if (widget.onSelectApp != null)
-          _AppSelector(
-            onSelect: widget.onSelectApp!,
-            currentIndex: 1,
-          ),
         const SizedBox(width: 10),
         _ButtonPair(
           mosaic: _mosaic,
@@ -245,11 +234,12 @@ class _AppSelector extends StatelessWidget {
       tooltip: 'Switch app',
       position: PopupMenuPosition.under,
       onSelected: onSelect,
-      color: const Color(0xFF1B1B23),
+      color: const Color(0xFF1F1F2A),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: Colors.white.withValues(alpha: 0.10)),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
       ),
+      elevation: 12,
       itemBuilder: (context) => [
         for (final app in apps)
           PopupMenuItem<int>(
@@ -264,30 +254,38 @@ class _AppSelector extends StatelessWidget {
           ),
       ],
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.06),
+          color: const Color(0xFF2B2A33),
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.10),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(current.icon, color: Colors.white, size: 15),
-            const SizedBox(width: 6),
+            const SizedBox(width: 7),
             Text(
               current.label,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 12.5,
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
+                letterSpacing: -0.1,
               ),
             ),
             const SizedBox(width: 4),
             const Icon(
               Icons.keyboard_arrow_down_rounded,
               color: Colors.white70,
-              size: 17,
+              size: 18,
             ),
           ],
         ),
