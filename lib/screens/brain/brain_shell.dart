@@ -16,9 +16,11 @@ class BrainShell extends StatefulWidget {
   const BrainShell({
     super.key,
     this.onSelectApp,
+    this.onBackToSpaces,
   });
 
   final void Function(int index)? onSelectApp;
+  final VoidCallback? onBackToSpaces;
 
   /// The brain's identity colour — a violet, distinct from the budget green.
   static const accent = Color(0xFF6D5DF6);
@@ -94,6 +96,19 @@ class _BrainShellState extends State<BrainShell> {
     }
     return Row(
       children: [
+        if (widget.onBackToSpaces != null)
+          IconButton(
+            onPressed: widget.onBackToSpaces,
+            tooltip: 'Back to Spaces',
+            style: IconButton.styleFrom(
+              backgroundColor: BrainShell.accent.withValues(alpha: 0.12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            icon: const Icon(Icons.arrow_back_rounded, size: 22),
+          ),
+        const SizedBox(width: 8),
         Container(
           width: 44,
           height: 44,
@@ -111,9 +126,14 @@ class _BrainShellState extends State<BrainShell> {
         Expanded(
           child: Align(
             alignment: Alignment.centerLeft,
-            child: _AppSelector(
-              onSelect: widget.onSelectApp ?? (_) {},
-              currentIndex: 1,
+            child: Text(
+              'Second Brain',
+              style: TextStyle(
+                color: context.isDark ? Colors.white : const Color(0xFF1C1B23),
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.4,
+              ),
             ),
           ),
         ),
@@ -249,16 +269,17 @@ class _AppSelector extends StatelessWidget {
           ),
       ],
       child: Container(
-        height: 42,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        constraints: const BoxConstraints(minWidth: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFF2C2A35),
+          color: const Color(0xFF2E2B38),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 12,
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 18,
+              spreadRadius: 0.5,
               offset: const Offset(0, 4),
             ),
           ],
@@ -267,22 +288,33 @@ class _AppSelector extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 20,
-              height: 20,
+              width: 22,
+              height: 22,
               decoration: BoxDecoration(
                 color: BrainShell.accent,
                 borderRadius: BorderRadius.circular(999),
+                boxShadow: [
+                  BoxShadow(
+                    color: BrainShell.accent.withValues(alpha: 0.45),
+                    blurRadius: 14,
+                    spreadRadius: 0,
+                  ),
+                ],
               ),
               child: Icon(current.icon, color: Colors.white, size: 12),
             ),
-            const SizedBox(width: 8),
-            Text(
-              current.label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.4,
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                current.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.28,
+                ),
               ),
             ),
             const SizedBox(width: 6),

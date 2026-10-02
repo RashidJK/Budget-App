@@ -43,7 +43,13 @@ class _SpacesShellState extends State<SpacesShell>
       tagline: 'Notes · tasks · journal',
       icon: Icons.bubble_chart_rounded,
       accent: BrainShell.accent,
-      builder: (_) => BrainShell(onSelectApp: _enter),
+      builder: (_) => BrainShell(
+        onSelectApp: _enter,
+        onBackToSpaces: () => _zoom.animateTo(
+          1,
+          curve: Curves.easeOutCubic,
+        ),
+      ),
     ),
   ];
 
