@@ -98,7 +98,7 @@ class _BrainShellState extends State<BrainShell> {
           width: 44,
           height: 44,
           decoration: const BoxDecoration(
-            color: Color.fromARGB(255, 131, 246, 93),
+            color: BrainShell.accent,
             shape: BoxShape.circle,
           ),
           child: const Icon(
@@ -111,15 +111,10 @@ class _BrainShellState extends State<BrainShell> {
         Expanded(
           child: Align(
             alignment: Alignment.centerLeft,
-            child: widget.onSelectApp != null
-                ? _AppSelector(
-                    onSelect: widget.onSelectApp!,
-                    currentIndex: 1,
-                  )
-                : const Text(
-                    'Second',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-                  ),
+            child: _AppSelector(
+              onSelect: widget.onSelectApp ?? (_) {},
+              currentIndex: 1,
+            ),
           ),
         ),
         const SizedBox(width: 10),
@@ -254,38 +249,47 @@ class _AppSelector extends StatelessWidget {
           ),
       ],
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        height: 42,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFF2B2A33),
+          color: const Color(0xFF2C2A35),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.10),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(current.icon, color: Colors.white, size: 15),
-            const SizedBox(width: 7),
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: BrainShell.accent,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Icon(current.icon, color: Colors.white, size: 12),
+            ),
+            const SizedBox(width: 8),
             Text(
               current.label,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -0.1,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.4,
               ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 6),
             const Icon(
               Icons.keyboard_arrow_down_rounded,
               color: Colors.white70,
-              size: 18,
+              size: 20,
             ),
           ],
         ),
