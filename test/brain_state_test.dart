@@ -111,6 +111,19 @@ void main() {
     expect(brain.items.single.id, note.id);
   });
 
+  test('attach a note to an expense and keep the link on reload', () async {
+    final storage = await _storage();
+    final brain = BrainState(storage);
+    final item = await brain.capture(BrainKind.note, 'hotel in Arusha');
+
+    await brain.attachToExpense(item.id, 'expense-123');
+
+    expect(brain.byId(item.id)?.expenseId, 'expense-123');
+
+    final reloaded = BrainState(storage);
+    expect(reloaded.byId(item.id)?.expenseId, 'expense-123');
+  });
+
   test('remove tombstones, restore brings it back', () async {
     final brain = BrainState(await _storage());
     final item = await brain.capture(BrainKind.link, 'https://example.com');

@@ -39,6 +39,7 @@ class BrainItem implements SyncFields {
     this.surfaceAt,
     this.previewTitle,
     this.previewImage,
+    this.expenseId,
     this.deletedAt,
   });
 
@@ -60,6 +61,7 @@ class BrainItem implements SyncFields {
       surfaceAt: DateTime.tryParse(json['surfaceAt'] as String? ?? ''),
       previewTitle: json['previewTitle'] as String?,
       previewImage: json['previewImage'] as String?,
+      expenseId: json['expenseId'] as String?,
       deletedAt: DateTime.tryParse(json['deletedAt'] as String? ?? ''),
     );
   }
@@ -101,6 +103,9 @@ class BrainItem implements SyncFields {
   final String? previewTitle;
   final String? previewImage;
 
+  /// Optional link to a tracked expense so a note can provide context for a cost.
+  final String? expenseId;
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'kind': kind.name,
@@ -116,6 +121,7 @@ class BrainItem implements SyncFields {
     'surfaceAt': surfaceAt?.toIso8601String(),
     'previewTitle': previewTitle,
     'previewImage': previewImage,
+    'expenseId': expenseId,
   };
 
   BrainItem copyWith({
@@ -129,6 +135,7 @@ class BrainItem implements SyncFields {
     DateTime? surfaceAt,
     String? previewTitle,
     String? previewImage,
+    String? expenseId,
     DateTime? updatedAt,
   }) {
     return BrainItem(
@@ -145,6 +152,7 @@ class BrainItem implements SyncFields {
       surfaceAt: surfaceAt ?? this.surfaceAt,
       previewTitle: previewTitle ?? this.previewTitle,
       previewImage: previewImage ?? this.previewImage,
+      expenseId: expenseId ?? this.expenseId,
       deletedAt: deletedAt,
     );
   }
@@ -166,6 +174,7 @@ class BrainItem implements SyncFields {
     surfaceAt: surfaceAt,
     previewTitle: previewTitle,
     previewImage: previewImage,
+    expenseId: expenseId,
     deletedAt: DateTime.now(),
   );
 
@@ -185,5 +194,6 @@ class BrainItem implements SyncFields {
     surfaceAt: surfaceAt,
     previewTitle: previewTitle,
     previewImage: previewImage,
+    expenseId: expenseId,
   );
 }

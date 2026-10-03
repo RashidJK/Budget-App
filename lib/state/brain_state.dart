@@ -162,6 +162,10 @@ class BrainState extends ChangeNotifier {
         url: i.url,
         pinned: i.pinned,
         tags: i.tags,
+        surfaceAt: null,
+        previewTitle: i.previewTitle,
+        previewImage: i.previewImage,
+        expenseId: i.expenseId,
         deletedAt: i.deletedAt,
       );
     await _persist();
@@ -246,6 +250,13 @@ class BrainState extends ChangeNotifier {
     if (index == -1) return;
     final item = _items[index];
     _items = [..._items]..[index] = item.copyWith(pinned: !item.pinned);
+    await _persist();
+  }
+
+  Future<void> attachToExpense(String id, String expenseId) async {
+    final index = _items.indexWhere((i) => i.id == id);
+    if (index == -1) return;
+    _items = [..._items]..[index] = _items[index].copyWith(expenseId: expenseId);
     await _persist();
   }
 
