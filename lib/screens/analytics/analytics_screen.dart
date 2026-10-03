@@ -24,11 +24,18 @@ class AnalyticsScreen extends StatelessWidget {
     final categories = state.categoryTotals(now);
     final biggest = state.biggestExpenseThisMonth;
     final txnCount = state.expensesInMonth(now).length;
+    final budget = state.budgetSummary(now);
 
     final average = months.where((m) => m.total > 0).toList();
     final averageMonthly = average.isEmpty
         ? 0.0
         : average.fold<double>(0, (sum, m) => sum + m.total) / average.length;
+
+    final insight = budget.totalBudget > 0
+        ? (budget.isOverBudget
+            ? 'You are over this month\'s budget by ${Money.compact(budget.actualSpend - budget.totalBudget)}.'
+            : 'You still have ${Money.compact(budget.remaining)} left in this month\'s budget.')
+        : 'No budgeted categories are set yet, so the trend view is based on actual spend only.';
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -63,6 +70,34 @@ class AnalyticsScreen extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
                 children: [
                   SectionCard(
+                    title: 'This month',
+                    child: StatGrid(
+                      tiles: [
+                        StatTile(
+                          label: 'Spent',
+                          value: state.spentThisMonth,
+                          accent: context.scheme.primary,
+                        ),
+                        StatTile(
+                          label: 'Projected',
+                          value: state.projectedThisMonth,
+                          accent: context.scheme.secondary,
+                        ),
+                        StatTile(
+                          label: 'Income',
+                          value: state.incomeThisMonth,
+                          accent: context.good,
+                        ),
+                        StatTile(
+                          label: 'Budget left',
+                          value: budget.remaining,
+                          accent: budget.isOverBudget ? context.warn : context.good,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SectionCard(
                     title: 'Monthly trend',
                     trailing: Text(
                       'Avg ${Money.compact(averageMonthly)}',
@@ -76,6 +111,29 @@ class AnalyticsScreen extends StatelessWidget {
                   _StatRow(
                     daily: state.dailyAverageThisMonth,
                     transactions: txnCount,
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: context.cardDecoration(),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          budget.isOverBudget ? Icons.warning_amber_rounded : Icons.insights_rounded,
+                          color: budget.isOverBudget ? context.warn : context.scheme.primary,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            insight,
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              height: 1.45,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 16),
                   if (biggest != null) ...[
