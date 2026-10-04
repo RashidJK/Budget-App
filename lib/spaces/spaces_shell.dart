@@ -142,12 +142,15 @@ class _SpacesShellState extends State<SpacesShell>
 
   @override
   Widget build(BuildContext context) {
-    return Listener(
-      onPointerDown: _onPointerDown,
-      onPointerMove: _onPointerMove,
-      onPointerUp: _onPointerUpOrCancel,
-      onPointerCancel: _onPointerUpOrCancel,
-      child: LayoutBuilder(
+    return Material(
+      type: MaterialType.transparency,
+      child: Listener(
+        onPointerDown: _onPointerDown,
+        onPointerMove: _onPointerMove,
+        onPointerUp: _onPointerUpOrCancel,
+        onPointerCancel: _onPointerUpOrCancel,
+        onPointerSignal: _onPointerSignal,
+        child: LayoutBuilder(
         builder: (context, constraints) {
           final size = Size(constraints.maxWidth, constraints.maxHeight);
           final slots = _slots(size);
@@ -188,8 +191,15 @@ class _SpacesShellState extends State<SpacesShell>
                 ],
               );
             },
+
+            void _onPointerSignal(PointerSignalEvent event) {
+              if (event is! PointerScaleEvent) return;
+              final destination = event.scale < 1 ? 1.0 : 0.0;
+              _zoom.animateTo(destination, curve: Curves.easeOutCubic);
+            }
           );
         },
+        ),
       ),
     );
   }
