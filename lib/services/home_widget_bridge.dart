@@ -1,5 +1,4 @@
-import 'dart:io' show Platform;
-
+import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
 
 import '../state/app_state.dart';
@@ -19,7 +18,8 @@ class HomeWidgetBridge {
   /// Matches the `kind` / struct name of the SwiftUI widget.
   static const _iOSWidgetName = 'BudgetWidget';
 
-  static bool get _supported => Platform.isIOS;
+  static bool get _supported =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
   /// Registers the App Group so reads and writes hit the shared container.
   static Future<void> init() async {

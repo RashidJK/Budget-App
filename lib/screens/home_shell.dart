@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:home_widget/home_widget.dart';
 
@@ -53,7 +53,7 @@ class _HomeShellState extends State<HomeShell> {
     // The Quick Add home-screen widget opens the app on a "budget://" link;
     // route it to the matching capture flow. iOS-only, so tests and other
     // platforms skip the platform channels entirely.
-    if (Platform.isIOS) {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
       _listenForWidgetLaunch();
     }
   }
