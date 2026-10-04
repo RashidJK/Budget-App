@@ -47,6 +47,8 @@ scenario:
 flutter pub get
 flutter run                 # debug, on a connected device or simulator
 flutter run --release       # release build (survives unplugging)
+flutter run -d chrome       # run the web version in Chrome
+flutter build web           # build static files in build/web
 ```
 
 Run the tests:
@@ -92,8 +94,9 @@ test/                   Engine, planner, tracker and merge tests
   "Other". Beyond eight, categories go neutral rather than inventing a ninth
   hue no colourblind reader could tell apart.
 - **Local-first storage.** All data lives on-device in `shared_preferences`;
-  receipts are files in the app's documents directory. The app has no network
-  dependency and works fully offline.
+  in a browser, data stays in that browser's local storage. Mobile receipts are
+  files in the app's documents directory. The app has no network dependency and
+  works fully offline.
 
 ## Roadmap
 

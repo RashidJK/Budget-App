@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -128,7 +129,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
         activeIndex: _tab,
         onSelect: _select,
         onCapture: (text) => captureFromText(context, text),
-        onScan: () => CommandBar.show(context, startScan: true),
+        onScan: kIsWeb ? null : () => CommandBar.show(context, startScan: true),
         onBriefing: () => showBriefing(
           context,
           kind: BriefingKind.account,

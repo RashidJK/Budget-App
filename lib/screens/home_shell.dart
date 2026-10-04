@@ -119,7 +119,7 @@ class _HomeShellState extends State<HomeShell> {
         activeIndex: _index,
         onSelect: _select,
         onCapture: (text) => captureFromText(context, text),
-        onScan: () => CommandBar.show(context, startScan: true),
+        onScan: kIsWeb ? null : () => CommandBar.show(context, startScan: true),
         // The ✨ briefs on wherever you are — each tab gets its own summary.
         onBriefing: () => showBriefing(context, kind: _briefingKind),
         items: const [

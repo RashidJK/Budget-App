@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -170,6 +171,7 @@ class AttachmentStore {
 
   /// Deletes an attachment, ignoring a file that is already gone.
   static Future<void> discard(String path) async {
+    if (kIsWeb) return;
     try {
       final file = File(path);
       if (file.existsSync()) await file.delete();

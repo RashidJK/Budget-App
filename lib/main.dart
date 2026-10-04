@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 
 import 'command/mlkit_receipt_scanner.dart';
@@ -15,7 +16,7 @@ Future<void> main() async {
 
   // Real on-device receipt OCR for the running app. Tests and non-mobile builds
   // leave the mock in place, so nothing else has to know about ML Kit.
-  defaultReceiptScanner = MlKitReceiptScanner();
+  if (!kIsWeb) defaultReceiptScanner = MlKitReceiptScanner();
 
   // Register the App Group before anything writes to it.
   await HomeWidgetBridge.init();

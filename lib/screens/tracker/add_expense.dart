@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -325,11 +326,12 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
               ),
             ),
             const SizedBox(height: 16),
-            _Receipts(
-              paths: _attachments,
-              onAdd: _chooseSource,
-              onRemove: _removeReceipt,
-            ),
+            if (!kIsWeb)
+              _Receipts(
+                paths: _attachments,
+                onAdd: _chooseSource,
+                onRemove: _removeReceipt,
+              ),
             const SizedBox(height: 8),
             // The note field stays collapsed until asked for: most expenses
             // don't need one, and an always-present box makes the form look

@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 /// A link's fetched preview — its page title and cover image, either of which
 /// may be missing.
 class LinkPreviewData {
@@ -24,6 +26,7 @@ class LinkPreview {
   static final Map<String, Future<LinkPreviewData>> _inflight = {};
 
   static Future<LinkPreviewData> fetch(String rawUrl) {
+    if (kIsWeb) return Future.value(const LinkPreviewData());
     final cached = _cache[rawUrl];
     if (cached != null) return Future.value(cached);
     return _inflight[rawUrl] ??= _fetch(rawUrl).then((data) {

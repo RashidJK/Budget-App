@@ -1,12 +1,11 @@
 {
-    "name": "budget",
-    "short_name": "budget",
+    "name": "Budget",
+    "short_name": "Budget",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#F7F8F5",
+    "theme_color": "#267A63",
+    "description": "Track spending, budgets, analytics and plans in one private workspace.",
     "prefer_related_applications": false,
     "icons": [
         {
