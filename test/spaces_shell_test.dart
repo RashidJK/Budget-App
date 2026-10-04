@@ -32,10 +32,7 @@ void main() {
 
     final spacesOpacity = tester.widget<Opacity>(
       find
-          .ancestor(
-            of: find.text('Spaces'),
-            matching: find.byType(Opacity),
-          )
+          .ancestor(of: find.text('Spaces'), matching: find.byType(Opacity))
           .first,
     );
     expect(spacesOpacity.opacity, 1);

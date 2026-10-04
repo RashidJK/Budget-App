@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../screens/brain/brain_shell.dart';
@@ -12,9 +13,9 @@ import 'app_space.dart';
 /// app is rendered live the whole time, scaling between full-screen and its
 /// card, so its card is a real moving thumbnail rather than a static snapshot.
 ///
-/// Pinch is tracked with a raw [Listener] rather than a scale GestureDetector,
-/// so it observes the two fingers in parallel without ever winning the gesture
-/// arena — the apps' own scrolling and pinch gestures keep working untouched.
+/// Touch pinch is tracked with a raw [Listener] rather than a scale
+/// GestureDetector, so it observes the two fingers without winning the gesture
+/// arena. Browser trackpad pinch arrives as a scale signal.
 class SpacesShell extends StatefulWidget {
   const SpacesShell({super.key});
 
@@ -45,10 +46,7 @@ class _SpacesShellState extends State<SpacesShell>
       accent: BrainShell.accent,
       builder: (_) => BrainShell(
         onSelectApp: _enter,
-        onBackToSpaces: () => _zoom.animateTo(
-          1,
-          curve: Curves.easeOutCubic,
-        ),
+        onBackToSpaces: () => _zoom.animateTo(1, curve: Curves.easeOutCubic),
       ),
     ),
   ];
@@ -120,6 +118,12 @@ class _SpacesShellState extends State<SpacesShell>
     }
   }
 
+  void _onPointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScaleEvent) return;
+    final destination = event.scale < 1 ? 1.0 : 0.0;
+    _zoom.animateTo(destination, curve: Curves.easeOutCubic);
+  }
+
   /// The resting card rectangles on the Spaces home — full-width cards stacked
   /// vertically and centred in the space below the heading.
   List<Rect> _slots(Size size) {
@@ -151,54 +155,52 @@ class _SpacesShellState extends State<SpacesShell>
         onPointerCancel: _onPointerUpOrCancel,
         onPointerSignal: _onPointerSignal,
         child: LayoutBuilder(
-        builder: (context, constraints) {
-          final size = Size(constraints.maxWidth, constraints.maxHeight);
-          final slots = _slots(size);
-          final fullRect = Offset.zero & size;
-          return AnimatedBuilder(
-            animation: _zoom,
-            builder: (context, _) {
-              final raw = _zoom.value;
-              final z = Curves.easeOutCubic.transform(raw);
-              final activeFrame = Rect.lerp(fullRect, slots[_activeIndex], z)!;
-              return Stack(
-                children: [
-                  // Always-present backdrop, so the shrinking app never reveals
-                  // a transparent gap.
-                  Positioned.fill(child: _backdrop(size, z)),
-                  // Inactive apps, as branded cards fixed in their slots.
-                  for (var i = 0; i < _apps.length; i++)
-                    if (i != _activeIndex)
-                      Positioned.fromRect(
-                        rect: slots[i],
-                        child: IgnorePointer(
-                          ignoring: raw < 0.6,
-                          child: Opacity(
-                            opacity: z,
-                            child: _AppCard(
-                              app: _apps[i],
-                              onTap: () => _enter(i),
+          builder: (context, constraints) {
+            final size = Size(constraints.maxWidth, constraints.maxHeight);
+            final slots = _slots(size);
+            final fullRect = Offset.zero & size;
+            return AnimatedBuilder(
+              animation: _zoom,
+              builder: (context, _) {
+                final raw = _zoom.value;
+                final z = Curves.easeOutCubic.transform(raw);
+                final activeFrame = Rect.lerp(
+                  fullRect,
+                  slots[_activeIndex],
+                  z,
+                )!;
+                return Stack(
+                  children: [
+                    // Always-present backdrop, so the shrinking app never reveals
+                    // a transparent gap.
+                    Positioned.fill(child: _backdrop(size, z)),
+                    // Inactive apps, as branded cards fixed in their slots.
+                    for (var i = 0; i < _apps.length; i++)
+                      if (i != _activeIndex)
+                        Positioned.fromRect(
+                          rect: slots[i],
+                          child: IgnorePointer(
+                            ignoring: raw < 0.6,
+                            child: Opacity(
+                              opacity: z,
+                              child: _AppCard(
+                                app: _apps[i],
+                                onTap: () => _enter(i),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                  // The focused app — rendered live, scaling between full-screen
-                  // and its card.
-                  Positioned.fromRect(
-                    rect: activeFrame,
-                    child: _liveCard(size, activeFrame, z),
-                  ),
-                ],
-              );
-            },
-
-            void _onPointerSignal(PointerSignalEvent event) {
-              if (event is! PointerScaleEvent) return;
-              final destination = event.scale < 1 ? 1.0 : 0.0;
-              _zoom.animateTo(destination, curve: Curves.easeOutCubic);
-            }
-          );
-        },
+                    // The focused app — rendered live, scaling between full-screen
+                    // and its card.
+                    Positioned.fromRect(
+                      rect: activeFrame,
+                      child: _liveCard(size, activeFrame, z),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
         ),
       ),
     );
