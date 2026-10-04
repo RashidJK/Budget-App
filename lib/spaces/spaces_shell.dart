@@ -120,6 +120,7 @@ class _SpacesShellState extends State<SpacesShell>
 
   void _onPointerSignal(PointerSignalEvent event) {
     if (event is! PointerScaleEvent) return;
+    if (event.scale == 1) return;
     final destination = event.scale < 1 ? 1.0 : 0.0;
     _zoom.animateTo(destination, curve: Curves.easeOutCubic);
   }

@@ -34,7 +34,24 @@ void main() {
       find
           .ancestor(of: find.text('Spaces'), matching: find.byType(Opacity))
           .first,
-    );
-    expect(spacesOpacity.opacity, 1);
-  });
-}
+      double spacesOpacity() => tester.widget<Opacity>(
+        find
+            .ancestor(
+              of: find.text('Spaces'),
+              matching: find.byType(Opacity),
+            )
+            .first,
+      ).opacity;
+
+      expect(spacesOpacity(), 1);
+      await tester.sendEventToBinding(
+        const PointerScaleEvent(position: Offset(20, 20), scale: 1),
+      );
+      await tester.pump();
+      expect(spacesOpacity(), 1);
+
+      await tester.sendEventToBinding(
+        const PointerScaleEvent(position: Offset(20, 20), scale: 1.2),
+      );
+      await tester.pumpAndSettle(const Duration(milliseconds: 500));
+      expect(spacesOpacity(), 0);
