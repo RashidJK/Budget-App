@@ -103,10 +103,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                         suffixIcon: _filter.query.isEmpty
                             ? null
                             : IconButton(
-                                icon: const Icon(
-                                  Icons.close_rounded,
-                                  size: 18,
-                                ),
+                                icon: const Icon(Icons.close_rounded, size: 18),
                                 onPressed: () {
                                   _search.clear();
                                   setState(
@@ -129,9 +126,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                           Text(
                             '${matches.length} '
                             '${matches.length == 1 ? 'expense' : 'expenses'}',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
+                            style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: context.muted),
                           ),
                           const Spacer(),

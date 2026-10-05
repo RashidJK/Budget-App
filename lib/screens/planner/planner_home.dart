@@ -164,9 +164,9 @@ class PlannerHomeScreen extends StatelessWidget {
                   children: [
                     description,
                     const SizedBox(height: 20),
-                    GridView.extent(
-                      maxCrossAxisExtent: 440,
-                      mainAxisExtent: 132,
+                    GridView.count(
+                      crossAxisCount: constraints.maxWidth >= 1200 ? 3 : 2,
+                      mainAxisExtent: 156,
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 12,
                       shrinkWrap: true,
