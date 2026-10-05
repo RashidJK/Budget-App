@@ -146,7 +146,7 @@ class AnalyticsScreen extends StatelessWidget {
               )
             : LayoutBuilder(
                 builder: (context, constraints) {
-                  if (constraints.maxWidth < 1100) {
+                  if (constraints.maxWidth < 850) {
                     return ListView(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
                       children: [

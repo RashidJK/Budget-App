@@ -299,7 +299,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final desktop = constraints.maxWidth >= 1050;
+        final desktop = constraints.maxWidth >= 850;
         if (!desktop) {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
