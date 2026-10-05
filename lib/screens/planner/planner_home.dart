@@ -128,10 +128,10 @@ class PlannerHomeScreen extends StatelessWidget {
         ],
       ),
       body: AppBackground(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-          children: [
-            Text(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 760;
+            final description = Text(
               'Work out what something will cost before you spend it. Nothing '
               'here touches your tracked expenses — change any number and the '
               'results update as you type.',
@@ -139,14 +139,48 @@ class PlannerHomeScreen extends StatelessWidget {
                 color: context.muted,
                 height: 1.5,
               ),
-            ),
-            const SizedBox(height: 20),
-            for (final tool in PlannerTool.all)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _ToolCard(tool: tool),
+            );
+
+            if (!wide) {
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                children: [
+                  description,
+                  const SizedBox(height: 20),
+                  for (final tool in PlannerTool.all)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _ToolCard(tool: tool),
+                    ),
+                ],
+              );
+            }
+
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1380),
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
+                  children: [
+                    description,
+                    const SizedBox(height: 20),
+                    GridView.extent(
+                      maxCrossAxisExtent: 440,
+                      mainAxisExtent: 132,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        for (final tool in PlannerTool.all)
+                          _ToolCard(tool: tool),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-          ],
+            );
+          },
         ),
       ),
     );

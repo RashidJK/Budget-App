@@ -85,72 +85,83 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
         child: const Icon(Icons.add_rounded),
       ),
       body: AppBackground(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-              child: TextField(
-                controller: _search,
-                decoration: InputDecoration(
-                  hintText: 'Search titles and notes',
-                  isDense: true,
-                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                  suffixIcon: _filter.query.isEmpty
-                      ? null
-                      : IconButton(
-                          icon: const Icon(Icons.close_rounded, size: 18),
-                          onPressed: () {
-                            _search.clear();
-                            setState(
-                              () => _filter = _filter.copyWith(query: ''),
-                            );
-                          },
-                        ),
-                ),
-                onChanged: (value) =>
-                    setState(() => _filter = _filter.copyWith(query: value)),
-              ),
-            ),
-            // A running total for the current filter is the whole point of
-            // filtering — "how much did I spend on fuel in March" is one query.
-            if (_filter.isActive)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-                child: Row(
-                  children: [
-                    Text(
-                      '${matches.length} '
-                      '${matches.length == 1 ? 'expense' : 'expenses'}',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: context.muted),
-                    ),
-                    const Spacer(),
-                    Text(
-                      Money.format(total),
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1280),
+            child: SizedBox(
+              width: double.infinity,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                    child: TextField(
+                      controller: _search,
+                      decoration: InputDecoration(
+                        hintText: 'Search titles and notes',
+                        isDense: true,
+                        prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                        suffixIcon: _filter.query.isEmpty
+                            ? null
+                            : IconButton(
+                                icon: const Icon(
+                                  Icons.close_rounded,
+                                  size: 18,
+                                ),
+                                onPressed: () {
+                                  _search.clear();
+                                  setState(
+                                    () => _filter = _filter.copyWith(query: ''),
+                                  );
+                                },
+                              ),
+                      ),
+                      onChanged: (value) => setState(
+                        () => _filter = _filter.copyWith(query: value),
                       ),
                     ),
-                  ],
-                ),
-              ),
-            Expanded(
-              child: groups.isEmpty
-                  ? _empty(context, state)
-                  : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                      itemCount: groups.length,
-                      itemBuilder: (context, index) {
-                        final group = groups[index];
-                        return _DayGroup(
-                          day: group.day,
-                          entries: group.entries,
-                        );
-                      },
+                  ),
+                  // Keep the running total visible while searching and filtering.
+                  if (_filter.isActive)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                      child: Row(
+                        children: [
+                          Text(
+                            '${matches.length} '
+                            '${matches.length == 1 ? 'expense' : 'expenses'}',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: context.muted),
+                          ),
+                          const Spacer(),
+                          Text(
+                            Money.format(total),
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
                     ),
+                  Expanded(
+                    child: groups.isEmpty
+                        ? _empty(context, state)
+                        : ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                            itemCount: groups.length,
+                            itemBuilder: (context, index) {
+                              final group = groups[index];
+                              return _DayGroup(
+                                day: group.day,
+                                entries: group.entries,
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
             ),
-          ],
+          ),
         ),
       ),
     );

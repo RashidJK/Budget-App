@@ -37,6 +37,84 @@ class AnalyticsScreen extends StatelessWidget {
             : 'You still have ${Money.compact(budget.remaining)} left in this month\'s budget.')
         : 'No budgeted categories are set yet, so the trend view is based on actual spend only.';
 
+    final monthCard = SectionCard(
+      title: 'This month',
+      child: StatGrid(
+        tiles: [
+          StatTile(
+            label: 'Spent',
+            value: state.spentThisMonth,
+            accent: context.scheme.primary,
+          ),
+          StatTile(
+            label: 'Projected',
+            value: state.projectedThisMonth,
+            accent: context.scheme.secondary,
+          ),
+          StatTile(
+            label: 'Income',
+            value: state.incomeThisMonth,
+            accent: context.good,
+          ),
+          StatTile(
+            label: 'Budget left',
+            value: budget.remaining,
+            accent: budget.isOverBudget ? context.warn : context.good,
+          ),
+        ],
+      ),
+    );
+    final trendCard = SectionCard(
+      title: 'Monthly trend',
+      trailing: Text(
+        'Avg ${Money.compact(averageMonthly)}',
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: context.muted),
+      ),
+      child: MonthlyTrendChart(months: months),
+    );
+    final insightCard = Container(
+      padding: const EdgeInsets.all(16),
+      decoration: context.cardDecoration(),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            budget.isOverBudget
+                ? Icons.warning_amber_rounded
+                : Icons.insights_rounded,
+            color: budget.isOverBudget ? context.warn : context.scheme.primary,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              insight,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(height: 1.45),
+            ),
+          ),
+        ],
+      ),
+    );
+    final biggestCard = biggest == null
+        ? null
+        : _BiggestExpenseCard(
+            title: biggest.title,
+            amount: biggest.amount,
+            categoryName: state.categoryById(biggest.categoryId).name,
+            color: state.categoryById(biggest.categoryId).of(context),
+            icon: state.categoryById(biggest.categoryId).icon,
+            date: biggest.date,
+          );
+    final categoryCard = categories.isEmpty
+        ? null
+        : SectionCard(
+            title: 'This month by category',
+            child: CategoryBreakdown(totals: categories, maxRows: 8),
+          );
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
@@ -66,93 +144,80 @@ class AnalyticsScreen extends StatelessWidget {
                     'Once you have recorded a few expenses, your trends and '
                     'breakdown show up here.',
               )
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
-                children: [
-                  SectionCard(
-                    title: 'This month',
-                    child: StatGrid(
-                      tiles: [
-                        StatTile(
-                          label: 'Spent',
-                          value: state.spentThisMonth,
-                          accent: context.scheme.primary,
-                        ),
-                        StatTile(
-                          label: 'Projected',
-                          value: state.projectedThisMonth,
-                          accent: context.scheme.secondary,
-                        ),
-                        StatTile(
-                          label: 'Income',
-                          value: state.incomeThisMonth,
-                          accent: context.good,
-                        ),
-                        StatTile(
-                          label: 'Budget left',
-                          value: budget.remaining,
-                          accent: budget.isOverBudget ? context.warn : context.good,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SectionCard(
-                    title: 'Monthly trend',
-                    trailing: Text(
-                      'Avg ${Money.compact(averageMonthly)}',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: context.muted),
-                    ),
-                    child: MonthlyTrendChart(months: months),
-                  ),
-                  const SizedBox(height: 16),
-                  _StatRow(
-                    daily: state.dailyAverageThisMonth,
-                    transactions: txnCount,
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: context.cardDecoration(),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  if (constraints.maxWidth < 1100) {
+                    return ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
                       children: [
-                        Icon(
-                          budget.isOverBudget ? Icons.warning_amber_rounded : Icons.insights_rounded,
-                          color: budget.isOverBudget ? context.warn : context.scheme.primary,
+                        monthCard,
+                        const SizedBox(height: 16),
+                        trendCard,
+                        const SizedBox(height: 16),
+                        _StatRow(
+                          daily: state.dailyAverageThisMonth,
+                          transactions: txnCount,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            insight,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              height: 1.45,
-                            ),
-                          ),
-                        ),
+                        const SizedBox(height: 16),
+                        insightCard,
+                        if (biggestCard != null) ...[
+                          const SizedBox(height: 16),
+                          biggestCard,
+                        ],
+                        if (categoryCard != null) ...[
+                          const SizedBox(height: 16),
+                          categoryCard,
+                        ],
                       ],
+                    );
+                  }
+
+                  return Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1480),
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 4,
+                              child: Column(
+                                children: [
+                                  monthCard,
+                                  const SizedBox(height: 16),
+                                  _StatRow(
+                                    daily: state.dailyAverageThisMonth,
+                                    transactions: txnCount,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  insightCard,
+                                  if (biggestCard != null) ...[
+                                    const SizedBox(height: 16),
+                                    biggestCard,
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 24),
+                            Expanded(
+                              flex: 6,
+                              child: Column(
+                                children: [
+                                  trendCard,
+                                  if (categoryCard != null) ...[
+                                    const SizedBox(height: 16),
+                                    categoryCard,
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (biggest != null) ...[
-                    _BiggestExpenseCard(
-                      title: biggest.title,
-                      amount: biggest.amount,
-                      categoryName: state.categoryById(biggest.categoryId).name,
-                      color: state.categoryById(biggest.categoryId).of(context),
-                      icon: state.categoryById(biggest.categoryId).icon,
-                      date: biggest.date,
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  if (categories.isNotEmpty)
-                    SectionCard(
-                      title: 'This month by category',
-                      child: CategoryBreakdown(totals: categories, maxRows: 8),
-                    ),
-                ],
+                  );
+                },
               ),
       ),
     );

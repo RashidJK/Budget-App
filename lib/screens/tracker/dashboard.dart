@@ -263,37 +263,93 @@ class _DashboardScreenState extends State<DashboardScreen>
   /// The scrollable body inside the white sheet.
   Widget _content(BuildContext context, AppState state) {
     final budgets = state.budgetProgress();
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
+    final hasActivity =
+        state.scopedExpenses.isNotEmpty || state.scopedActivities.isNotEmpty;
+
+    Widget monthlySummary() => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // A summary of the month's spend — the headline figure, its trend, how
-        // far it is toward the projected total, and the sub-stats. Shown once
-        // there's something to summarise.
-        if (state.spentThisMonth > 0) ...[
-          const SectionHeader(title: 'This month'),
-          const SizedBox(height: 14),
-          _MonthSummaryCard(state: state),
-          const SizedBox(height: 28),
-        ],
-        if (budgets.isNotEmpty)
-          _BudgetSection(budgets: budgets, daysLeft: state.daysLeftThisMonth)
-        else
-          _BudgetEmpty(
+        const SectionHeader(title: 'This month'),
+        const SizedBox(height: 14),
+        _MonthSummaryCard(state: state),
+      ],
+    );
+
+    Widget budgetsSection() => budgets.isNotEmpty
+        ? _BudgetSection(budgets: budgets, daysLeft: state.daysLeftThisMonth)
+        : _BudgetEmpty(
             hasExpenses: state.spentThisMonth > 0,
             onManage: () => ManageScreen.open(context),
-          ),
-        if (state.scopedExpenses.isNotEmpty ||
-            state.scopedActivities.isNotEmpty) ...[
-          const SizedBox(height: 28),
+          );
+
+    Widget secondarySections() => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (hasActivity) ...[
           _RecentSection(onSeeAll: () => _openHistory(context)),
+          const SizedBox(height: 28),
         ],
         if (state.outstandingBalances.isNotEmpty) ...[
-          const SizedBox(height: 28),
           _BalancesSection(balances: state.outstandingBalances),
+          const SizedBox(height: 28),
         ],
-        const SizedBox(height: 28),
         _PlannerSection(onSeeAll: widget.onSeePlanner),
       ],
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final desktop = constraints.maxWidth >= 1050;
+        if (!desktop) {
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
+            children: [
+              if (state.spentThisMonth > 0) ...[
+                monthlySummary(),
+                const SizedBox(height: 28),
+              ],
+              budgetsSection(),
+              if (hasActivity || state.outstandingBalances.isNotEmpty) ...[
+                const SizedBox(height: 28),
+                secondarySections(),
+              ] else ...[
+                const SizedBox(height: 28),
+                _PlannerSection(onSeeAll: widget.onSeePlanner),
+              ],
+            ],
+          );
+        }
+
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1440),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (state.spentThisMonth > 0) ...[
+                            monthlySummary(),
+                            const SizedBox(height: 28),
+                          ],
+                          budgetsSection(),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+                    Expanded(child: secondarySections()),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
