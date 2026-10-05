@@ -8,6 +8,7 @@ import '../command/command_bar.dart';
 import '../models/phosphor.dart';
 import 'briefing.dart';
 import '../widgets/morph_nav_bar.dart';
+import '../theme.dart';
 import 'analytics/analytics_screen.dart';
 import 'planner/planner_home.dart';
 import 'quick_capture.dart';
@@ -34,6 +35,31 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
+  static const _items = [
+    MorphNavItem(
+      icon: PhosphorR.squaresFour,
+      activeIcon: PhosphorF.squaresFour,
+      label: 'Home',
+    ),
+    MorphNavItem(
+      icon: PhosphorR.receipt,
+      activeIcon: PhosphorF.receipt,
+      label: 'Expenses',
+    ),
+    MorphNavItem(
+      icon: PhosphorR.chartPie,
+      activeIcon: PhosphorF.chartPie,
+      label: 'Analytics',
+    ),
+    MorphNavItem(
+      icon: PhosphorR.calculator,
+      activeIcon: PhosphorF.calculator,
+      label: 'Planner',
+    ),
+  ];
+
+  static const _desktopBreakpoint = 900.0;
+
   int _index = 0;
   StreamSubscription<Uri?>? _widgetClicks;
 
@@ -96,54 +122,201 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      // No FAB: the nav bar's "+" now raises the capture menu (Add expense,
-      // Income, Transfer, Scan) from every screen, so a separate Home FAB would
-      // just be a second green "+" stacked on the same corner.
-      // IndexedStack preserves each tab's scroll position and the planner's
-      // half-entered inputs when the user pops between tabs.
-      body: IndexedStack(
-        index: _index,
-        children: [
-          DashboardScreen(onSeePlanner: () => _select(3)),
-          const ExpenseListScreen(),
-          const AnalyticsScreen(),
-          const PlannerHomeScreen(),
-        ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useSidebar = constraints.maxWidth >= _desktopBreakpoint;
+        return Scaffold(
+          extendBody: !useSidebar,
+          // IndexedStack preserves each tab's scroll position and the planner's
+          // half-entered inputs when the user pops between tabs.
+          body: Row(
+            children: [
+              if (useSidebar)
+                _DesktopSidebar(
+                  items: _items,
+                  selectedIndex: _index,
+                  onSelect: _select,
+                  onCapture: () => CommandBar.show(context),
+                  onBriefing: () => showBriefing(context, kind: _briefingKind),
+                ),
+              Expanded(
+                child: IndexedStack(
+                  index: _index,
+                  children: [
+                    DashboardScreen(onSeePlanner: () => _select(3)),
+                    const ExpenseListScreen(),
+                    const AnalyticsScreen(),
+                    const PlannerHomeScreen(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          bottomNavigationBar: useSidebar
+              ? null
+              : MorphNavBar(
+                  activeIndex: _index,
+                  onSelect: _select,
+                  onCapture: (text) => captureFromText(context, text),
+                  onScan: kIsWeb
+                      ? null
+                      : () => CommandBar.show(context, startScan: true),
+                  onBriefing: () => showBriefing(context, kind: _briefingKind),
+                  items: _items,
+                ),
+        );
+      },
+    );
+  }
+}
+
+class _DesktopSidebar extends StatelessWidget {
+  const _DesktopSidebar({
+    required this.items,
+    required this.selectedIndex,
+    required this.onSelect,
+    required this.onCapture,
+    required this.onBriefing,
+  });
+
+  final List<MorphNavItem> items;
+  final int selectedIndex;
+  final ValueChanged<int> onSelect;
+  final VoidCallback onCapture;
+  final VoidCallback onBriefing;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: 240,
+      decoration: BoxDecoration(
+        color: context.card,
+        border: Border(right: BorderSide(color: context.hairline)),
       ),
-      // The centre + is the universal command bar — capture first (spec §4).
-      // The bar's destinations are supplied per screen, so it morphs as you
-      // move deeper (e.g. into an account); here it's the home shell's tabs.
-      bottomNavigationBar: MorphNavBar(
-        activeIndex: _index,
-        onSelect: _select,
-        onCapture: (text) => captureFromText(context, text),
-        onScan: kIsWeb ? null : () => CommandBar.show(context, startScan: true),
-        // The ✨ briefs on wherever you are — each tab gets its own summary.
-        onBriefing: () => showBriefing(context, kind: _briefingKind),
-        items: const [
-          MorphNavItem(
-            icon: PhosphorR.squaresFour,
-            activeIcon: PhosphorF.squaresFour,
-            label: 'Home',
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 28),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.brandGradient,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.account_balance_wallet_rounded,
+                        color: scheme.onPrimary,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 11),
+                    Text(
+                      'Budget',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              for (var i = 0; i < items.length; i++)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: _SidebarDestination(
+                    item: items[i],
+                    selected: selectedIndex == i,
+                    onTap: () => onSelect(i),
+                  ),
+                ),
+              const Spacer(),
+              FilledButton.icon(
+                onPressed: onCapture,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Add or capture'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppTheme.brandGreen,
+                  foregroundColor: const Color(0xFF10231A),
+                  minimumSize: const Size.fromHeight(48),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: onBriefing,
+                icon: const Icon(Icons.auto_awesome_rounded, size: 19),
+                label: const Text('Your briefing'),
+                style: TextButton.styleFrom(
+                  alignment: Alignment.centerLeft,
+                  minimumSize: const Size.fromHeight(44),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                ),
+              ),
+            ],
           ),
-          MorphNavItem(
-            icon: PhosphorR.receipt,
-            activeIcon: PhosphorF.receipt,
-            label: 'Expenses',
+        ),
+      ),
+    );
+  }
+}
+
+class _SidebarDestination extends StatelessWidget {
+  const _SidebarDestination({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final MorphNavItem item;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? context.scheme.primary : context.muted;
+    return Semantics(
+      key: ValueKey('desktop-nav-${item.label.toLowerCase()}'),
+      button: true,
+      selected: selected,
+      label: item.label,
+      child: Material(
+        color: selected
+            ? context.scheme.primary.withValues(
+                alpha: context.isDark ? 0.2 : 0.1,
+              )
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            child: Row(
+              children: [
+                Icon(
+                  selected ? item.activeIcon : item.icon,
+                  color: selected ? (item.accent ?? color) : color,
+                  size: 21,
+                ),
+                const SizedBox(width: 13),
+                Text(
+                  item.label,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: selected ? context.scheme.onSurface : context.muted,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ),
-          MorphNavItem(
-            icon: PhosphorR.chartPie,
-            activeIcon: PhosphorF.chartPie,
-            label: 'Analytics',
-          ),
-          MorphNavItem(
-            icon: PhosphorR.calculator,
-            activeIcon: PhosphorF.calculator,
-            label: 'Planner',
-          ),
-        ],
+        ),
       ),
     );
   }
