@@ -60,7 +60,7 @@ void main() {
     final state = await _freshState();
     await state.addExpense(
       title: 'Petrol',
-      amount: 50000,
+      amount: 50000, 
       categoryId: 'fuel',
       date: DateTime.now(),
     );
