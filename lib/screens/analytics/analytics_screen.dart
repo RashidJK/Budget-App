@@ -33,8 +33,8 @@ class AnalyticsScreen extends StatelessWidget {
 
     final insight = budget.totalBudget > 0
         ? (budget.isOverBudget
-            ? 'You are over this month\'s budget by ${Money.compact(budget.actualSpend - budget.totalBudget)}.'
-            : 'You still have ${Money.compact(budget.remaining)} left in this month\'s budget.')
+              ? 'You are over this month\'s budget by ${Money.compact(budget.actualSpend - budget.totalBudget)}.'
+              : 'You still have ${Money.compact(budget.remaining)} left in this month\'s budget.')
         : 'No budgeted categories are set yet, so the trend view is based on actual spend only.';
 
     final monthCard = SectionCard(
@@ -146,7 +146,7 @@ class AnalyticsScreen extends StatelessWidget {
               )
             : LayoutBuilder(
                 builder: (context, constraints) {
-                  if (constraints.maxWidth < 850) {
+                  if (constraints.maxWidth < 700) {
                     return ListView(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
                       children: [
