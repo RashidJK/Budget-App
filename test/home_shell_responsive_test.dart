@@ -32,6 +32,10 @@ void main() {
     expect(find.byType(MorphNavBar), findsNothing);
     expect(find.text('Budget'), findsOneWidget);
     expect(find.text('Add or capture'), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('desktop-sidebar'))).width,
+      240,
+    );
     expect(find.byKey(const ValueKey('desktop-nav-home')), findsOneWidget);
     expect(
       tester.getSemantics(find.byKey(const ValueKey('desktop-nav-home'))),
@@ -45,6 +49,22 @@ void main() {
       tester.getSemantics(find.byKey(const ValueKey('desktop-nav-planner'))),
       isSemantics(isSelected: true),
     );
+
+    await tester.tap(find.byTooltip('Collapse sidebar'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+    expect(find.text('Budget'), findsNothing);
+    expect(find.text('Add or capture'), findsNothing);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('desktop-sidebar'))).width,
+      76,
+    );
+    expect(find.byTooltip('Home'), findsOneWidget);
+    expect(find.byTooltip('Add or capture'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Expand sidebar'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+    expect(find.text('Budget'), findsOneWidget);
+    expect(find.text('Add or capture'), findsOneWidget);
   });
 
   testWidgets('narrow layouts keep the touch navigation bar', (tester) async {
