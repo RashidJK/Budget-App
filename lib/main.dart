@@ -13,6 +13,7 @@ import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  debugPrint('Budget startup: bindings ready');
 
   // Real on-device receipt OCR for the running app. Tests and non-mobile builds
   // leave the mock in place, so nothing else has to know about ML Kit.
@@ -20,10 +21,12 @@ Future<void> main() async {
 
   // Register the App Group before anything writes to it.
   await HomeWidgetBridge.init();
+  debugPrint('Budget startup: widget bridge ready');
 
   // Storage is opened before the first frame so the dashboard can render real
   // figures immediately rather than flashing an empty state on every launch.
   final storage = await Storage.open();
+  debugPrint('Budget startup: storage ready');
 
   final appState = AppState(storage);
   // Keep the iOS home-screen widget in step with the latest figures.
@@ -33,6 +36,7 @@ Future<void> main() async {
   final brainState = BrainState(storage);
 
   runApp(BudgetApp(appState: appState, brainState: brainState));
+  debugPrint('Budget startup: runApp called');
 }
 
 class BudgetApp extends StatelessWidget {
