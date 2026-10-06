@@ -36,7 +36,9 @@ class _SpacesShellState extends State<SpacesShell>
       tagline: 'Track your money',
       icon: Icons.account_balance_wallet_rounded,
       accent: AppTheme.brandGreen,
-      builder: (_) => const HomeShell(),
+      builder: (_) => HomeShell(
+        onBackToSpaces: () => _zoom.animateTo(1, curve: Curves.easeOutCubic),
+      ),
     ),
     AppSpace(
       id: 'brain',

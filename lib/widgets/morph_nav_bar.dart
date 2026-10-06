@@ -44,6 +44,7 @@ class MorphNavBar extends StatefulWidget {
     required this.onCapture,
     this.onScan,
     this.onBriefing,
+    this.onSpaces,
     this.captureHint = "Try 'Transfer 100k to M-Pesa'",
   });
 
@@ -60,6 +61,9 @@ class MorphNavBar extends StatefulWidget {
 
   /// Opens the blue briefing island. When null, the briefing icon is hidden.
   final VoidCallback? onBriefing;
+
+  /// Returns to the app chooser when one is provided by the host shell.
+  final VoidCallback? onSpaces;
 
   final String captureHint;
 
@@ -434,6 +438,15 @@ class _MorphNavBarState extends State<MorphNavBar>
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _fnAction(Icons.chevron_left_rounded, 'Back', onTap: _toRest),
+          if (widget.onSpaces != null)
+            _fnAction(
+              Icons.grid_view_rounded,
+              'Go to Spaces',
+              onTap: () {
+                widget.onSpaces!();
+                _toRest();
+              },
+            ),
           if (widget.onBriefing != null)
             _fnAction(
               Icons.auto_awesome_rounded,

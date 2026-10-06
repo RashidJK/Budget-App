@@ -28,7 +28,9 @@ import 'tracker/expense_list.dart';
 /// own header, since that is where they belong conceptually and it freed the
 /// slot Analytics now fills.
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key});
+  const HomeShell({super.key, this.onBackToSpaces});
+
+  final VoidCallback? onBackToSpaces;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -138,6 +140,7 @@ class _HomeShellState extends State<HomeShell> {
                   onSelect: _select,
                   onCapture: () => CommandBar.show(context),
                   onBriefing: () => showBriefing(context, kind: _briefingKind),
+                  onBackToSpaces: widget.onBackToSpaces,
                 ),
               Expanded(
                 child: IndexedStack(
@@ -162,6 +165,7 @@ class _HomeShellState extends State<HomeShell> {
                       ? null
                       : () => CommandBar.show(context, startScan: true),
                   onBriefing: () => showBriefing(context, kind: _briefingKind),
+                  onSpaces: widget.onBackToSpaces,
                   items: _items,
                 ),
         );
@@ -177,6 +181,7 @@ class _DesktopSidebar extends StatelessWidget {
     required this.onSelect,
     required this.onCapture,
     required this.onBriefing,
+    this.onBackToSpaces,
   });
 
   final List<MorphNavItem> items;
@@ -184,6 +189,7 @@ class _DesktopSidebar extends StatelessWidget {
   final ValueChanged<int> onSelect;
   final VoidCallback onCapture;
   final VoidCallback onBriefing;
+  final VoidCallback? onBackToSpaces;
 
   @override
   Widget build(BuildContext context) {
@@ -238,6 +244,20 @@ class _DesktopSidebar extends StatelessWidget {
                   ),
                 ),
               const Spacer(),
+              if (onBackToSpaces != null) ...[
+                OutlinedButton.icon(
+                  key: const ValueKey('spaces-back-button'),
+                  onPressed: onBackToSpaces,
+                  icon: const Icon(Icons.grid_view_rounded, size: 19),
+                  label: const Text('Spaces'),
+                  style: OutlinedButton.styleFrom(
+                    alignment: Alignment.centerLeft,
+                    minimumSize: const Size.fromHeight(44),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
               FilledButton.icon(
                 onPressed: onCapture,
                 icon: const Icon(Icons.add_rounded),
