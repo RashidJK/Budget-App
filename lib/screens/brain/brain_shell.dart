@@ -686,6 +686,17 @@ class _BrainTile extends StatelessWidget {
       );
     }
     final isLink = item.kind == BrainKind.link && (item.url?.isNotEmpty ?? false);
+    // The favicon reads better bare — a tinted badge fights the icon image —
+    // so links drop the background; the plain line icons keep their subtle tint.
+    if (isLink) {
+      return SizedBox(
+        width: 30,
+        height: 30,
+        child: Center(
+          child: _LinkFavicon(url: item.url!, size: 24, fallback: color),
+        ),
+      );
+    }
     return Container(
       width: 30,
       height: 30,
@@ -694,9 +705,7 @@ class _BrainTile extends StatelessWidget {
         color: color.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(9),
       ),
-      child: isLink
-          ? _LinkFavicon(url: item.url!, size: 18, fallback: color)
-          : Icon(brainKindIcon(item.kind), size: 17, color: color),
+      child: Icon(brainKindIcon(item.kind), size: 17, color: color),
     );
   }
 
