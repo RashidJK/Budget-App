@@ -147,14 +147,29 @@ class _HomeShellState extends State<HomeShell> {
                       setState(() => _sidebarCollapsed = !_sidebarCollapsed),
                 ),
               Expanded(
-                child: IndexedStack(
-                  index: _index,
-                  children: [
-                    DashboardScreen(onSeePlanner: () => _select(3)),
-                    const ExpenseListScreen(),
-                    const AnalyticsScreen(),
-                    const PlannerHomeScreen(),
-                  ],
+                // Cap the content width on wide screens so it reads as a
+                // centred column instead of stretching across a monitor.
+                child: LayoutBuilder(
+                  builder: (context, c) {
+                    final content = IndexedStack(
+                      index: _index,
+                      children: [
+                        DashboardScreen(onSeePlanner: () => _select(3)),
+                        const ExpenseListScreen(),
+                        const AnalyticsScreen(),
+                        const PlannerHomeScreen(),
+                      ],
+                    );
+                    if (c.maxWidth <= 1100) return content;
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Spacer(),
+                        SizedBox(width: 1100, child: content),
+                        const Spacer(),
+                      ],
+                    );
+                  },
                 ),
               ),
             ],
