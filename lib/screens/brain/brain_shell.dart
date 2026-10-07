@@ -13,11 +13,7 @@ import 'brain_modal.dart';
 /// and links. One feed interleaves every kind, newest first; the chips filter
 /// it; the ✨ command bar at the bottom captures and routes a new thought.
 class BrainShell extends StatefulWidget {
-  const BrainShell({
-    super.key,
-    this.onSelectApp,
-    this.onBackToSpaces,
-  });
+  const BrainShell({super.key, this.onSelectApp, this.onBackToSpaces});
 
   final void Function(int index)? onSelectApp;
   final VoidCallback? onBackToSpaces;
@@ -46,7 +42,8 @@ class _BrainShellState extends State<BrainShell> {
   }
 
   bool _onDay(BrainItem i, DateTime d) {
-    bool eq(DateTime a) => a.year == d.year && a.month == d.month && a.day == d.day;
+    bool eq(DateTime a) =>
+        a.year == d.year && a.month == d.month && a.day == d.day;
     return eq(i.createdAt) || (i.dueDate != null && eq(i.dueDate!));
   }
 
@@ -175,37 +172,46 @@ class _BrainShellState extends State<BrainShell> {
       backgroundColor: bg,
       body: SafeArea(
         bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 16, 0),
-              child: _header(context),
+        // On wide screens (web/desktop) keep the brain a centred column so the
+        // mosaic and capture pill don't stretch edge to edge.
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 16, 0),
+                  child: _header(context),
+                ),
+                const SizedBox(height: 14),
+                BrainCalendar(
+                  selected: _dayFilter,
+                  onSelect: (d) => setState(() => _dayFilter = d),
+                ),
+                const SizedBox(height: 12),
+                _FilterBar(
+                  selected: _filter,
+                  counts: {
+                    for (final k in BrainKind.values) k: brain.countOf(k),
+                  },
+                  onSelect: (k) => setState(() => _filter = k),
+                ),
+                const SizedBox(height: 8),
+                if (showResurface)
+                  Builder(
+                    builder: (context) {
+                      final r = brain.resurfaced();
+                      return r.isEmpty
+                          ? const SizedBox.shrink()
+                          : _ResurfaceStrip(items: r);
+                    },
+                  ),
+                Expanded(child: _feed(context, brain, items)),
+                const BrainCommandBar(),
+              ],
             ),
-            const SizedBox(height: 14),
-            BrainCalendar(
-              selected: _dayFilter,
-              onSelect: (d) => setState(() => _dayFilter = d),
-            ),
-            const SizedBox(height: 12),
-            _FilterBar(
-              selected: _filter,
-              counts: {for (final k in BrainKind.values) k: brain.countOf(k)},
-              onSelect: (k) => setState(() => _filter = k),
-            ),
-            const SizedBox(height: 8),
-            if (showResurface)
-              Builder(
-                builder: (context) {
-                  final r = brain.resurfaced();
-                  return r.isEmpty
-                      ? const SizedBox.shrink()
-                      : _ResurfaceStrip(items: r);
-                },
-              ),
-            Expanded(child: _feed(context, brain, items)),
-            const BrainCommandBar(),
-          ],
+          ),
         ),
       ),
     );
@@ -243,7 +249,9 @@ class _ButtonPair extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pill = context.isDark ? const Color(0xFF35333F) : const Color(0xFF1C1B24);
+    final pill = context.isDark
+        ? const Color(0xFF35333F)
+        : const Color(0xFF1C1B24);
     return Container(
       decoration: BoxDecoration(
         color: pill,
@@ -253,8 +261,15 @@ class _ButtonPair extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _half(Icons.search_rounded, onSearch),
-          Container(width: 1, height: 20, color: Colors.white.withValues(alpha: 0.16)),
-          _half(mosaic ? Icons.view_agenda_outlined : Icons.grid_view_rounded, onToggle),
+          Container(
+            width: 1,
+            height: 20,
+            color: Colors.white.withValues(alpha: 0.16),
+          ),
+          _half(
+            mosaic ? Icons.view_agenda_outlined : Icons.grid_view_rounded,
+            onToggle,
+          ),
         ],
       ),
     );
@@ -414,7 +429,11 @@ class _MosaicCardState extends State<_MosaicCard> {
                         border: Border.all(color: color, width: 2),
                       ),
                       child: item.done
-                          ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                          ? const Icon(
+                              Icons.check_rounded,
+                              size: 14,
+                              color: Colors.white,
+                            )
                           : null,
                     ),
                   )
@@ -442,7 +461,8 @@ class _MosaicCardState extends State<_MosaicCard> {
                 decorationColor: context.muted,
               ),
             ),
-            if (item.kind == BrainKind.link && (item.url?.isNotEmpty ?? false)) ...[
+            if (item.kind == BrainKind.link &&
+                (item.url?.isNotEmpty ?? false)) ...[
               const SizedBox(height: 6),
               Text(
                 _domainOf(item.url!) ?? item.url!,
@@ -505,7 +525,12 @@ class _FilterBar extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         children: [
-          _chip(context, label: 'All', active: selected == null, onTap: () => onSelect(null)),
+          _chip(
+            context,
+            label: 'All',
+            active: selected == null,
+            onTap: () => onSelect(null),
+          ),
           for (final k in BrainKind.values) ...[
             const SizedBox(width: 8),
             _chip(
@@ -587,7 +612,9 @@ class _BrainTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final brain = context.read<BrainState>();
     final isTask = item.kind == BrainKind.task;
-    final keepColor = isTask ? brainKindColor(BrainKind.task) : BrainShell.accent;
+    final keepColor = isTask
+        ? brainKindColor(BrainKind.task)
+        : BrainShell.accent;
     return Dismissible(
       key: ValueKey(item.id),
       direction: DismissDirection.horizontal,
@@ -685,7 +712,8 @@ class _BrainTile extends StatelessWidget {
         ),
       );
     }
-    final isLink = item.kind == BrainKind.link && (item.url?.isNotEmpty ?? false);
+    final isLink =
+        item.kind == BrainKind.link && (item.url?.isNotEmpty ?? false);
     // The favicon reads better bare — a tinted badge fights the icon image —
     // so links drop the background; the plain line icons keep their subtle tint.
     if (isLink) {
@@ -854,7 +882,11 @@ class _EmptyState extends StatelessWidget {
             Text(
               'Type a thought below — a link, "todo …", "journal: …"\nor anything else — and it files itself.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: context.muted, fontSize: 14, height: 1.35),
+              style: TextStyle(
+                color: context.muted,
+                fontSize: 14,
+                height: 1.35,
+              ),
             ),
           ],
         ),
@@ -1014,8 +1046,12 @@ class _ResurfaceRow extends StatelessWidget {
               HapticFeedback.selectionClick();
               brain.togglePinned(item.id);
             }),
-            _mini(context, Icons.close_rounded, 'Dismiss',
-                () => brain.dismissResurface(item.id)),
+            _mini(
+              context,
+              Icons.close_rounded,
+              'Dismiss',
+              () => brain.dismissResurface(item.id),
+            ),
           ],
         ),
       ),
@@ -1105,8 +1141,18 @@ String _dayLabel(DateTime d) {
   if (diff == 1) return 'Tomorrow';
   if (diff == -1) return 'Yesterday';
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   return '${months[d.month - 1]} ${d.day}';
 }
