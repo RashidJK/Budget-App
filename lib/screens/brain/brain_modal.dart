@@ -69,125 +69,145 @@ class _BrainModal extends StatelessWidget {
         .length;
     final body = _body(context, item, isLink, color);
 
-    return Scaffold(
-      backgroundColor: dark ? const Color(0xFF14131C) : Colors.white,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Action bar.
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                  const Spacer(),
-                  _action(
-                    context,
-                    item.pinned
-                        ? Icons.push_pin_rounded
-                        : Icons.push_pin_outlined,
-                    item.pinned ? color : context.muted,
-                    () => brain.togglePinned(item.id),
-                  ),
-                  _action(context, Icons.edit_outlined, context.muted, () {
-                    showBrainDetail(context, item);
-                  }),
-                  _action(context, Icons.ios_share_rounded, context.muted, () {
-                    final text = isLink ? (item.url ?? item.text) : item.text;
-                    Clipboard.setData(ClipboardData(text: text));
-                    ScaffoldMessenger.of(context)
-                      ..hideCurrentSnackBar()
-                      ..showSnackBar(const SnackBar(content: Text('Copied')));
-                  }),
-                  _action(
-                    context,
-                    Icons.delete_outline_rounded,
-                    context.warn,
-                    () {
-                      brain.remove(item.id);
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                  const SizedBox(width: 4),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(24, 6, 24, 40),
-                children: [
-                  Text(
-                    _fullDate(item.createdAt),
-                    style: TextStyle(fontSize: 13, color: context.muted),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): () {
+          if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+        },
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          backgroundColor: dark ? const Color(0xFF14131C) : Colors.white,
+          body: SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Action bar.
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+                  child: Row(
                     children: [
-                      if (item.kind == BrainKind.task)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4, right: 12),
-                          child: _Checkbox(item: item, color: color),
-                        ),
-                      Expanded(
-                        child: SelectableText(
-                          title,
-                          style: TextStyle(
-                            fontSize: 28,
-                            height: 1.15,
-                            fontWeight: FontWeight.w800,
-                            color: context.scheme.onSurface,
-                            decoration: item.done
-                                ? TextDecoration.lineThrough
-                                : null,
-                            decorationColor: context.muted,
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                      const Spacer(),
+                      _action(
+                        context,
+                        item.pinned
+                            ? Icons.push_pin_rounded
+                            : Icons.push_pin_outlined,
+                        item.pinned ? color : context.muted,
+                        () => brain.togglePinned(item.id),
+                      ),
+                      _action(context, Icons.edit_outlined, context.muted, () {
+                        showBrainDetail(context, item);
+                      }),
+                      _action(
+                        context,
+                        Icons.ios_share_rounded,
+                        context.muted,
+                        () {
+                          final text = isLink
+                              ? (item.url ?? item.text)
+                              : item.text;
+                          Clipboard.setData(ClipboardData(text: text));
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              const SnackBar(content: Text('Copied')),
+                            );
+                        },
+                      ),
+                      _action(
+                        context,
+                        Icons.delete_outline_rounded,
+                        context.warn,
+                        () {
+                          brain.remove(item.id);
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(24, 6, 24, 40),
+                    children: [
+                      Text(
+                        _fullDate(item.createdAt),
+                        style: TextStyle(fontSize: 13, color: context.muted),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (item.kind == BrainKind.task)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4, right: 12),
+                              child: _Checkbox(item: item, color: color),
+                            ),
+                          Expanded(
+                            child: SelectableText(
+                              title,
+                              style: TextStyle(
+                                fontSize: 28,
+                                height: 1.15,
+                                fontWeight: FontWeight.w800,
+                                color: context.scheme.onSurface,
+                                decoration: item.done
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                                decorationColor: context.muted,
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
+                      const SizedBox(height: 14),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _MetaChip(
+                            icon: brainKindIcon(item.kind),
+                            label: item.kind.label,
+                            color: color,
+                          ),
+                          _MetaChip(
+                            label: '$words ${words == 1 ? 'word' : 'words'}',
+                            color: context.muted,
+                          ),
+                          _MetaChip(
+                            label: _time(item.createdAt),
+                            color: context.muted,
+                          ),
+                          if (item.kind == BrainKind.task &&
+                              item.dueDate != null)
+                            _MetaChip(
+                              icon: Icons.event_rounded,
+                              label: 'Due ${_shortDate(item.dueDate!)}',
+                              color: color,
+                            ),
+                          for (final t in item.tags)
+                            _MetaChip(label: '#$t', color: color),
+                        ],
+                      ),
+                      if (body.isNotEmpty) ...[
+                        const SizedBox(height: 20),
+                        Divider(color: context.hairline, height: 1),
+                        const SizedBox(height: 20),
+                        ...body,
+                      ],
                     ],
                   ),
-                  const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _MetaChip(
-                        icon: brainKindIcon(item.kind),
-                        label: item.kind.label,
-                        color: color,
-                      ),
-                      _MetaChip(
-                        label: '$words ${words == 1 ? 'word' : 'words'}',
-                        color: context.muted,
-                      ),
-                      _MetaChip(
-                        label: _time(item.createdAt),
-                        color: context.muted,
-                      ),
-                      if (item.kind == BrainKind.task && item.dueDate != null)
-                        _MetaChip(
-                          icon: Icons.event_rounded,
-                          label: 'Due ${_shortDate(item.dueDate!)}',
-                          color: color,
-                        ),
-                      for (final t in item.tags)
-                        _MetaChip(label: '#$t', color: color),
-                    ],
-                  ),
-                  if (body.isNotEmpty) ...[
-                    const SizedBox(height: 20),
-                    Divider(color: context.hairline, height: 1),
-                    const SizedBox(height: 20),
-                    ...body,
-                  ],
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -345,8 +365,9 @@ class _MetaChip extends StatelessWidget {
 
 String? _domainOf(String url) {
   var u = url.trim();
-  if (!RegExp(r'^https?://', caseSensitive: false).hasMatch(u))
+  if (!RegExp(r'^https?://', caseSensitive: false).hasMatch(u)) {
     u = 'https://$u';
+  }
   try {
     final host = Uri.parse(u).host;
     return host.isEmpty ? null : host.replaceFirst(RegExp(r'^www\.'), '');
