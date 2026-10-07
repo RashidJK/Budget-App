@@ -1,11 +1,11 @@
 {
-    "name": "Budget",
-    "short_name": "Budget",
+    "name": "Spaces",
+    "short_name": "Spaces",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#F7F8F5",
-    "theme_color": "#267A63",
-    "description": "Track spending, budgets, analytics and plans in one private workspace.",
+    "background_color": "#F4F3FB",
+    "theme_color": "#6D5DF6",
+    "description": "Your budget and second brain in one private workspace — capture, track and resurface.",
     "prefer_related_applications": false,
     "icons": [
         {
