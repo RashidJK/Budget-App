@@ -229,7 +229,8 @@ class _BrainShellState extends State<BrainShell> {
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         itemCount: items.length,
-        itemBuilder: (context, i) => _BrainTile(item: items[i], onTag: _openTag),
+        itemBuilder: (context, i) =>
+            _BrainTile(item: items[i], onTag: _openTag),
       ),
     );
   }
@@ -384,125 +385,129 @@ class _MosaicCardState extends State<_MosaicCard> {
             (item.text.isEmpty || item.text == item.url))
         ? item.previewTitle!
         : (item.text.isEmpty ? '(empty)' : item.text);
-    return GestureDetector(
-      onTap: () => showBrainModal(context, item),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: dark ? 0.20 : 0.11),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withValues(alpha: 0.20)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (isLink && item.previewImage != null) ...[
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  item.previewImage!,
-                  height: 120,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  gaplessPlayback: true,
-                  errorBuilder: (context, error, stack) =>
-                      const SizedBox.shrink(),
-                  loadingBuilder: (context, child, progress) => progress == null
-                      ? child
-                      : Container(
-                          height: 120,
-                          color: color.withValues(alpha: 0.12),
-                        ),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => showBrainModal(context, item),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: dark ? 0.20 : 0.11),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: color.withValues(alpha: 0.20)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (isLink && item.previewImage != null) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    item.previewImage!,
+                    height: 120,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    gaplessPlayback: true,
+                    errorBuilder: (context, error, stack) =>
+                        const SizedBox.shrink(),
+                    loadingBuilder: (context, child, progress) =>
+                        progress == null
+                        ? child
+                        : Container(
+                            height: 120,
+                            color: color.withValues(alpha: 0.12),
+                          ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 10),
-            ],
-            Row(
-              children: [
-                if (item.kind == BrainKind.task)
-                  GestureDetector(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      context.read<BrainState>().toggleDone(item.id);
-                    },
-                    child: Container(
-                      width: 22,
-                      height: 22,
-                      decoration: BoxDecoration(
-                        color: item.done ? color : Colors.transparent,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: color, width: 2),
-                      ),
-                      child: item.done
-                          ? const Icon(
-                              Icons.check_rounded,
-                              size: 14,
-                              color: Colors.white,
-                            )
-                          : null,
-                    ),
-                  )
-                else if (item.kind == BrainKind.link &&
-                    (item.url?.isNotEmpty ?? false))
-                  _LinkFavicon(url: item.url!, size: 22, fallback: color)
-                else
-                  Icon(brainKindIcon(item.kind), size: 18, color: color),
-                const Spacer(),
-                if (item.pinned)
-                  Icon(Icons.push_pin_rounded, size: 13, color: color),
+                const SizedBox(height: 10),
               ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              titleText,
-              maxLines: 4,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 14.5,
-                height: 1.3,
-                fontWeight: FontWeight.w600,
-                color: context.scheme.onSurface,
-                decoration: item.done ? TextDecoration.lineThrough : null,
-                decorationColor: context.muted,
-              ),
-            ),
-            if (item.kind == BrainKind.link &&
-                (item.url?.isNotEmpty ?? false)) ...[
-              const SizedBox(height: 6),
-              Text(
-                _domainOf(item.url!) ?? item.url!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: context.muted,
-                ),
-              ),
-            ],
-            if (item.kind == BrainKind.journal) ...[
-              const SizedBox(height: 6),
-              Text(
-                _dayLabel(item.createdAt),
-                style: TextStyle(fontSize: 12, color: context.muted),
-              ),
-            ],
-            if (item.kind == BrainKind.task && item.dueDate != null) ...[
-              const SizedBox(height: 8),
-              _DueChip(due: item.dueDate!),
-            ],
-            if (item.tags.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
+              Row(
                 children: [
-                  for (final t in item.tags)
-                    _TagChip(tag: t, onTap: () => onTag(t)),
+                  if (item.kind == BrainKind.task)
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        context.read<BrainState>().toggleDone(item.id);
+                      },
+                      child: Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          color: item.done ? color : Colors.transparent,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: color, width: 2),
+                        ),
+                        child: item.done
+                            ? const Icon(
+                                Icons.check_rounded,
+                                size: 14,
+                                color: Colors.white,
+                              )
+                            : null,
+                      ),
+                    )
+                  else if (item.kind == BrainKind.link &&
+                      (item.url?.isNotEmpty ?? false))
+                    _LinkFavicon(url: item.url!, size: 22, fallback: color)
+                  else
+                    Icon(brainKindIcon(item.kind), size: 18, color: color),
+                  const Spacer(),
+                  if (item.pinned)
+                    Icon(Icons.push_pin_rounded, size: 13, color: color),
                 ],
               ),
+              const SizedBox(height: 10),
+              Text(
+                titleText,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14.5,
+                  height: 1.3,
+                  fontWeight: FontWeight.w600,
+                  color: context.scheme.onSurface,
+                  decoration: item.done ? TextDecoration.lineThrough : null,
+                  decorationColor: context.muted,
+                ),
+              ),
+              if (item.kind == BrainKind.link &&
+                  (item.url?.isNotEmpty ?? false)) ...[
+                const SizedBox(height: 6),
+                Text(
+                  _domainOf(item.url!) ?? item.url!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: context.muted,
+                  ),
+                ),
+              ],
+              if (item.kind == BrainKind.journal) ...[
+                const SizedBox(height: 6),
+                Text(
+                  _dayLabel(item.createdAt),
+                  style: TextStyle(fontSize: 12, color: context.muted),
+                ),
+              ],
+              if (item.kind == BrainKind.task && item.dueDate != null) ...[
+                const SizedBox(height: 8),
+                _DueChip(due: item.dueDate!),
+              ],
+              if (item.tags.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    for (final t in item.tags)
+                      _TagChip(tag: t, onTap: () => onTag(t)),
+                  ],
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -670,25 +675,28 @@ class _BrainTile extends StatelessWidget {
             ),
           );
       },
-      child: GestureDetector(
-        onTap: () => showBrainModal(context, item),
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: context.isDark ? const Color(0xFF201F2B) : Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: context.hairline),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _leading(context, brain),
-              const SizedBox(width: 12),
-              Expanded(child: _body(context)),
-              if (item.pinned)
-                Icon(Icons.push_pin_rounded, size: 15, color: context.muted),
-            ],
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: () => showBrainModal(context, item),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: context.isDark ? const Color(0xFF201F2B) : Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: context.hairline),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _leading(context, brain),
+                const SizedBox(width: 12),
+                Expanded(child: _body(context)),
+                if (item.pinned)
+                  Icon(Icons.push_pin_rounded, size: 15, color: context.muted),
+              ],
+            ),
           ),
         ),
       ),
