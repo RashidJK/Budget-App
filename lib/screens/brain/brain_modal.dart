@@ -134,7 +134,7 @@ class _BrainModal extends StatelessWidget {
                           child: _Checkbox(item: item, color: color),
                         ),
                       Expanded(
-                        child: Text(
+                        child: SelectableText(
                           title,
                           style: TextStyle(
                             fontSize: 28,
@@ -227,7 +227,7 @@ class _BrainModal extends StatelessWidget {
         if (item.previewImage != null) const SizedBox(height: 16),
         // A label the user added, if it isn't just the raw URL.
         if (item.text.isNotEmpty && item.text != item.url) ...[
-          Text(
+          SelectableText(
             item.text,
             style: TextStyle(
               fontSize: 16,
