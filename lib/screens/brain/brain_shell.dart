@@ -225,10 +225,12 @@ class _BrainShellState extends State<BrainShell> {
       return _EmptyFilter(kind: _filter!);
     }
     if (_mosaic) return _MosaicFeed(items: items, onTag: _openTag);
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      itemCount: items.length,
-      itemBuilder: (context, i) => _BrainTile(item: items[i], onTag: _openTag),
+    return Scrollbar(
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        itemCount: items.length,
+        itemBuilder: (context, i) => _BrainTile(item: items[i], onTag: _openTag),
+      ),
     );
   }
 }
@@ -326,15 +328,18 @@ class _MosaicFeed extends StatelessWidget {
         rh += _estimate(item);
       }
     }
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(child: Column(children: left)),
-          const SizedBox(width: 12),
-          Expanded(child: Column(children: right)),
-        ],
+    return Scrollbar(
+      child: SingleChildScrollView(
+        primary: true,
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: Column(children: left)),
+            const SizedBox(width: 12),
+            Expanded(child: Column(children: right)),
+          ],
+        ),
       ),
     );
   }
