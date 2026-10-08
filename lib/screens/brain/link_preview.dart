@@ -1,7 +1,4 @@
-import 'dart:convert';
-import 'dart:io';
-
-import 'package:flutter/foundation.dart';
+import 'link_html_fetch.dart';
 
 /// A link's fetched preview — its page title and cover image, either of which
 /// may be missing.
@@ -14,11 +11,11 @@ class LinkPreviewData {
   bool get isEmpty => (title?.isEmpty ?? true) && (image?.isEmpty ?? true);
 }
 
-/// Best-effort Open Graph scraper. Fetches a page's `<head>`, pulls out
-/// og:title / og:image (falling back to the <title> tag), and caches the
-/// result in memory. No package needed — dart:io does the request and a couple
-/// of regexes do the parsing. Every failure path returns an empty preview, so
-/// the UI just keeps its favicon fallback.
+/// Best-effort Open Graph scraper. Fetches a page's `<head>` (directly on
+/// mobile/desktop, via a CORS proxy on web — see link_html_fetch.dart), pulls
+/// out og:title / og:image (falling back to the `<title>` tag), and caches the
+/// result in memory. A couple of regexes do the parsing — no package needed.
+/// Every failure path returns an empty preview, so the UI keeps its favicon.
 class LinkPreview {
   LinkPreview._();
 
@@ -26,7 +23,6 @@ class LinkPreview {
   static final Map<String, Future<LinkPreviewData>> _inflight = {};
 
   static Future<LinkPreviewData> fetch(String rawUrl) {
-    if (kIsWeb) return Future.value(const LinkPreviewData());
     final cached = _cache[rawUrl];
     if (cached != null) return Future.value(cached);
     return _inflight[rawUrl] ??= _fetch(rawUrl).then((data) {
@@ -47,34 +43,10 @@ class LinkPreview {
     } catch (_) {
       return const LinkPreviewData();
     }
-
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 5)
-      ..userAgent =
-          'Mozilla/5.0 (compatible; SecondBrain/1.0; +link-preview)';
-    try {
-      final request = await client.getUrl(uri);
-      request.followRedirects = true;
-      final response = await request.close().timeout(
-        const Duration(seconds: 6),
-      );
-      if (response.statusCode >= 400) return const LinkPreviewData();
-
-      // Read only the first slice — the metadata lives in <head>.
-      final buffer = StringBuffer();
-      await for (final chunk
-          in response.transform(const Utf8Decoder(allowMalformed: true))) {
-        buffer.write(chunk);
-        if (buffer.length > 60000 || buffer.toString().contains('</head>')) {
-          break;
-        }
-      }
-      return parse(buffer.toString(), base: uri);
-    } catch (_) {
-      return const LinkPreviewData();
-    } finally {
-      client.close(force: true);
-    }
+    // Platform-specific fetch: direct on mobile/desktop, CORS-proxied on web.
+    final html = await fetchHtml(url);
+    if (html == null || html.isEmpty) return const LinkPreviewData();
+    return parse(html, base: uri);
   }
 
   /// Extracts a preview from raw HTML — public so it can be unit-tested without
