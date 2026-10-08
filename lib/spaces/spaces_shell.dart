@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../screens/brain/brain_shell.dart';
 import '../screens/home_shell.dart';
@@ -66,6 +67,16 @@ class _SpacesShellState extends State<SpacesShell>
       vsync: this,
       duration: const Duration(milliseconds: 360),
     );
+    // Reflect where you are in the browser tab / app switcher: the focused app's
+    // name while zoomed in, "Spaces" once the launcher is open.
+    _zoom.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _setTabTitle('Spaces');
+      } else if (status == AnimationStatus.dismissed) {
+        _setTabTitle(_apps[_activeIndex].name);
+      }
+    });
+    _setTabTitle(_apps[_activeIndex].name);
   }
 
   @override
@@ -74,8 +85,15 @@ class _SpacesShellState extends State<SpacesShell>
     super.dispose();
   }
 
+  void _setTabTitle(String label) {
+    SystemChrome.setApplicationSwitcherDescription(
+      ApplicationSwitcherDescription(label: label),
+    );
+  }
+
   void _enter(int i) {
     if (i != _activeIndex) setState(() => _activeIndex = i);
+    _setTabTitle(_apps[i].name);
     _zoom.animateTo(0, curve: Curves.easeOutCubic);
   }
 
