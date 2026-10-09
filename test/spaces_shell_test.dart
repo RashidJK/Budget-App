@@ -21,37 +21,39 @@ Future<Widget> _hostSpaces() async {
 }
 
 void main() {
-  testWidgets('browser pinch zoom-out opens Spaces', (tester) async {
+  testWidgets('trackpad pinch zooms the Spaces launcher in and out', (tester) async {
     await tester.pumpWidget(await _hostSpaces());
     await tester.pumpAndSettle();
 
+    // The launcher heading sits inside an Opacity that tracks the zoom: 1 when
+    // Spaces is open, 0 when a focused app fills the screen.
+    double spacesOpacity() => tester
+        .widget<Opacity>(
+          find
+              .ancestor(of: find.text('Spaces'), matching: find.byType(Opacity))
+              .first,
+        )
+        .opacity;
+
+    // Pinch out (scale < 1) opens the launcher.
     await tester.sendEventToBinding(
       const PointerScaleEvent(position: Offset(20, 20), scale: 0.8),
     );
     await tester.pumpAndSettle(const Duration(milliseconds: 500));
+    expect(spacesOpacity(), 1);
 
-    final spacesOpacity = tester.widget<Opacity>(
-      find
-          .ancestor(of: find.text('Spaces'), matching: find.byType(Opacity))
-          .first,
-      double spacesOpacity() => tester.widget<Opacity>(
-        find
-            .ancestor(
-              of: find.text('Spaces'),
-              matching: find.byType(Opacity),
-            )
-            .first,
-      ).opacity;
+    // A neutral scale of exactly 1 must not move the zoom.
+    await tester.sendEventToBinding(
+      const PointerScaleEvent(position: Offset(20, 20), scale: 1),
+    );
+    await tester.pump();
+    expect(spacesOpacity(), 1);
 
-      expect(spacesOpacity(), 1);
-      await tester.sendEventToBinding(
-        const PointerScaleEvent(position: Offset(20, 20), scale: 1),
-      );
-      await tester.pump();
-      expect(spacesOpacity(), 1);
-
-      await tester.sendEventToBinding(
-        const PointerScaleEvent(position: Offset(20, 20), scale: 1.2),
-      );
-      await tester.pumpAndSettle(const Duration(milliseconds: 500));
-      expect(spacesOpacity(), 0);
+    // Spread (scale > 1) dives back into the focused app.
+    await tester.sendEventToBinding(
+      const PointerScaleEvent(position: Offset(20, 20), scale: 1.2),
+    );
+    await tester.pumpAndSettle(const Duration(milliseconds: 500));
+    expect(spacesOpacity(), 0);
+  });
+}
