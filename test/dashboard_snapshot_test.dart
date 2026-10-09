@@ -132,12 +132,11 @@ void main() {
 
       await _pumpDashboard(tester, state);
 
-      // One summary card: the spend headline plus the four sub-stats.
+      // One summary card: the spend headline plus the three sub-stats.
       expect(find.text('Spent this month'), findsOneWidget);
       expect(find.text('Today'), findsOneWidget);
       expect(find.text('This week'), findsOneWidget);
       expect(find.text('Avg/day'), findsOneWidget);
-      expect(find.text('Projected'), findsOneWidget);
       expect(find.text('Entries'), findsNothing);
       expect(find.text('Biggest'), findsNothing);
     });
