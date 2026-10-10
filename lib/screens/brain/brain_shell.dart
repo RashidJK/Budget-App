@@ -33,12 +33,28 @@ class _BrainShellState extends State<BrainShell> {
   bool _searching = false;
   final _searchCtrl = TextEditingController();
 
+  // Owned here so `/` or `n` can focus the capture bar from anywhere.
+  final _captureFocus = FocusNode();
+
   String get _query => _searchCtrl.text.trim().toLowerCase();
 
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _captureFocus.dispose();
     super.dispose();
+  }
+
+  /// `/` or `n` (when not already typing) jumps to the capture bar.
+  KeyEventResult _onShellKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (_searching || _captureFocus.hasFocus) return KeyEventResult.ignored;
+    final k = event.logicalKey;
+    if (k == LogicalKeyboardKey.slash || k == LogicalKeyboardKey.keyN) {
+      _captureFocus.requestFocus();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   bool _onDay(BrainItem i, DateTime d) {
@@ -174,49 +190,63 @@ class _BrainShellState extends State<BrainShell> {
         bottom: false,
         // Phone-width stays a single tidy column; a wide browser window gets a
         // roomier workspace so the mosaic can spread into more columns.
-        child: LayoutBuilder(
-          builder: (context, c) {
-            final maxW = c.maxWidth >= 900 ? 1180.0 : 640.0;
-            return Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxW),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 14, 16, 0),
-                      child: _header(context),
-                    ),
-                    const SizedBox(height: 14),
-                    BrainCalendar(
-                      selected: _dayFilter,
-                      onSelect: (d) => setState(() => _dayFilter = d),
-                    ),
-                    const SizedBox(height: 12),
-                    _FilterBar(
-                      selected: _filter,
-                      counts: {
-                        for (final k in BrainKind.values) k: brain.countOf(k),
-                      },
-                      onSelect: (k) => setState(() => _filter = k),
-                    ),
-                    const SizedBox(height: 8),
-                    if (showResurface)
-                      Builder(
-                        builder: (context) {
-                          final r = brain.resurfaced();
-                          return r.isEmpty
-                              ? const SizedBox.shrink()
-                              : _ResurfaceStrip(items: r);
-                        },
+        child: Focus(
+          autofocus: true,
+          skipTraversal: true,
+          onKeyEvent: _onShellKey,
+          child: LayoutBuilder(
+            builder: (context, c) {
+              final wide = c.maxWidth >= 900;
+              final maxW = wide ? 1180.0 : 640.0;
+              // On the web the capture bar reads as an inline composer at the
+              // top of the page; on phones it stays a floating island at the
+              // bottom, above the thumb.
+              final composer = BrainCommandBar(
+                focusNode: _captureFocus,
+                previewBelow: wide,
+              );
+              return Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxW),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 14, 16, 0),
+                        child: _header(context),
                       ),
-                    Expanded(child: _feed(context, brain, items)),
-                    const BrainCommandBar(),
-                  ],
+                      if (wide) composer,
+                      const SizedBox(height: 14),
+                      BrainCalendar(
+                        selected: _dayFilter,
+                        onSelect: (d) => setState(() => _dayFilter = d),
+                      ),
+                      const SizedBox(height: 12),
+                      _FilterBar(
+                        selected: _filter,
+                        counts: {
+                          for (final k in BrainKind.values) k: brain.countOf(k),
+                        },
+                        onSelect: (k) => setState(() => _filter = k),
+                      ),
+                      const SizedBox(height: 8),
+                      if (showResurface)
+                        Builder(
+                          builder: (context) {
+                            final r = brain.resurfaced();
+                            return r.isEmpty
+                                ? const SizedBox.shrink()
+                                : _ResurfaceStrip(items: r);
+                          },
+                        ),
+                      Expanded(child: _feed(context, brain, items)),
+                      if (!wide) composer,
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
