@@ -6,6 +6,7 @@ import '../screens/brain/brain_shell.dart';
 import '../screens/home_shell.dart';
 import '../theme.dart';
 import 'app_space.dart';
+import 'route_sync.dart';
 
 /// The root shell: a zoom-out "Spaces" home that holds each app as a card.
 ///
@@ -37,9 +38,7 @@ class _SpacesShellState extends State<SpacesShell>
       tagline: 'Track your money',
       icon: Icons.account_balance_wallet_rounded,
       accent: AppTheme.brandGreen,
-      builder: (_) => HomeShell(
-        onBackToSpaces: () => _zoom.animateTo(1, curve: Curves.easeOutCubic),
-      ),
+      builder: (_) => HomeShell(onBackToSpaces: _openLauncher),
     ),
     AppSpace(
       id: 'brain',
@@ -47,10 +46,7 @@ class _SpacesShellState extends State<SpacesShell>
       tagline: 'Notes · tasks · journal',
       icon: Icons.bubble_chart_rounded,
       accent: BrainShell.accent,
-      builder: (_) => BrainShell(
-        onSelectApp: _enter,
-        onBackToSpaces: () => _zoom.animateTo(1, curve: Curves.easeOutCubic),
-      ),
+      builder: (_) => BrainShell(onSelectApp: _enter, onBackToSpaces: _openLauncher),
     ),
   ];
 
@@ -60,6 +56,20 @@ class _SpacesShellState extends State<SpacesShell>
   double _zoomAtPinchStart = 0;
   bool _pinching = false;
 
+  // The launcher's own URL; each app's is '/<id>'.
+  static const _launcherPath = '/spaces';
+  String _currentPath = _launcherPath;
+
+  String _pathFor(int i) => '/${_apps[i].id}';
+
+  int? _indexForPath(String? path) {
+    if (path == null) return null;
+    for (var i = 0; i < _apps.length; i++) {
+      if (path == '/${_apps[i].id}') return i;
+    }
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -67,16 +77,34 @@ class _SpacesShellState extends State<SpacesShell>
       vsync: this,
       duration: const Duration(milliseconds: 360),
     );
-    // Reflect where you are in the browser tab / app switcher: the focused app's
-    // name while zoomed in, "Spaces" once the launcher is open.
+
+    // Open at whatever the URL points to: a Space path (/brain) dives straight
+    // in, /spaces shows the launcher, anything else falls back to the default.
+    final initial = initialRoutePath();
+    if (initial == _launcherPath) {
+      _zoom.value = 1;
+      _currentPath = _launcherPath;
+    } else {
+      _activeIndex = _indexForPath(initial) ?? 0;
+      _currentPath = _pathFor(_activeIndex);
+      pushRoutePath(_currentPath, replace: true); // canonicalise, no new entry
+    }
+
+    // Keep the tab title and the URL in step with the zoom, whatever drove it
+    // (card tap, Back-to-Spaces, pinch, trackpad): the app while zoomed in,
+    // Spaces once the launcher is open.
     _zoom.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         _setTabTitle('Spaces');
+        _syncRoute(_launcherPath);
       } else if (status == AnimationStatus.dismissed) {
         _setTabTitle(_apps[_activeIndex].name);
+        _syncRoute(_pathFor(_activeIndex));
       }
     });
-    _setTabTitle(_apps[_activeIndex].name);
+    _setTabTitle(initial == _launcherPath ? 'Spaces' : _apps[_activeIndex].name);
+
+    listenRoutePop(_onPop);
   }
 
   @override
@@ -89,6 +117,30 @@ class _SpacesShellState extends State<SpacesShell>
     SystemChrome.setApplicationSwitcherDescription(
       ApplicationSwitcherDescription(label: label),
     );
+  }
+
+  /// Push a new URL for the active Space, unless we're already there.
+  void _syncRoute(String path) {
+    if (path == _currentPath) return;
+    _currentPath = path;
+    pushRoutePath(path);
+  }
+
+  void _openLauncher() => _zoom.animateTo(1, curve: Curves.easeOutCubic);
+
+  /// Browser Back/Forward: drive the zoom from the URL, without pushing a new
+  /// entry back (we mark the path current first).
+  void _onPop(String path) {
+    _currentPath = path;
+    final idx = _indexForPath(path);
+    if (idx != null) {
+      if (idx != _activeIndex) setState(() => _activeIndex = idx);
+      _setTabTitle(_apps[idx].name);
+      _zoom.animateTo(0, curve: Curves.easeOutCubic);
+    } else {
+      _setTabTitle('Spaces');
+      _zoom.animateTo(1, curve: Curves.easeOutCubic);
+    }
   }
 
   void _enter(int i) {
