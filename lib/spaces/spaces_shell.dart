@@ -240,23 +240,56 @@ class _SpacesShellState extends State<SpacesShell>
     _zoom.animateTo(destination, curve: Curves.easeOutCubic);
   }
 
-  /// The resting card rectangles on the Spaces home — full-width cards stacked
-  /// vertically and centred in the space below the heading.
+  /// The resting card rectangles on the Spaces home. On a phone the cards are
+  /// full-width and stacked; a wide browser window lays them out as a centred
+  /// grid of tiles, so the home reads like a launcher page rather than a column
+  /// of phone-width cards. The active app's zoom animates into its slot either
+  /// way.
   List<Rect> _slots(Size size) {
-    const hMargin = 20.0;
-    const bottomPad = 32.0;
     const gap = 18.0;
     final topInset = MediaQuery.of(context).padding.top;
     final headerH = topInset + 84; // status bar + "Spaces" heading
     final n = _apps.length;
-    final cardW = size.width - 2 * hMargin;
-    final avail = size.height - headerH - bottomPad;
-    final cardH = ((avail - (n - 1) * gap) / n).clamp(160.0, 300.0);
-    final groupH = n * cardH + (n - 1) * gap;
-    final y0 = headerH + (avail - groupH) / 2;
+
+    if (size.width < 900) {
+      const hMargin = 20.0;
+      const bottomPad = 32.0;
+      final cardW = size.width - 2 * hMargin;
+      final avail = size.height - headerH - bottomPad;
+      final cardH = ((avail - (n - 1) * gap) / n).clamp(160.0, 300.0);
+      final groupH = n * cardH + (n - 1) * gap;
+      final y0 = headerH + (avail - groupH) / 2;
+      return [
+        for (var i = 0; i < n; i++)
+          Rect.fromLTWH(hMargin, y0 + i * (cardH + gap), cardW, cardH),
+      ];
+    }
+
+    // Desktop/web: a centred grid of tidy tiles.
+    const sideMargin = 48.0;
+    const bottomPad = 48.0;
+    const maxCardW = 440.0;
+    final cols = n >= 3 ? 3 : n;
+    final rows = (n / cols).ceil();
+    final availW = size.width - 2 * sideMargin;
+    var cardW = (availW - (cols - 1) * gap) / cols;
+    if (cardW > maxCardW) cardW = maxCardW;
+    final availH = size.height - headerH - bottomPad;
+    var cardH = (availH - (rows - 1) * gap) / rows;
+    if (cardH > cardW * 0.68) cardH = cardW * 0.68; // tidy landscape aspect
+    if (cardH < 200) cardH = 200;
+    final gridW = cols * cardW + (cols - 1) * gap;
+    final gridH = rows * cardH + (rows - 1) * gap;
+    final x0 = (size.width - gridW) / 2;
+    final y0 = headerH + ((availH - gridH) / 2).clamp(0.0, double.infinity);
     return [
       for (var i = 0; i < n; i++)
-        Rect.fromLTWH(hMargin, y0 + i * (cardH + gap), cardW, cardH),
+        Rect.fromLTWH(
+          x0 + (i % cols) * (cardW + gap),
+          y0 + (i ~/ cols) * (cardH + gap),
+          cardW,
+          cardH,
+        ),
     ];
   }
 
@@ -327,6 +360,7 @@ class _SpacesShellState extends State<SpacesShell>
     final top = dark ? const Color(0xFF15151F) : const Color(0xFF20303F);
     final bottom = dark ? const Color(0xFF0B0B10) : const Color(0xFF0E141B);
     final topInset = MediaQuery.of(context).padding.top;
+    final wide = size.width >= 900;
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -435,9 +469,9 @@ class _SpacesShellState extends State<SpacesShell>
                   ],
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'Pinch to switch apps',
-                  style: TextStyle(color: Colors.white54, fontSize: 14),
+                Text(
+                  wide ? 'Click a space to open it' : 'Pinch to switch apps',
+                  style: const TextStyle(color: Colors.white54, fontSize: 14),
                 ),
               ],
             ),
@@ -516,56 +550,59 @@ class _AppCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = Color.lerp(app.accent, Colors.black, 0.28)!;
-    return GestureDetector(
-      onTap: onTap,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(34),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [app.accent, dark],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: app.accent.withValues(alpha: 0.35),
-              blurRadius: 26,
-              offset: const Offset(0, 12),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(34),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [app.accent, dark],
             ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.22),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(app.icon, color: Colors.white, size: 26),
-              ),
-              const Spacer(),
-              Text(
-                app.name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                app.tagline,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.82),
-                  fontSize: 15,
-                ),
+            boxShadow: [
+              BoxShadow(
+                color: app.accent.withValues(alpha: 0.35),
+                blurRadius: 26,
+                offset: const Offset(0, 12),
               ),
             ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.22),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(app.icon, color: Colors.white, size: 26),
+                ),
+                const Spacer(),
+                Text(
+                  app.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  app.tagline,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.82),
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
