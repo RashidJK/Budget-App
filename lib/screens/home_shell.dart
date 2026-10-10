@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:home_widget/home_widget.dart';
 
 import '../command/command_bar.dart';
@@ -28,9 +29,13 @@ import 'tracker/expense_list.dart';
 /// own header, since that is where they belong conceptually and it freed the
 /// slot Analytics now fills.
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key, this.onBackToSpaces});
+  const HomeShell({super.key, this.onBackToSpaces, this.tabController});
 
   final VoidCallback? onBackToSpaces;
+
+  /// Optional shared tab index. The Spaces URL router reads and drives this so
+  /// each tab is deep-linkable and Back/Forward moves between them.
+  final ValueNotifier<int>? tabController;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -66,7 +71,48 @@ class _HomeShellState extends State<HomeShell> {
   bool _sidebarCollapsed = false;
   StreamSubscription<Uri?>? _widgetClicks;
 
-  void _select(int index) => setState(() => _index = index);
+  void _select(int index) {
+    final controller = widget.tabController;
+    if (controller != null) {
+      controller.value = index; // its listener applies it and syncs the URL
+    } else {
+      setState(() => _index = index);
+    }
+  }
+
+  void _onTabController() {
+    final v = widget.tabController!.value;
+    if (v != _index) setState(() => _index = v);
+  }
+
+  /// Keyboard: 1–4 switch tabs, A opens capture, B opens the briefing. Text
+  /// fields consume these first, so they only fire when you're not typing.
+  KeyEventResult _onShellKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    final tab = key == LogicalKeyboardKey.digit1
+        ? 0
+        : key == LogicalKeyboardKey.digit2
+        ? 1
+        : key == LogicalKeyboardKey.digit3
+        ? 2
+        : key == LogicalKeyboardKey.digit4
+        ? 3
+        : null;
+    if (tab != null) {
+      _select(tab);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.keyA) {
+      CommandBar.show(context);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.keyB) {
+      showBriefing(context, kind: _briefingKind);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
 
   // The briefing summarises whichever tab is showing.
   BriefingKind get _briefingKind => switch (_index) {
@@ -79,6 +125,11 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
+    final controller = widget.tabController;
+    if (controller != null) {
+      _index = controller.value;
+      controller.addListener(_onTabController);
+    }
     // The Quick Add home-screen widget opens the app on a "budget://" link;
     // route it to the matching capture flow. iOS-only, so tests and other
     // platforms skip the platform channels entirely.
@@ -119,6 +170,7 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   void dispose() {
+    widget.tabController?.removeListener(_onTabController);
     _widgetClicks?.cancel();
     super.dispose();
   }
@@ -128,65 +180,72 @@ class _HomeShellState extends State<HomeShell> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final useSidebar = constraints.maxWidth >= _desktopBreakpoint;
-        return Scaffold(
-          extendBody: !useSidebar,
-          // IndexedStack preserves each tab's scroll position and the planner's
-          // half-entered inputs when the user pops between tabs.
-          body: Row(
-            children: [
-              if (useSidebar)
-                _DesktopSidebar(
-                  items: _items,
-                  selectedIndex: _index,
-                  onSelect: _select,
-                  onCapture: () => CommandBar.show(context),
-                  onBriefing: () => showBriefing(context, kind: _briefingKind),
-                  onBackToSpaces: widget.onBackToSpaces,
-                  collapsed: _sidebarCollapsed,
-                  onToggleCollapsed: () =>
-                      setState(() => _sidebarCollapsed = !_sidebarCollapsed),
+        return Focus(
+          autofocus: true,
+          skipTraversal: true,
+          onKeyEvent: _onShellKey,
+          child: Scaffold(
+            extendBody: !useSidebar,
+            // IndexedStack preserves each tab's scroll position and the planner's
+            // half-entered inputs when the user pops between tabs.
+            body: Row(
+              children: [
+                if (useSidebar)
+                  _DesktopSidebar(
+                    items: _items,
+                    selectedIndex: _index,
+                    onSelect: _select,
+                    onCapture: () => CommandBar.show(context),
+                    onBriefing: () =>
+                        showBriefing(context, kind: _briefingKind),
+                    onBackToSpaces: widget.onBackToSpaces,
+                    collapsed: _sidebarCollapsed,
+                    onToggleCollapsed: () =>
+                        setState(() => _sidebarCollapsed = !_sidebarCollapsed),
+                  ),
+                Expanded(
+                  // Cap the content width on wide screens so it reads as a
+                  // centred column instead of stretching across a monitor.
+                  child: LayoutBuilder(
+                    builder: (context, c) {
+                      final content = IndexedStack(
+                        index: _index,
+                        children: [
+                          DashboardScreen(onSeePlanner: () => _select(3)),
+                          const ExpenseListScreen(),
+                          const AnalyticsScreen(),
+                          const PlannerHomeScreen(),
+                        ],
+                      );
+                      if (c.maxWidth <= 1100) return content;
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Spacer(),
+                          SizedBox(width: 1100, child: content),
+                          const Spacer(),
+                        ],
+                      );
+                    },
+                  ),
                 ),
-              Expanded(
-                // Cap the content width on wide screens so it reads as a
-                // centred column instead of stretching across a monitor.
-                child: LayoutBuilder(
-                  builder: (context, c) {
-                    final content = IndexedStack(
-                      index: _index,
-                      children: [
-                        DashboardScreen(onSeePlanner: () => _select(3)),
-                        const ExpenseListScreen(),
-                        const AnalyticsScreen(),
-                        const PlannerHomeScreen(),
-                      ],
-                    );
-                    if (c.maxWidth <= 1100) return content;
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const Spacer(),
-                        SizedBox(width: 1100, child: content),
-                        const Spacer(),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ],
+              ],
+            ),
+            bottomNavigationBar: useSidebar
+                ? null
+                : MorphNavBar(
+                    activeIndex: _index,
+                    onSelect: _select,
+                    onCapture: (text) => captureFromText(context, text),
+                    onScan: kIsWeb
+                        ? null
+                        : () => CommandBar.show(context, startScan: true),
+                    onBriefing: () =>
+                        showBriefing(context, kind: _briefingKind),
+                    onSpaces: widget.onBackToSpaces,
+                    items: _items,
+                  ),
           ),
-          bottomNavigationBar: useSidebar
-              ? null
-              : MorphNavBar(
-                  activeIndex: _index,
-                  onSelect: _select,
-                  onCapture: (text) => captureFromText(context, text),
-                  onScan: kIsWeb
-                      ? null
-                      : () => CommandBar.show(context, startScan: true),
-                  onBriefing: () => showBriefing(context, kind: _briefingKind),
-                  onSpaces: widget.onBackToSpaces,
-                  items: _items,
-                ),
         );
       },
     );

@@ -31,6 +31,10 @@ class _SpacesShellState extends State<SpacesShell>
   late final AnimationController _zoom;
   int _activeIndex = 0;
 
+  // Budget's active tab, shared with its HomeShell so tab changes, Back/Forward
+  // and the URL all flow through one source of truth.
+  final ValueNotifier<int> _budgetTab = ValueNotifier(0);
+
   late final List<AppSpace> _apps = [
     AppSpace(
       id: 'budget',
@@ -38,7 +42,8 @@ class _SpacesShellState extends State<SpacesShell>
       tagline: 'Track your money',
       icon: Icons.account_balance_wallet_rounded,
       accent: AppTheme.brandGreen,
-      builder: (_) => HomeShell(onBackToSpaces: _openLauncher),
+      builder: (_) =>
+          HomeShell(onBackToSpaces: _openLauncher, tabController: _budgetTab),
     ),
     AppSpace(
       id: 'brain',
@@ -46,7 +51,8 @@ class _SpacesShellState extends State<SpacesShell>
       tagline: 'Notes · tasks · journal',
       icon: Icons.bubble_chart_rounded,
       accent: BrainShell.accent,
-      builder: (_) => BrainShell(onSelectApp: _enter, onBackToSpaces: _openLauncher),
+      builder: (_) =>
+          BrainShell(onSelectApp: _enter, onBackToSpaces: _openLauncher),
     ),
   ];
 
@@ -56,19 +62,42 @@ class _SpacesShellState extends State<SpacesShell>
   double _zoomAtPinchStart = 0;
   bool _pinching = false;
 
-  // The launcher's own URL; each app's is '/<id>'.
+  // The launcher's own URL; each app's is '/<id>', and Budget's tabs nest
+  // under it (/budget/analytics, …).
   static const _launcherPath = '/spaces';
+  static const _budgetTabPaths = ['', 'expenses', 'analytics', 'planner'];
+  static const _budgetTabLabels = ['Home', 'Expenses', 'Analytics', 'Planner'];
   String _currentPath = _launcherPath;
 
-  String _pathFor(int i) => '/${_apps[i].id}';
+  bool _isBudget(int i) => _apps[i].id == 'budget';
+
+  String _pathFor(int i) {
+    if (_isBudget(i)) {
+      final suffix = _budgetTabPaths[_budgetTab.value];
+      return suffix.isEmpty ? '/budget' : '/budget/$suffix';
+    }
+    return '/${_apps[i].id}';
+  }
 
   int? _indexForPath(String? path) {
     if (path == null) return null;
     for (var i = 0; i < _apps.length; i++) {
-      if (path == '/${_apps[i].id}') return i;
+      final id = _apps[i].id;
+      if (path == '/$id' || path.startsWith('/$id/')) return i;
     }
     return null;
   }
+
+  int _budgetTabForPath(String path) {
+    if (!path.startsWith('/budget/')) return 0;
+    final i = _budgetTabPaths.indexOf(path.substring('/budget/'.length));
+    return i < 0 ? 0 : i;
+  }
+
+  /// Tab title for the active app — Budget appends its tab.
+  String _appTitle(int i) => _isBudget(i) && _budgetTab.value != 0
+      ? 'Budget · ${_budgetTabLabels[_budgetTab.value]}'
+      : _apps[i].name;
 
   @override
   void initState() {
@@ -86,6 +115,9 @@ class _SpacesShellState extends State<SpacesShell>
       _currentPath = _launcherPath;
     } else {
       _activeIndex = _indexForPath(initial) ?? 0;
+      if (_isBudget(_activeIndex)) {
+        _budgetTab.value = _budgetTabForPath(initial ?? '');
+      }
       _currentPath = _pathFor(_activeIndex);
       pushRoutePath(_currentPath, replace: true); // canonicalise, no new entry
     }
@@ -98,11 +130,20 @@ class _SpacesShellState extends State<SpacesShell>
         _setTabTitle('Spaces');
         _syncRoute(_launcherPath);
       } else if (status == AnimationStatus.dismissed) {
-        _setTabTitle(_apps[_activeIndex].name);
+        _setTabTitle(_appTitle(_activeIndex));
         _syncRoute(_pathFor(_activeIndex));
       }
     });
-    _setTabTitle(initial == _launcherPath ? 'Spaces' : _apps[_activeIndex].name);
+    _setTabTitle(initial == _launcherPath ? 'Spaces' : _appTitle(_activeIndex));
+
+    // A Budget tab change (its own nav or a keyboard shortcut) flows into the
+    // URL and title while Budget is the focused app.
+    _budgetTab.addListener(() {
+      if (_isBudget(_activeIndex) && _zoom.value == 0) {
+        _syncRoute(_pathFor(_activeIndex));
+        _setTabTitle(_appTitle(_activeIndex));
+      }
+    });
 
     listenRoutePop(_onPop);
   }
@@ -110,6 +151,7 @@ class _SpacesShellState extends State<SpacesShell>
   @override
   void dispose() {
     _zoom.dispose();
+    _budgetTab.dispose();
     super.dispose();
   }
 
@@ -134,8 +176,9 @@ class _SpacesShellState extends State<SpacesShell>
     _currentPath = path;
     final idx = _indexForPath(path);
     if (idx != null) {
+      if (_isBudget(idx)) _budgetTab.value = _budgetTabForPath(path);
       if (idx != _activeIndex) setState(() => _activeIndex = idx);
-      _setTabTitle(_apps[idx].name);
+      _setTabTitle(_appTitle(idx));
       _zoom.animateTo(0, curve: Curves.easeOutCubic);
     } else {
       _setTabTitle('Spaces');
