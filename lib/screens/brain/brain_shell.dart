@@ -172,46 +172,51 @@ class _BrainShellState extends State<BrainShell> {
       backgroundColor: bg,
       body: SafeArea(
         bottom: false,
-        // On wide screens (web/desktop) keep the brain a centred column so the
-        // mosaic and capture pill don't stretch edge to edge.
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 16, 0),
-                  child: _header(context),
+        // Phone-width stays a single tidy column; a wide browser window gets a
+        // roomier workspace so the mosaic can spread into more columns.
+        child: LayoutBuilder(
+          builder: (context, c) {
+            final maxW = c.maxWidth >= 900 ? 1180.0 : 640.0;
+            return Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxW),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 14, 16, 0),
+                      child: _header(context),
+                    ),
+                    const SizedBox(height: 14),
+                    BrainCalendar(
+                      selected: _dayFilter,
+                      onSelect: (d) => setState(() => _dayFilter = d),
+                    ),
+                    const SizedBox(height: 12),
+                    _FilterBar(
+                      selected: _filter,
+                      counts: {
+                        for (final k in BrainKind.values) k: brain.countOf(k),
+                      },
+                      onSelect: (k) => setState(() => _filter = k),
+                    ),
+                    const SizedBox(height: 8),
+                    if (showResurface)
+                      Builder(
+                        builder: (context) {
+                          final r = brain.resurfaced();
+                          return r.isEmpty
+                              ? const SizedBox.shrink()
+                              : _ResurfaceStrip(items: r);
+                        },
+                      ),
+                    Expanded(child: _feed(context, brain, items)),
+                    const BrainCommandBar(),
+                  ],
                 ),
-                const SizedBox(height: 14),
-                BrainCalendar(
-                  selected: _dayFilter,
-                  onSelect: (d) => setState(() => _dayFilter = d),
-                ),
-                const SizedBox(height: 12),
-                _FilterBar(
-                  selected: _filter,
-                  counts: {
-                    for (final k in BrainKind.values) k: brain.countOf(k),
-                  },
-                  onSelect: (k) => setState(() => _filter = k),
-                ),
-                const SizedBox(height: 8),
-                if (showResurface)
-                  Builder(
-                    builder: (context) {
-                      final r = brain.resurfaced();
-                      return r.isEmpty
-                          ? const SizedBox.shrink()
-                          : _ResurfaceStrip(items: r);
-                    },
-                  ),
-                Expanded(child: _feed(context, brain, items)),
-                const BrainCommandBar(),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -312,34 +317,46 @@ class _MosaicFeed extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final left = <Widget>[];
-    final right = <Widget>[];
-    var lh = 0.0;
-    var rh = 0.0;
-    for (final item in items) {
-      final card = Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: _MosaicCard(item: item, onTag: onTag),
-      );
-      if (lh <= rh) {
-        left.add(card);
-        lh += _estimate(item);
-      } else {
-        right.add(card);
-        rh += _estimate(item);
-      }
-    }
     return Scrollbar(
       child: SingleChildScrollView(
         primary: true,
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: Column(children: left)),
-            const SizedBox(width: 12),
-            Expanded(child: Column(children: right)),
-          ],
+        child: LayoutBuilder(
+          builder: (context, c) {
+            // More browser width → more columns, so the bento fills the page
+            // instead of a narrow phone strip.
+            final cols = c.maxWidth >= 1100
+                ? 4
+                : c.maxWidth >= 820
+                ? 3
+                : c.maxWidth >= 560
+                ? 2
+                : 1;
+            final columns = List.generate(cols, (_) => <Widget>[]);
+            final heights = List.filled(cols, 0.0);
+            for (final item in items) {
+              var target = 0;
+              for (var i = 1; i < cols; i++) {
+                if (heights[i] < heights[target]) target = i;
+              }
+              columns[target].add(
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _MosaicCard(item: item, onTag: onTag),
+                ),
+              );
+              heights[target] += _estimate(item);
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < cols; i++) ...[
+                  if (i > 0) const SizedBox(width: 12),
+                  Expanded(child: Column(children: columns[i])),
+                ],
+              ],
+            );
+          },
         ),
       ),
     );
