@@ -16,10 +16,12 @@ Future<AppState> _freshState() async {
 }
 
 /// The dashboard is a tall vertical list with a horizontal card row near the
-/// top; a wide, tall viewport lays enough of both axes out that finders can see
-/// the cards rather than silently missing ones below or right of the fold.
+/// top; a tall viewport lays enough out that finders can see the cards rather
+/// than silently missing ones below the fold. The width is kept just under the
+/// 900px web breakpoint so these exercise the phone hero/sheet layout (the
+/// wide band+grid layout has its own test).
 void _useLargeViewport(WidgetTester tester) {
-  tester.view.physicalSize = const Size(1400, 2400);
+  tester.view.physicalSize = const Size(860, 2400);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
 }
@@ -278,6 +280,44 @@ void main() {
       );
       expect(total, findsOneWidget);
       expect(find.byKey(const ValueKey('hero-handle')), findsOneWidget);
+    });
+  });
+
+  group('web home', () {
+    testWidgets('wide screens show the hero band + card grid, not the sheet', (
+      tester,
+    ) async {
+      final state = await _freshState();
+      await state.updateAccount(
+        state.accounts.single.copyWith(openingBalance: 250000),
+      );
+      await state.addExpense(
+        title: 'Lunch',
+        amount: 5000,
+        categoryId: 'eating_out',
+        date: DateTime.now(),
+      );
+
+      tester.view.physicalSize = const Size(1200, 2200);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        ChangeNotifierProvider<AppState>.value(
+          value: state,
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            home: const DashboardScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle(const Duration(milliseconds: 600));
+
+      // The band shows the Total; the grid shows the section cards; the phone
+      // drag-sheet handle is gone.
+      expect(find.text('Total'), findsWidgets);
+      expect(find.text('This month'), findsWidgets);
+      expect(find.text('Accounts'), findsWidgets);
+      expect(find.byKey(const ValueKey('hero-handle')), findsNothing);
     });
   });
 }

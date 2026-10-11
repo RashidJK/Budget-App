@@ -51,15 +51,24 @@ class _DashboardScreenState extends State<DashboardScreen>
   // 0 = collapsed (just the Total figure), 1 = expanded (the stacked cards).
   // The green band grows from the height of the single figure to the full deck,
   // and the white sheet below rides down with it.
-  late final AnimationController _reveal = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 380),
-  );
+  // Eagerly created (not lazy): the wide/desktop layout never touches it, and a
+  // lazy `late` would otherwise initialise during dispose() — which creates a
+  // Ticker while the element is deactivating and throws.
+  late final AnimationController _reveal;
 
   static const double _collapsedBand = 60;
   static const double _expandedBand = 334; // deck 250 + peek 52 + dots ~32
 
   double get _range => _expandedBand - _collapsedBand;
+
+  @override
+  void initState() {
+    super.initState();
+    _reveal = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 380),
+    );
+  }
 
   @override
   void dispose() {
@@ -99,6 +108,17 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
+    // The phone keeps its hero-morph-into-deck over a drag-to-reveal sheet; a
+    // wide browser window reorganises into a full-width hero band over a card
+    // grid, which uses the space instead of a tall phone column.
+    return LayoutBuilder(
+      builder: (context, c) => c.maxWidth >= 900
+          ? _desktopHome(context, state)
+          : _phoneHome(context, state),
+    );
+  }
+
+  Widget _phoneHome(BuildContext context, AppState state) {
     // A misty "celadon → pine" wash: deep pine at the top so the white greeting
     // and Total stay legible, easing down through sage to a pale celadon right
     // where the white sheet emerges. The dark top holds through the collapsed
@@ -348,6 +368,224 @@ class _DashboardScreenState extends State<DashboardScreen>
               ],
             ),
           ),
+        );
+      },
+    );
+  }
+
+  // ---- Web/desktop home: a full-width hero band over a card grid ----------
+
+  Widget _desktopHome(BuildContext context, AppState state) {
+    return Scaffold(
+      backgroundColor: context.scheme.surface,
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 48),
+        children: [
+          _heroBand(context, state),
+          const SizedBox(height: 24),
+          _dashboardGrid(context, state),
+        ],
+      ),
+    );
+  }
+
+  Widget _heroBand(BuildContext context, AppState state) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+      decoration: BoxDecoration(
+        gradient: AppTheme.brandGradient,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.brandGreen.withValues(alpha: 0.28),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _TopBar(),
+          const SizedBox(height: 18),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Total',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.72),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        Money.format(state.totalBalance),
+                        maxLines: 1,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 40,
+                          fontWeight: FontWeight.w800,
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _bandAction(
+                    Icons.add_rounded,
+                    'Add',
+                    () => CommandBar.show(context),
+                    primary: true,
+                  ),
+                  _bandAction(
+                    Icons.south_west_rounded,
+                    'Income',
+                    () => CommandBar.show(context, initialText: 'Received '),
+                  ),
+                  _bandAction(
+                    Icons.swap_horiz_rounded,
+                    'Transfer',
+                    () => CommandBar.show(context, initialText: 'Transfer '),
+                  ),
+                  _bandAction(
+                    Icons.history_rounded,
+                    'History',
+                    () => _openHistory(context),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _bandAction(
+    IconData icon,
+    String label,
+    VoidCallback onTap, {
+    bool primary = false,
+  }) {
+    final fg = primary ? const Color(0xFF10231A) : Colors.white;
+    final bg = primary ? Colors.white : Colors.white.withValues(alpha: 0.16);
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18, color: fg),
+              const SizedBox(width: 7),
+              Text(
+                label,
+                style: TextStyle(
+                  color: fg,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _dashboardGrid(BuildContext context, AppState state) {
+    final budgets = state.budgetProgress();
+    final hasActivity =
+        state.scopedExpenses.isNotEmpty || state.scopedActivities.isNotEmpty;
+
+    Widget titled(String title, Widget body) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionHeader(title: title),
+        const SizedBox(height: 14),
+        body,
+      ],
+    );
+
+    // Each entry is a self-contained card; the sections that bring their own
+    // header aren't wrapped again.
+    final cards = <Widget>[
+      if (state.spentThisMonth > 0)
+        titled('This month', _MonthSummaryCard(state: state)),
+      budgets.isNotEmpty
+          ? _BudgetSection(budgets: budgets, daysLeft: state.daysLeftThisMonth)
+          : _BudgetEmpty(
+              hasExpenses: state.spentThisMonth > 0,
+              onManage: () => ManageScreen.open(context),
+            ),
+      titled(
+        'Accounts',
+        // _BalanceCard is a deck card (it expands to a fixed height), so give
+        // it one in the flowing grid.
+        SizedBox(
+          height: 250,
+          child: _BalanceCard(
+            total: state.totalBalance,
+            accounts: state.accountBalances,
+            onAdd: () => CommandBar.show(context),
+            onIncome: () => CommandBar.show(context, initialText: 'Received '),
+            onTransfer: () => CommandBar.show(context, initialText: 'Transfer '),
+            onHistory: () => _openHistory(context),
+            onManageAccounts: () => AccountsScreen.open(context),
+            onOpenAccount: (id) => AccountDetailScreen.open(context, id),
+          ),
+        ),
+      ),
+      if (hasActivity) _RecentSection(onSeeAll: () => _openHistory(context)),
+      if (state.outstandingBalances.isNotEmpty)
+        _BalancesSection(balances: state.outstandingBalances),
+      _PlannerSection(onSeeAll: widget.onSeePlanner),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, c) {
+        final cols = c.maxWidth >= 1200 ? 3 : 2;
+        final columns = List.generate(cols, (_) => <Widget>[]);
+        for (var i = 0; i < cards.length; i++) {
+          columns[i % cols].add(
+            Padding(
+              padding: const EdgeInsets.only(bottom: 24),
+              child: cards[i],
+            ),
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var i = 0; i < cols; i++) ...[
+              if (i > 0) const SizedBox(width: 24),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: columns[i],
+                ),
+              ),
+            ],
+          ],
         );
       },
     );
