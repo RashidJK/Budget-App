@@ -1,0 +1,104 @@
+import 'package:budget/services/storage.dart';
+import 'package:budget/state/app_state.dart';
+import 'package:budget/state/auth_state.dart';
+import 'package:budget/state/brain_state.dart';
+import 'package:budget/sync/api_client.dart';
+import 'package:budget/sync/sync_service.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class _FakeApi implements SyncApi {
+  _FakeApi(this.response);
+  Map<String, dynamic>? response;
+  Map<String, dynamic>? lastSent;
+
+  @override
+  Future<Map<String, dynamic>?> sync({
+    required String token,
+    required int since,
+    required Map<String, List<Map<String, dynamic>>> changes,
+  }) async {
+    lastSent = {'token': token, 'since': since, 'changes': changes};
+    return response;
+  }
+}
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  Future<Storage> freshStorage() async {
+    SharedPreferences.setMockInitialValues({});
+    return Storage.open();
+  }
+
+  SyncService service(Storage storage, SyncApi api, AuthState auth) =>
+      SyncService(
+        storage: storage,
+        api: api,
+        auth: auth,
+        appState: AppState(storage),
+        brainState: BrainState(storage),
+      );
+
+  test('pull merges a remote record into storage and bumps the cursor', () async {
+    final storage = await freshStorage();
+    final auth = AuthState(storage);
+    await auth.setSession('tok', email: 'a@b.c');
+    final brainState = BrainState(storage);
+
+    final now = DateTime(2026, 1, 1).toIso8601String();
+    final api = _FakeApi({
+      'cursor': 42,
+      'changes': {
+        'brain': [
+          {'id': 'r1', 'kind': 'note', 'text': 'from another device', 'createdAt': now, 'updatedAt': now},
+        ],
+      },
+    });
+    final sync = SyncService(
+      storage: storage,
+      api: api,
+      auth: auth,
+      appState: AppState(storage),
+      brainState: brainState,
+    );
+
+    expect(await sync.syncNow(), isTrue);
+    expect(storage.readSyncCursor(), 42);
+    expect(storage.readBrainItems().any((m) => m['id'] == 'r1'), isTrue);
+    expect(brainState.items.any((i) => i.id == 'r1'), isTrue);
+    expect((api.lastSent!['changes'] as Map).containsKey('brain'), isTrue);
+  });
+
+  test('last-write-wins keeps the newer local edit over an older remote one', () async {
+    final storage = await freshStorage();
+    final auth = AuthState(storage);
+    await auth.setSession('tok');
+    final older = DateTime(2026, 1, 1).toIso8601String();
+    final newer = DateTime(2026, 2, 1).toIso8601String();
+    await storage.writeBrainItems([
+      {'id': 'r1', 'kind': 'note', 'text': 'local newer', 'createdAt': older, 'updatedAt': newer},
+    ]);
+
+    final api = _FakeApi({
+      'cursor': 7,
+      'changes': {
+        'brain': [
+          {'id': 'r1', 'kind': 'note', 'text': 'remote older', 'createdAt': older, 'updatedAt': older},
+        ],
+      },
+    });
+    await service(storage, api, auth).syncNow();
+
+    final r1 = storage.readBrainItems().firstWhere((m) => m['id'] == 'r1');
+    expect(r1['text'], 'local newer');
+  });
+
+  test('syncNow is a no-op when signed out', () async {
+    final storage = await freshStorage();
+    final auth = AuthState(storage); // no session
+    final api = _FakeApi({'cursor': 1, 'changes': <String, dynamic>{}});
+    expect(await service(storage, api, auth).syncNow(), isFalse);
+    expect(api.lastSent, isNull);
+  });
+}

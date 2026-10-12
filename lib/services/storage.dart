@@ -118,6 +118,30 @@ class Storage {
   Future<void> writeMerchantCategories(Map<String, String> map) =>
       _prefs.setString(_merchantCategoryKey, jsonEncode(map));
 
+  // --- account + sync -------------------------------------------------------
+  static const _authTokenKey = 'auth.token.v1';
+  static const _authEmailKey = 'auth.email.v1';
+  static const _authNameKey = 'auth.name.v1';
+  static const _syncCursorKey = 'sync.cursor.v1';
+
+  String? readAuthToken() => _prefs.getString(_authTokenKey);
+  String? readAuthEmail() => _prefs.getString(_authEmailKey);
+  String? readAuthName() => _prefs.getString(_authNameKey);
+
+  Future<void> writeAuth({String? token, String? email, String? name}) async {
+    Future<void> set(String key, String? value) =>
+        value == null ? _prefs.remove(key) : _prefs.setString(key, value);
+    await set(_authTokenKey, token);
+    await set(_authEmailKey, email);
+    await set(_authNameKey, name);
+  }
+
+  /// The server write-counter this device has pulled up to. 0 = never synced.
+  int readSyncCursor() => _prefs.getInt(_syncCursorKey) ?? 0;
+
+  Future<void> writeSyncCursor(int cursor) =>
+      _prefs.setInt(_syncCursorKey, cursor);
+
   /// True when nothing has ever been written — the signal to seed defaults.
   bool get isFirstLaunch => !_prefs.containsKey(_categoriesKey);
 

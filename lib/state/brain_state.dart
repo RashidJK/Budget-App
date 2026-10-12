@@ -17,6 +17,14 @@ class BrainState extends ChangeNotifier {
     _loadDismissed();
   }
 
+  /// Re-read from storage and rebuild — used after a sync merges remote
+  /// changes into storage underneath us.
+  void reload() {
+    _load();
+    _loadDismissed();
+    notifyListeners();
+  }
+
   final Storage _storage;
 
   List<BrainItem> _items = [];

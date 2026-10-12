@@ -25,6 +25,13 @@ class AppState extends ChangeNotifier {
     _load();
   }
 
+  /// Re-read everything from storage and rebuild — used after a sync merges
+  /// remote changes into storage underneath us.
+  void reload() {
+    _load();
+    notifyListeners();
+  }
+
   final Storage _storage;
 
   List<Expense> _expenses = [];

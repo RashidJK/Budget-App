@@ -78,7 +78,9 @@ class Db {
               deleted_at = excluded.deleted_at,
               body = excluded.body,
               seq = nextval('documents_seq')
-          where excluded.updated_at >= documents.updated_at
+          -- strictly newer only: re-pushing an unchanged record must not bump
+          -- its seq, or every device would re-pull everything each sync.
+          where excluded.updated_at > documents.updated_at
       '''),
       parameters: {
         'uid': userId,
