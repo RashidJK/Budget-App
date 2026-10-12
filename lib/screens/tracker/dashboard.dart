@@ -390,6 +390,52 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _heroBand(BuildContext context, AppState state) {
+    Widget label(String text, {double size = 13}) => Text(
+      text,
+      style: TextStyle(
+        color: Colors.white.withValues(alpha: 0.72),
+        fontSize: size,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+
+    // A month figure beside the Total (spent / income this month).
+    Widget stat(String name, double value) => Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        label(name),
+        const SizedBox(height: 4),
+        Text(
+          Money.compact(value),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+
+    final total = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        label('Total', size: 14),
+        const SizedBox(height: 4),
+        Text(
+          Money.format(state.totalBalance),
+          maxLines: 1,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 40,
+            fontWeight: FontWeight.w800,
+            height: 1.1,
+          ),
+        ),
+      ],
+    );
+
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
       decoration: BoxDecoration(
@@ -411,33 +457,16 @@ class _DashboardScreenState extends State<DashboardScreen>
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
+              // Total + month figures reflow together as the band narrows.
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Wrap(
+                  spacing: 36,
+                  runSpacing: 14,
+                  crossAxisAlignment: WrapCrossAlignment.end,
                   children: [
-                    Text(
-                      'Total',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.72),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        Money.format(state.totalBalance),
-                        maxLines: 1,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 40,
-                          fontWeight: FontWeight.w800,
-                          height: 1.1,
-                        ),
-                      ),
-                    ),
+                    total,
+                    stat('Spent', state.spentThisMonth),
+                    stat('Income', state.incomeThisMonth),
                   ],
                 ),
               ),
