@@ -1,82 +1,110 @@
-# Airtel Money proxy
+# Budget / Spaces API
 
-A tiny Dart ([shelf](https://pub.dev/packages/shelf)) backend that holds your
-Airtel API credentials, does the OAuth2 token dance, and exposes **one** endpoint
-the Budget app syncs from. The app never sees the client secret or the Airtel
-token — that's the whole point of this service.
+A small Dart ([shelf](https://pub.dev/packages/shelf)) backend for the product:
 
-```
-Budget app ──►  this proxy  ──►  Airtel OpenAPI
-                  │  client_id / client_secret (env)
-                  │  POST /auth/oauth2/token   (cached ~1h)
-                  └─ GET  /merchant/v1/transactions
-```
+- **Google sign-in** — the app sends a Google ID token; the server verifies it
+  and returns its own session token.
+- **Sync** — a per-user document store with last-write-wins. One `POST /sync`
+  pushes the records a device changed and pulls back everything else.
+- **Airtel Money proxy** — the original `/transactions` endpoint, unchanged and
+  optional.
 
-## Endpoint
+Nothing secret (Google client secret, Airtel credentials, the session signing
+key) ever reaches the app.
 
 ```
-GET /transactions?from=<epochMillis>&to=<epochMillis>&limit=100&offset=0
-Authorization: Bearer <PROXY_API_KEY>        # only if PROXY_API_KEY is set
+Flutter web (Cloudflare Pages)  ──►  this API (Contabo VPS, Docker)  ──►  Postgres
+        Google ID token                 verifies, mints a session           JSONB docs
 ```
 
-Returns Airtel's `/merchant/v1/transactions` JSON body verbatim — the app's
-`RemoteTxn.parseAirtelSummary` already understands it.
+## Endpoints
 
-Plus `GET /health` → `ok`.
+| Method + path | Auth | Body → result |
+| --- | --- | --- |
+| `POST /auth/google` | — | `{idToken}` → `{token, email, name}` |
+| `POST /sync` | `Bearer <token>` | `{since, changes}` → `{cursor, changes}` |
+| `GET /transactions` | `Bearer <PROXY_API_KEY>` | Airtel summary JSON (optional) |
+| `GET /health` | — | `ok` |
+
+`changes` is `{ "expenses": [ {record}, … ], "brain": [ … ], … }`; each record
+is a model's JSON, already carrying `id` / `updatedAt` / `deletedAt`. `since` /
+`cursor` are integers — send back the `cursor` you last received.
 
 ## Configure
 
-Copy `.env.example` and fill it in (see comments there):
+Copy `.env.example` → `.env` and fill it in. Generate the secrets with
+`openssl rand -hex 32`. `GOOGLE_CLIENT_ID` and `CORS_ORIGIN` are the two that
+must match the frontend.
 
-| Variable | What |
-| --- | --- |
-| `AIRTEL_BASE_URL` | `https://openapiuat.airtel.co.tz` (staging) → `https://openapi.airtel.co.tz` (prod) |
-| `AIRTEL_CLIENT_ID` / `AIRTEL_CLIENT_SECRET` | from your Airtel developer app |
-| `AIRTEL_COUNTRY` / `AIRTEL_CURRENCY` | `TZ` / `TZS` — sent as `x-country` / `x-currency` |
-| `PROXY_API_KEY` | shared secret for the app↔backend call (long random string; empty = no auth) |
-| `PORT` | listen port (default `8080`) |
+## Run it on Contabo (Docker)
 
-## Run locally
+On a fresh Ubuntu VPS:
 
 ```sh
+# 1. Install Docker (get.docker.com) and the compose plugin.
+curl -fsSL https://get.docker.com | sh
+
+# 2. Get the code and configure.
+git clone <your repo> && cd Budget/backend
+cp .env.example .env && nano .env      # fill in secrets + CORS_ORIGIN
+
+# 3. Build and start the API + Postgres.
+docker compose up -d --build
+curl localhost:8080/health             # → ok
+```
+
+The API listens on `127.0.0.1:8080`. Put TLS in front of it — easiest is
+**Cloudflare Tunnel** (no open ports, no manual certs):
+
+```sh
+# Install cloudflared, then:
+cloudflared tunnel login
+cloudflared tunnel create budget-api
+cloudflared tunnel route dns budget-api api.yourdomain.com
+cloudflared tunnel run --url http://localhost:8080 budget-api
+```
+
+(Or a reverse proxy like Caddy with `api.yourdomain.com { reverse_proxy
+localhost:8080 }` for automatic Let's Encrypt certs.) Either way the app talks
+to `https://api.yourdomain.com`.
+
+## Google OAuth setup
+
+In the [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
+
+1. Create an **OAuth client ID** → **Web application**.
+2. Under *Authorised JavaScript origins*, add the frontend origin(s):
+   `https://your-app.pages.dev` (and `http://localhost:8732` for local dev).
+3. Copy the client ID into `GOOGLE_CLIENT_ID` here **and** into the Flutter web
+   build (`--dart-define=GOOGLE_CLIENT_ID=…`). No client *secret* is needed —
+   the app uses Google Identity Services and the server only verifies the token.
+
+## Frontend on Cloudflare Pages
+
+```sh
+cd ..                                  # repo root
+flutter build web --release \
+  --dart-define=API_BASE=https://api.yourdomain.com \
+  --dart-define=GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
+# Deploy build/web — via the Pages dashboard (connect the repo, build command
+# above, output dir build/web) or Wrangler:
+npx wrangler pages deploy build/web --project-name spaces
+```
+
+Set `CORS_ORIGIN` in `.env` to the resulting Pages URL (or your custom domain),
+then `docker compose up -d` again.
+
+## Local development
+
+```sh
+cd backend
 dart pub get
-set -a && source .env && set +a      # load env vars
-dart run bin/server.dart
-# → Airtel proxy listening on :8080
-
-curl "http://localhost:8080/transactions?from=1772800000000&to=1773100000000&limit=100&offset=0" \
-  -H "Authorization: Bearer $PROXY_API_KEY"
+set -a && source .env && set +a
+dart run bin/server.dart            # needs a reachable Postgres in DATABASE_URL
 ```
 
-## Deploy (Cloud Run)
-
-```sh
-gcloud run deploy airtel-proxy --source . --region <region> --allow-unauthenticated \
-  --set-env-vars AIRTEL_BASE_URL=https://openapi.airtel.co.tz,AIRTEL_COUNTRY=TZ,AIRTEL_CURRENCY=TZS
-# set AIRTEL_CLIENT_ID / AIRTEL_CLIENT_SECRET / PROXY_API_KEY as secrets, not plain env vars
-```
-
-(The `Dockerfile` builds an AOT binary on a scratch image; any container host —
-Fly.io, Render, a VPS — works the same way.)
-
-## Point the app at it
-
-In the Budget app, swap the demo source for the real one:
-
-```dart
-final source = HttpTransactionSource(
-  endpoint: Uri.parse('https://<your-proxy-host>/transactions'),
-  userMsisdn: '785000000',        // your wallet number, no country code
-  authToken: '<PROXY_API_KEY>',   // matches the backend
-);
-// TransactionSync(state: state, source: source).run();
-```
-
-That's the only app change — parsing, mapping, dedup and the UI are already done.
-
-## Note on scope
+## Note on the Airtel scope
 
 Transactions-Summary returns the **merchant account's** transactions
-(`MERCHPAY` = payments received, `CASHIN` = cash-ins), so it's ideal for
-auto-recording money **in**. Personal outgoing sends/cash-outs only appear when
-your number is the payer on a `MERCHPAY`.
+(`MERCHPAY` received, `CASHIN`), so it's ideal for auto-recording money **in**.
+Leave the `AIRTEL_*` vars blank to disable the endpoint entirely.
