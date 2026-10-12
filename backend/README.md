@@ -50,23 +50,42 @@ cp .env.example .env && nano .env      # fill in secrets + CORS_ORIGIN
 
 # 3. Build and start the API + Postgres.
 docker compose up -d --build
-curl localhost:8080/health             # → ok
+curl localhost:${HOST_PORT:-8090}/health   # → ok
 ```
 
-The API listens on `127.0.0.1:8080`. Put TLS in front of it — easiest is
-**Cloudflare Tunnel** (no open ports, no manual certs):
+The stack is namespaced (`spenda-api`, `spenda-db`, `spenda_pgdata`) and the
+API binds to `127.0.0.1:${HOST_PORT}` (default **8090**), so it won't collide
+with the other projects on the box. Postgres isn't published at all — it's only
+reachable inside the compose network.
 
-```sh
-# Install cloudflared, then:
-cloudflared tunnel login
-cloudflared tunnel create budget-api
-cloudflared tunnel route dns budget-api api.yourdomain.com
-cloudflared tunnel run --url http://localhost:8080 budget-api
+### Route the API subdomain through the box's existing reverse proxy
+
+`api.spenda.flow-hq.com` → `127.0.0.1:8090`. (We use `api.spenda.flow-hq.com`,
+not `api.flow-hq.com`, which another project owns.) Add one vhost to whatever
+proxy already fronts the other sites:
+
+**nginx**
+```nginx
+server {
+  server_name api.spenda.flow-hq.com;
+  location / { proxy_pass http://127.0.0.1:8090; proxy_set_header Host $host; }
+}
+# then: certbot --nginx -d api.spenda.flow-hq.com
 ```
 
-(Or a reverse proxy like Caddy with `api.yourdomain.com { reverse_proxy
-localhost:8080 }` for automatic Let's Encrypt certs.) Either way the app talks
-to `https://api.yourdomain.com`.
+**Caddy** (automatic certs)
+```
+api.spenda.flow-hq.com {
+  reverse_proxy 127.0.0.1:8090
+}
+```
+
+**Traefik**: add a router for `Host(\`api.spenda.flow-hq.com\`)` → a service on
+`127.0.0.1:8090`.
+
+Point an `A` record for `api.spenda.flow-hq.com` at the VPS IP (in Cloudflare;
+DNS-only or proxied both work). The app then talks to
+`https://api.spenda.flow-hq.com`.
 
 ## Google OAuth setup
 
@@ -74,25 +93,25 @@ In the [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
 
 1. Create an **OAuth client ID** → **Web application**.
 2. Under *Authorised JavaScript origins*, add the frontend origin(s):
-   `https://your-app.pages.dev` (and `http://localhost:8732` for local dev).
+   `https://spenda.flow-hq.com` (and `http://localhost:8732` for local dev).
 3. Copy the client ID into `GOOGLE_CLIENT_ID` here **and** into the Flutter web
    build (`--dart-define=GOOGLE_CLIENT_ID=…`). No client *secret* is needed —
    the app uses Google Identity Services and the server only verifies the token.
 
-## Frontend on Cloudflare Pages
+## Frontend on Cloudflare Pages (spenda.flow-hq.com)
 
 ```sh
 cd ..                                  # repo root
 flutter build web --release \
-  --dart-define=API_BASE=https://api.yourdomain.com \
+  --dart-define=API_BASE=https://api.spenda.flow-hq.com \
   --dart-define=GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
 # Deploy build/web — via the Pages dashboard (connect the repo, build command
 # above, output dir build/web) or Wrangler:
-npx wrangler pages deploy build/web --project-name spaces
+npx wrangler pages deploy build/web --project-name spenda
 ```
 
-Set `CORS_ORIGIN` in `.env` to the resulting Pages URL (or your custom domain),
-then `docker compose up -d` again.
+Add `spenda.flow-hq.com` as the Pages project's custom domain. `CORS_ORIGIN` in
+`.env` is already that origin; re-run `docker compose up -d` after any change.
 
 ## Local development
 

@@ -1,6 +1,10 @@
 # One command brings up the API + Postgres on the Contabo VPS:
 #   cp .env.example .env   # fill it in
 #   docker compose up -d --build
+#
+# A dedicated project name keeps the containers/network/volume (spenda-api,
+# spenda-db, spenda_pgdata) from colliding with the other projects on the box.
+name: spenda
 services:
   db:
     image: postgres:16-alpine
@@ -36,9 +40,10 @@ services:
       PROXY_API_KEY: ${PROXY_API_KEY:-}
       PORT: 8080
     ports:
-      # Bind to localhost only; a reverse proxy (Caddy/nginx) or cloudflared
-      # terminates TLS in front. Use "8080:8080" to expose it directly.
-      - "127.0.0.1:8080:8080"
+      # Bind to localhost only; the box's existing reverse proxy routes
+      # api.spenda.flow-hq.com to this port and terminates TLS. HOST_PORT is
+      # configurable so it won't clash with the other projects' ports.
+      - "127.0.0.1:${HOST_PORT:-8090}:8080"
 
 volumes:
   pgdata:
