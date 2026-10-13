@@ -64,28 +64,35 @@ reachable inside the compose network.
 not `api.flow-hq.com`, which another project owns.) Add one vhost to whatever
 proxy already fronts the other sites:
 
-**nginx**
+**nginx** — `/etc/nginx/sites-available/api.spenda.flow-hq.com`, then symlink
+into `sites-enabled/`, `nginx -t`, `systemctl reload nginx`:
 ```nginx
 server {
+  listen 80;
+  listen [::]:80;
   server_name api.spenda.flow-hq.com;
-  location / { proxy_pass http://127.0.0.1:8090; proxy_set_header Host $host; }
+
+  location / {
+    proxy_pass http://127.0.0.1:8090;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
 }
-# then: certbot --nginx -d api.spenda.flow-hq.com
 ```
+Then `sudo certbot --nginx -d api.spenda.flow-hq.com` adds the `443` block,
+the cert and the http→https redirect. (If the Cloudflare record is proxied,
+certbot's HTTP-01 challenge still works over port 80; if it ever fails, flip the
+record to DNS-only, issue, then re-enable the proxy and set SSL mode
+Full (strict).)
 
-**Caddy** (automatic certs)
-```
-api.spenda.flow-hq.com {
-  reverse_proxy 127.0.0.1:8090
-}
-```
+Point an `A` record for `api.spenda.flow-hq.com` at the VPS IP. The app then
+talks to `https://api.spenda.flow-hq.com`.
 
-**Traefik**: add a router for `Host(\`api.spenda.flow-hq.com\`)` → a service on
-`127.0.0.1:8090`.
-
-Point an `A` record for `api.spenda.flow-hq.com` at the VPS IP (in Cloudflare;
-DNS-only or proxied both work). The app then talks to
-`https://api.spenda.flow-hq.com`.
+(Caddy: `api.spenda.flow-hq.com { reverse_proxy 127.0.0.1:8090 }`. Traefik: a
+router on `Host(\`api.spenda.flow-hq.com\`)` → `127.0.0.1:8090`.)
 
 ## Google OAuth setup
 
