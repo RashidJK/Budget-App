@@ -35,7 +35,9 @@ class Db {
 
   Future<void> _migrate() async {
     final ddl = await File('schema.sql').readAsString();
-    await _pool.execute(ddl);
+    // schema.sql has several statements; the default (extended/prepared)
+    // protocol rejects that with 42601, so run it as a simple query.
+    await _pool.execute(ddl, queryMode: QueryMode.simple);
   }
 
   /// Find or create the user behind a verified Google identity; returns the id.

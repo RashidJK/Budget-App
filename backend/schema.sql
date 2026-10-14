@@ -1,7 +1,6 @@
 -- Budget/Spaces API schema. Applied automatically on boot (see lib/db.dart),
--- and safe to re-run.
-
-create extension if not exists pgcrypto; -- gen_random_uuid()
+-- and safe to re-run. gen_random_uuid() is built into Postgres 13+ (no
+-- pgcrypto extension needed).
 
 -- One row per signed-in person, keyed by their Google account.
 create table if not exists users (
