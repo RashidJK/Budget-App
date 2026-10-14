@@ -131,22 +131,42 @@ Future<void> main() async {
   stdout.writeln('budget_api listening on :${server.port}');
 }
 
-/// Allow the Cloudflare Pages frontend (a different origin) to call the API,
-/// and answer the preflight OPTIONS the browser sends first.
-Middleware _cors(String origin) {
-  final headers = {
-    'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Origin, Content-Type, Authorization',
-    'Access-Control-Max-Age': '86400',
-  };
+/// Allow the configured frontend origin(s) to call the API, and answer the
+/// preflight OPTIONS the browser sends first. CORS_ORIGIN may be a single
+/// origin, a comma-separated list (e.g. the Pages site + localhost for dev),
+/// or `*`. A browser needs the response to echo its exact Origin, so we match
+/// the request's Origin against the allowlist.
+Middleware _cors(String originConfig) {
+  final allowed = originConfig
+      .split(',')
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty)
+      .toSet();
+  final allowAll = allowed.contains('*');
+
+  Map<String, String> headersFor(Request request) {
+    final requestOrigin = request.headers['origin'];
+    final allow = allowAll
+        ? '*'
+        : (requestOrigin != null && allowed.contains(requestOrigin)
+              ? requestOrigin
+              : (allowed.isEmpty ? '*' : allowed.first));
+    return {
+      'Access-Control-Allow-Origin': allow,
+      'Vary': 'Origin',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Origin, Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400',
+    };
+  }
+
   return (Handler innerHandler) {
     return (Request request) async {
       if (request.method == 'OPTIONS') {
-        return Response.ok(null, headers: headers);
+        return Response.ok(null, headers: headersFor(request));
       }
       final response = await innerHandler(request);
-      return response.change(headers: {...response.headers, ...headers});
+      return response.change(headers: {...response.headers, ...headersFor(request)});
     };
   };
 }
