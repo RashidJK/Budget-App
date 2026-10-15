@@ -61,6 +61,11 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     }
     final groups = _groupByDay(entries);
     final total = state.totalFor(matches);
+    final biggest = matches.isEmpty
+        ? 0.0
+        : matches
+              .map((e) => e.amount.toDouble())
+              .reduce((a, b) => a > b ? a : b);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -85,10 +90,10 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
         child: const Icon(Icons.add_rounded),
       ),
       body: AppBackground(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1280),
-            child: SizedBox(
+        child: LayoutBuilder(
+          builder: (context, c) {
+            final wide = c.maxWidth >= 900;
+            final content = SizedBox(
               width: double.infinity,
               child: Column(
                 children: [
@@ -155,8 +160,44 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                   ),
                 ],
               ),
-            ),
-          ),
+            );
+            if (!wide) {
+              return Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 640),
+                  child: content,
+                ),
+              );
+            }
+            // Wide: the transaction list beside a summary of the current view,
+            // so the space is used rather than stretching the rows.
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1100),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: content),
+                      const SizedBox(width: 24),
+                      SizedBox(
+                        width: 300,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 12, bottom: 12),
+                          child: _ViewSummary(
+                            count: matches.length,
+                            total: total,
+                            biggest: biggest,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -225,6 +266,66 @@ class _DayBucket {
 
   final DateTime day;
   final List<_Entry> entries;
+}
+
+/// Desktop-only side panel: a quick read of the current (searched/filtered)
+/// view — total, count, average and biggest.
+class _ViewSummary extends StatelessWidget {
+  const _ViewSummary({
+    required this.count,
+    required this.total,
+    required this.biggest,
+  });
+
+  final int count;
+  final double total;
+  final double biggest;
+
+  @override
+  Widget build(BuildContext context) {
+    final avg = count > 0 ? total / count : 0.0;
+
+    Widget stat(String label, String value) => Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: context.muted, fontSize: 13)),
+          Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+          ),
+        ],
+      ),
+    );
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+      decoration: context.cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'In this view',
+            style: TextStyle(
+              color: context.muted,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            Money.format(total),
+            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
+          ),
+          const Divider(height: 26),
+          stat('Expenses', '$count'),
+          stat('Average', Money.compact(avg)),
+          stat('Biggest', Money.compact(biggest)),
+        ],
+      ),
+    );
+  }
 }
 
 class _DayGroup extends StatelessWidget {
