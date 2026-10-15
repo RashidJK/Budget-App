@@ -130,7 +130,7 @@ class PlannerHomeScreen extends StatelessWidget {
       body: AppBackground(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 760;
+            final wide = constraints.maxWidth >= 900;
             final description = Text(
               'Work out what something will cost before you spend it. Nothing '
               'here touches your tracked expenses — change any number and the '
@@ -158,14 +158,14 @@ class PlannerHomeScreen extends StatelessWidget {
 
             return Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1380),
+                constraints: const BoxConstraints(maxWidth: 1100),
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
                   children: [
                     description,
                     const SizedBox(height: 20),
                     GridView.count(
-                      crossAxisCount: constraints.maxWidth >= 1200 ? 3 : 2,
+                      crossAxisCount: 2,
                       mainAxisExtent: 156,
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 12,

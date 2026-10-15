@@ -146,7 +146,7 @@ class AnalyticsScreen extends StatelessWidget {
               )
             : LayoutBuilder(
                 builder: (context, constraints) {
-                  if (constraints.maxWidth < 700) {
+                  if (constraints.maxWidth < 900) {
                     return ListView(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
                       children: [
@@ -174,7 +174,7 @@ class AnalyticsScreen extends StatelessWidget {
 
                   return Center(
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1480),
+                      constraints: const BoxConstraints(maxWidth: 1100),
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
                         child: Row(
