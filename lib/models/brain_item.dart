@@ -13,11 +13,10 @@ enum BrainKind {
 
   final String label;
 
-  static BrainKind fromName(String? name) =>
-      BrainKind.values.firstWhere(
-        (k) => k.name == name,
-        orElse: () => BrainKind.note,
-      );
+  static BrainKind fromName(String? name) => BrainKind.values.firstWhere(
+    (k) => k.name == name,
+    orElse: () => BrainKind.note,
+  );
 }
 
 /// One captured thought: a note, a task, a journal entry or a saved link.
@@ -40,6 +39,7 @@ class BrainItem implements SyncFields {
     this.previewTitle,
     this.previewImage,
     this.expenseId,
+    this.shift,
     this.deletedAt,
   });
 
@@ -62,6 +62,7 @@ class BrainItem implements SyncFields {
       previewTitle: json['previewTitle'] as String?,
       previewImage: json['previewImage'] as String?,
       expenseId: json['expenseId'] as String?,
+      shift: (json['shift'] as Map?)?.cast<String, dynamic>(),
       deletedAt: DateTime.tryParse(json['deletedAt'] as String? ?? ''),
     );
   }
@@ -106,6 +107,12 @@ class BrainItem implements SyncFields {
   /// Optional link to a tracked expense so a note can provide context for a cost.
   final String? expenseId;
 
+  /// Computed Shapeshift cards (calc, colour, convert…) keep enough to re-render
+  /// the real card in the feed: `{intent, source}`. The card and its signals are
+  /// a pure function of the source text, so nothing else needs storing. Null for
+  /// ordinary notes/tasks/links.
+  final Map<String, dynamic>? shift;
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'kind': kind.name,
@@ -122,6 +129,7 @@ class BrainItem implements SyncFields {
     'previewTitle': previewTitle,
     'previewImage': previewImage,
     'expenseId': expenseId,
+    'shift': shift,
   };
 
   BrainItem copyWith({
@@ -136,6 +144,7 @@ class BrainItem implements SyncFields {
     String? previewTitle,
     String? previewImage,
     String? expenseId,
+    Map<String, dynamic>? shift,
     DateTime? updatedAt,
   }) {
     return BrainItem(
@@ -153,6 +162,7 @@ class BrainItem implements SyncFields {
       previewTitle: previewTitle ?? this.previewTitle,
       previewImage: previewImage ?? this.previewImage,
       expenseId: expenseId ?? this.expenseId,
+      shift: shift ?? this.shift,
       deletedAt: deletedAt,
     );
   }
@@ -175,6 +185,7 @@ class BrainItem implements SyncFields {
     previewTitle: previewTitle,
     previewImage: previewImage,
     expenseId: expenseId,
+    shift: shift,
     deletedAt: DateTime.now(),
   );
 
@@ -195,5 +206,6 @@ class BrainItem implements SyncFields {
     previewTitle: previewTitle,
     previewImage: previewImage,
     expenseId: expenseId,
+    shift: shift,
   );
 }

@@ -196,6 +196,7 @@ class BrainState extends ChangeNotifier {
     String? url,
     DateTime? dueDate,
     List<String> tags = const [],
+    Map<String, dynamic>? shift,
   }) async {
     final now = DateTime.now();
     final item = BrainItem(
@@ -207,6 +208,7 @@ class BrainState extends ChangeNotifier {
       url: url,
       dueDate: dueDate,
       tags: tags,
+      shift: shift,
     );
     _items = [item, ..._items];
     await _persist();
@@ -264,7 +266,8 @@ class BrainState extends ChangeNotifier {
   Future<void> attachToExpense(String id, String expenseId) async {
     final index = _items.indexWhere((i) => i.id == id);
     if (index == -1) return;
-    _items = [..._items]..[index] = _items[index].copyWith(expenseId: expenseId);
+    _items = [..._items]
+      ..[index] = _items[index].copyWith(expenseId: expenseId);
     await _persist();
   }
 

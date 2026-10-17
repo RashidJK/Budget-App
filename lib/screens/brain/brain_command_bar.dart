@@ -11,6 +11,7 @@ import 'shift/shift_classifier.dart';
 import 'shift/shift_decide.dart';
 import 'shift/shift_intent.dart';
 import 'shift/shift_registry.dart';
+import 'shift/shift_restore.dart';
 import 'shift/shift_signals.dart';
 
 /// Per-kind accent, shared with the inbox tiles.
@@ -178,6 +179,12 @@ class _BrainCommandBarState extends State<BrainCommandBar> {
     final data = shiftParse(intent, cleaned, colorMood: _gated.colorMood);
     final (kind, text, url, due) = _toCapture(intent, data, cleaned);
 
+    // Computed cards (calc, colour, convert…) keep their source so the feed can
+    // re-render the real card rather than a flat one-line note.
+    final shift = richCardIntents.contains(intent)
+        ? {'intent': intent.name, 'source': cleaned}
+        : null;
+
     final brain = context.read<BrainState>();
     final item = await brain.capture(
       kind,
@@ -185,6 +192,7 @@ class _BrainCommandBarState extends State<BrainCommandBar> {
       url: url,
       dueDate: due,
       tags: tags,
+      shift: shift,
     );
     if (kind == BrainKind.link) {
       // Fire-and-forget: fetch the link's title/cover for the feed card.
@@ -274,7 +282,12 @@ class _BrainCommandBarState extends State<BrainCommandBar> {
           caseSensitive: false,
         ).firstMatch(cleaned);
         if (j != null) {
-          return (BrainKind.journal, cleaned.substring(j.end).trim(), null, null);
+          return (
+            BrainKind.journal,
+            cleaned.substring(j.end).trim(),
+            null,
+            null,
+          );
         }
         return (BrainKind.note, cleaned, null, null);
       default:

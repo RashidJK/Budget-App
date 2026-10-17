@@ -8,6 +8,7 @@ import '../../theme.dart';
 import 'brain_calendar.dart';
 import 'brain_command_bar.dart';
 import 'brain_modal.dart';
+import 'shift/shift_restore.dart';
 
 /// The Second Brain — a capture-first inbox for notes, tasks, journal entries
 /// and links. One feed interleaves every kind, newest first; the chips filter
@@ -726,27 +727,84 @@ class _BrainTile extends StatelessWidget {
         cursor: SystemMouseCursors.click,
         child: GestureDetector(
           onTap: () => showBrainModal(context, item),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: context.isDark ? const Color(0xFF201F2B) : Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: context.hairline),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          child: _content(context, brain),
+        ),
+      ),
+    );
+  }
+
+  /// A saved computed card re-renders as the real Shapeshift card; everything
+  /// else gets the plain leading-icon + body tile.
+  Widget _content(BuildContext context, BrainState brain) {
+    final saved = item.shift == null
+        ? null
+        : buildSavedShiftCard(
+            context,
+            item.shift!['intent'] as String?,
+            item.shift!['source'] as String?,
+          );
+    if (saved != null) {
+      final footer = _shiftFooter(context);
+      return Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            saved,
+            if (footer != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8, left: 2),
+                child: footer,
+              ),
+          ],
+        ),
+      );
+    }
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.isDark ? const Color(0xFF201F2B) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: context.hairline),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _leading(context, brain),
+          const SizedBox(width: 12),
+          Expanded(child: _body(context)),
+          if (item.pinned)
+            Icon(Icons.push_pin_rounded, size: 15, color: context.muted),
+        ],
+      ),
+    );
+  }
+
+  /// Tags (and a pinned marker) under a saved card, which carries its own body.
+  Widget? _shiftFooter(BuildContext context) {
+    if (item.tags.isEmpty && !item.pinned) return null;
+    return Row(
+      children: [
+        if (item.pinned) ...[
+          Icon(Icons.push_pin_rounded, size: 13, color: context.muted),
+          const SizedBox(width: 8),
+        ],
+        if (item.tags.isNotEmpty)
+          Expanded(
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 4,
               children: [
-                _leading(context, brain),
-                const SizedBox(width: 12),
-                Expanded(child: _body(context)),
-                if (item.pinned)
-                  Icon(Icons.push_pin_rounded, size: 15, color: context.muted),
+                for (final t in item.tags)
+                  _TagChip(
+                    tag: t,
+                    onTap: onTag == null ? null : () => onTag!(t),
+                  ),
               ],
             ),
           ),
-        ),
-      ),
+      ],
     );
   }
 

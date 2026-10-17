@@ -7,6 +7,7 @@ import '../../state/brain_state.dart';
 import '../../theme.dart';
 import 'brain_command_bar.dart' show brainKindColor, brainKindIcon;
 import 'brain_detail_sheet.dart' show showBrainDetail;
+import 'shift/shift_restore.dart';
 
 /// Opens an item full-screen, expanding in from its card. A reading view: date,
 /// title, meta chips and actions up top, the content below.
@@ -68,6 +69,16 @@ class _BrainModal extends StatelessWidget {
         .where((w) => w.isNotEmpty)
         .length;
     final body = _body(context, item, isLink, color);
+    // Computed cards show the real card up top, interactive here (copy a colour,
+    // read the full conversion) rather than just their one-line summary.
+    final savedCard = item.shift == null
+        ? null
+        : buildSavedShiftCard(
+            context,
+            item.shift!['intent'] as String?,
+            item.shift!['source'] as String?,
+            interactive: true,
+          );
 
     return CallbackShortcuts(
       bindings: {
@@ -142,6 +153,10 @@ class _BrainModal extends StatelessWidget {
                         style: TextStyle(fontSize: 13, color: context.muted),
                       ),
                       const SizedBox(height: 8),
+                      if (savedCard != null) ...[
+                        savedCard,
+                        const SizedBox(height: 16),
+                      ],
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
