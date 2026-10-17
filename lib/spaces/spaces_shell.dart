@@ -7,6 +7,7 @@ import '../config.dart';
 import '../screens/brain/brain_shell.dart';
 import '../screens/home_shell.dart';
 import '../state/auth_state.dart';
+import '../sync/sync_service.dart';
 import '../theme.dart';
 import 'app_space.dart';
 import 'route_sync.dart';
@@ -491,7 +492,11 @@ class _SpacesShellState extends State<SpacesShell>
                   ],
                 ),
               ),
-              if (auth != null && auth.isSignedIn) _accountMenu(context, auth),
+              if (auth != null && auth.isSignedIn) ...[
+                const _SyncIndicator(),
+                const SizedBox(width: 10),
+                _accountMenu(context, auth),
+              ],
             ],
           ),
         ),
@@ -701,5 +706,74 @@ class _AppCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// The sync status in the Spaces header: a round button whose icon tracks the
+/// [SyncService] — spinning while a round-trip is in flight, a cloud-done tick
+/// when up to date, a cloud-off when the last attempt failed. Tap to sync now.
+class _SyncIndicator extends StatelessWidget {
+  const _SyncIndicator();
+
+  @override
+  Widget build(BuildContext context) {
+    final sync = context.watch<SyncService>();
+    final status = sync.status;
+
+    final (IconData icon, String label) = switch (status) {
+      SyncStatus.syncing => (Icons.sync_rounded, 'Syncing…'),
+      SyncStatus.synced => (
+        Icons.cloud_done_rounded,
+        _syncedLabel(sync.lastSyncedAt),
+      ),
+      SyncStatus.error => (Icons.cloud_off_rounded, 'Offline — tap to retry'),
+      SyncStatus.idle => (Icons.cloud_queue_rounded, 'Not synced yet'),
+    };
+
+    final glyph = status == SyncStatus.syncing
+        ? const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation(Colors.white),
+            ),
+          )
+        : Icon(icon, color: Colors.white, size: 20);
+
+    return Tooltip(
+      message: label,
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: status == SyncStatus.syncing
+              ? null
+              : () => context.read<SyncService>().syncNow(),
+          child: Container(
+            width: 42,
+            height: 42,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+            ),
+            child: glyph,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _syncedLabel(DateTime? at) {
+    if (at == null) return 'Synced';
+    final d = DateTime.now().difference(at);
+    if (d.inSeconds < 10) return 'Synced • just now';
+    if (d.inMinutes < 1) return 'Synced • ${d.inSeconds}s ago';
+    if (d.inHours < 1) return 'Synced • ${d.inMinutes}m ago';
+    if (d.inDays < 1) return 'Synced • ${d.inHours}h ago';
+    return 'Synced • ${d.inDays}d ago';
   }
 }

@@ -54,13 +54,15 @@ Future<void> main() async {
     );
   }
 
-  runApp(BudgetApp(
-    appState: appState,
-    brainState: brainState,
-    authState: authState,
-    api: api,
-    sync: sync,
-  ));
+  runApp(
+    BudgetApp(
+      appState: appState,
+      brainState: brainState,
+      authState: authState,
+      api: api,
+      sync: sync,
+    ),
+  );
 }
 
 class BudgetApp extends StatelessWidget {
@@ -87,7 +89,8 @@ class BudgetApp extends StatelessWidget {
         ChangeNotifierProvider<BrainState>.value(value: brainState),
         ChangeNotifierProvider<AuthState>.value(value: authState),
         if (api != null) Provider<ApiClient>.value(value: api!),
-        if (sync != null) Provider<SyncService>.value(value: sync!),
+        if (sync != null)
+          ChangeNotifierProvider<SyncService>.value(value: sync!),
       ],
       child: MaterialApp(
         title: 'Spaces',
