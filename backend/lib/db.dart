@@ -17,8 +17,10 @@ class Db {
     final endpoint = Endpoint(
       host: uri.host.isEmpty ? 'localhost' : uri.host,
       port: uri.hasPort ? uri.port : 5432,
-      database: uri.pathSegments.isNotEmpty ? uri.pathSegments.first : 'postgres',
-      username: creds.isNotEmpty && creds.first.isNotEmpty ? creds.first : 'postgres',
+      database:
+          uri.pathSegments.isNotEmpty ? uri.pathSegments.first : 'postgres',
+      username:
+          creds.isNotEmpty && creds.first.isNotEmpty ? creds.first : 'postgres',
       password: creds.length > 1 ? creds.sublist(1).join(':') : null,
     );
     final pool = Pool.withEndpoints(
@@ -98,7 +100,7 @@ class Db {
   /// Every record for [userId] written after [since] (null = everything),
   /// oldest change first, grouped by collection, plus the new cursor.
   Future<({int cursor, Map<String, List<Map<String, dynamic>>> changes})>
-  changesSince(String userId, int since) async {
+      changesSince(String userId, int since) async {
     final result = await _pool.execute(
       Sql.named('''
         select collection, body, seq from documents
@@ -123,5 +125,25 @@ class Db {
       (changes[collection] ??= []).add(record);
     }
     return (cursor: cursor, changes: changes);
+  }
+
+  /// Permanently remove tombstones (soft-deleted rows) older than [olderThan],
+  /// so the table doesn't keep every deletion forever. Returns how many rows
+  /// were removed.
+  ///
+  /// The window must be comfortably longer than any device stays offline: once
+  /// a tombstone is gone, a device that still holds the record and syncs would
+  /// re-push it and resurrect it. 90 days is the default — long enough that
+  /// this is a non-issue in practice.
+  Future<int> pruneTombstones(Duration olderThan) async {
+    final result = await _pool.execute(
+      Sql.named('''
+        delete from documents
+        where deleted_at is not null
+          and deleted_at < now() - make_interval(secs => @secs)
+      '''),
+      parameters: {'secs': olderThan.inSeconds},
+    );
+    return result.affectedRows;
   }
 }

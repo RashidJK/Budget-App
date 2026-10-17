@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:budget_api/airtel_client.dart';
 import 'package:budget_api/auth.dart';
 import 'package:budget_api/db.dart';
+import 'package:budget_api/limits.dart';
 import 'package:budget_api/sync.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
@@ -24,10 +26,18 @@ Future<void> main() async {
   final googleClientId = _require(env, 'GOOGLE_CLIENT_ID');
   final sessionSecret = _require(env, 'SESSION_SECRET');
   final corsOrigin = env['CORS_ORIGIN'] ?? '*';
+  final maxBodyBytes = int.tryParse(env['MAX_BODY_BYTES'] ?? '') ?? 5000000;
+  final rateMax = int.tryParse(env['RATE_LIMIT_MAX'] ?? '') ?? 300;
+  final rateWindow = Duration(
+    seconds: int.tryParse(env['RATE_LIMIT_WINDOW_SECONDS'] ?? '') ?? 60,
+  );
+  final tombstoneTtl = Duration(
+    days: int.tryParse(env['TOMBSTONE_TTL_DAYS'] ?? '') ?? 90,
+  );
 
   // Postgres may still be booting when we start (docker compose); retry briefly.
   late final Db db;
-  for (var attempt = 1; ; attempt++) {
+  for (var attempt = 1;; attempt++) {
     try {
       db = await Db.open(dbUrl);
       break;
@@ -37,6 +47,23 @@ Future<void> main() async {
       await Future<void>.delayed(const Duration(seconds: 2));
     }
   }
+
+  // Keep the document table from accumulating ancient tombstones. Run once now,
+  // then daily; failures are logged, never fatal.
+  Future<void> prune() async {
+    try {
+      final removed = await db.pruneTombstones(tombstoneTtl);
+      if (removed > 0) {
+        stdout.writeln(
+            'pruned $removed tombstone(s) older than ${tombstoneTtl.inDays}d');
+      }
+    } catch (e) {
+      stderr.writeln('tombstone prune failed: $e');
+    }
+  }
+
+  await prune();
+  Timer.periodic(const Duration(hours: 24), (_) => prune());
 
   // The Airtel proxy is optional — only wired when credentials are present.
   AirtelClient? airtel;
@@ -105,7 +132,8 @@ Future<void> main() async {
       final from = q['from'];
       final to = q['to'];
       if (from == null || to == null) {
-        return Response(400, body: 'Query params "from" and "to" are required.');
+        return Response(400,
+            body: 'Query params "from" and "to" are required.');
       }
       try {
         final result = await client.transactions(
@@ -114,16 +142,26 @@ Future<void> main() async {
           limit: q['limit'] ?? '100',
           offset: q['offset'] ?? '0',
         );
-        return Response.ok(result, headers: {'content-type': 'application/json'});
+        return Response.ok(result,
+            headers: {'content-type': 'application/json'});
       } catch (e) {
         stderr.writeln('transactions error: $e');
         return Response.internalServerError(body: 'Upstream error.');
       }
     });
 
+  // One shared limiter for the process; sweep expired windows periodically so
+  // the map tracks only active clients.
+  final limiter = FixedWindowLimiter(max: rateMax, window: rateWindow);
+  Timer.periodic(rateWindow, (_) => limiter.sweep(DateTime.now()));
+
+  // CORS is outermost so even a 413/429 carries the headers the browser needs
+  // to read it; the limits sit just inside it, before any real work.
   final handler = const Pipeline()
       .addMiddleware(logRequests())
       .addMiddleware(_cors(corsOrigin))
+      .addMiddleware(limitBody(maxBodyBytes))
+      .addMiddleware(rateLimit(limiter))
       .addHandler(router.call);
 
   final port = int.parse(env['PORT'] ?? '8080');
@@ -149,8 +187,8 @@ Middleware _cors(String originConfig) {
     final allow = allowAll
         ? '*'
         : (requestOrigin != null && allowed.contains(requestOrigin)
-              ? requestOrigin
-              : (allowed.isEmpty ? '*' : allowed.first));
+            ? requestOrigin
+            : (allowed.isEmpty ? '*' : allowed.first));
     return {
       'Access-Control-Allow-Origin': allow,
       'Vary': 'Origin',
@@ -166,7 +204,8 @@ Middleware _cors(String originConfig) {
         return Response.ok(null, headers: headersFor(request));
       }
       final response = await innerHandler(request);
-      return response.change(headers: {...response.headers, ...headersFor(request)});
+      return response
+          .change(headers: {...response.headers, ...headersFor(request)});
     };
   };
 }

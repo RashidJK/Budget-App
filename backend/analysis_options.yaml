@@ -1,0 +1,3 @@
+# This is a plain Dart package, not Flutter — use the Dart recommended lints
+# rather than inheriting the Flutter rules from the repo root.
+include: package:lints/recommended.yaml
