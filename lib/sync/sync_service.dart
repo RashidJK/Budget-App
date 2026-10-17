@@ -51,34 +51,40 @@ class SyncService {
       final since = storage.readSyncCursor();
 
       final result = await api.sync(token: token, since: since, changes: changes);
-      if (result == null) return false;
-
-      var touched = false;
-      final remote = result['changes'];
-      if (remote is Map) {
-        for (final entry in remote.entries) {
-          final collection = _collections[entry.key.toString()];
-          final value = entry.value;
-          if (collection == null || value is! List) continue;
-          final remoteMaps = value
-              .whereType<Map>()
-              .map((m) => Map<String, dynamic>.from(m))
-              .toList();
-          if (remoteMaps.isEmpty) continue;
-          final merged = _merge(collection.read(), remoteMaps);
-          await collection.write(merged);
-          touched = true;
-        }
+      switch (result) {
+        case SyncAuthExpired():
+          // The session is no longer valid — sign out so the gate prompts a
+          // fresh sign-in rather than failing silently forever.
+          await auth.signOut();
+          return false;
+        case SyncFailed():
+          return false;
+        case SyncOk(:final data):
+          var touched = false;
+          final remote = data['changes'];
+          if (remote is Map) {
+            for (final entry in remote.entries) {
+              final collection = _collections[entry.key.toString()];
+              final value = entry.value;
+              if (collection == null || value is! List) continue;
+              final remoteMaps = value
+                  .whereType<Map>()
+                  .map((m) => Map<String, dynamic>.from(m))
+                  .toList();
+              if (remoteMaps.isEmpty) continue;
+              final merged = _merge(collection.read(), remoteMaps);
+              await collection.write(merged);
+              touched = true;
+            }
+          }
+          final cursor = int.tryParse(data['cursor']?.toString() ?? '');
+          if (cursor != null) await storage.writeSyncCursor(cursor);
+          if (touched) {
+            appState.reload();
+            brainState.reload();
+          }
+          return true;
       }
-
-      final cursor = int.tryParse(result['cursor']?.toString() ?? '');
-      if (cursor != null) await storage.writeSyncCursor(cursor);
-
-      if (touched) {
-        appState.reload();
-        brainState.reload();
-      }
-      return true;
     } finally {
       _busy = false;
     }

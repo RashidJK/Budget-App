@@ -8,18 +8,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeApi implements SyncApi {
-  _FakeApi(this.response);
-  Map<String, dynamic>? response;
+  _FakeApi(this.result);
+  SyncResult result;
   Map<String, dynamic>? lastSent;
 
   @override
-  Future<Map<String, dynamic>?> sync({
+  Future<SyncResult> sync({
     required String token,
     required int since,
     required Map<String, List<Map<String, dynamic>>> changes,
   }) async {
     lastSent = {'token': token, 'since': since, 'changes': changes};
-    return response;
+    return result;
   }
 }
 
@@ -47,14 +47,14 @@ void main() {
     final brainState = BrainState(storage);
 
     final now = DateTime(2026, 1, 1).toIso8601String();
-    final api = _FakeApi({
+    final api = _FakeApi(SyncOk({
       'cursor': 42,
       'changes': {
         'brain': [
           {'id': 'r1', 'kind': 'note', 'text': 'from another device', 'createdAt': now, 'updatedAt': now},
         ],
       },
-    });
+    }));
     final sync = SyncService(
       storage: storage,
       api: api,
@@ -80,14 +80,14 @@ void main() {
       {'id': 'r1', 'kind': 'note', 'text': 'local newer', 'createdAt': older, 'updatedAt': newer},
     ]);
 
-    final api = _FakeApi({
+    final api = _FakeApi(SyncOk({
       'cursor': 7,
       'changes': {
         'brain': [
           {'id': 'r1', 'kind': 'note', 'text': 'remote older', 'createdAt': older, 'updatedAt': older},
         ],
       },
-    });
+    }));
     await service(storage, api, auth).syncNow();
 
     final r1 = storage.readBrainItems().firstWhere((m) => m['id'] == 'r1');
@@ -97,8 +97,19 @@ void main() {
   test('syncNow is a no-op when signed out', () async {
     final storage = await freshStorage();
     final auth = AuthState(storage); // no session
-    final api = _FakeApi({'cursor': 1, 'changes': <String, dynamic>{}});
+    final api = _FakeApi(const SyncFailed());
     expect(await service(storage, api, auth).syncNow(), isFalse);
     expect(api.lastSent, isNull);
+  });
+
+  test('an expired session signs the user out', () async {
+    final storage = await freshStorage();
+    final auth = AuthState(storage);
+    await auth.setSession('tok', email: 'a@b.c');
+    expect(auth.isSignedIn, isTrue);
+
+    final api = _FakeApi(const SyncAuthExpired());
+    expect(await service(storage, api, auth).syncNow(), isFalse);
+    expect(auth.isSignedIn, isFalse); // bounced to signed-out
   });
 }

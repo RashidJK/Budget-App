@@ -2,11 +2,32 @@ import 'dart:convert';
 
 import 'api_http.dart';
 
+/// The outcome of a sync call, so the caller can tell an expired session apart
+/// from a transient (offline/server) failure.
+sealed class SyncResult {
+  const SyncResult();
+}
+
+/// Success — the server's `{cursor, changes}`.
+class SyncOk extends SyncResult {
+  const SyncOk(this.data);
+  final Map<String, dynamic> data;
+}
+
+/// The session is no longer valid (401/403) — re-authenticate.
+class SyncAuthExpired extends SyncResult {
+  const SyncAuthExpired();
+}
+
+/// Network, server or parse failure — transient; keep the session and retry.
+class SyncFailed extends SyncResult {
+  const SyncFailed();
+}
+
 /// Just the sync call, so [SyncService] can be tested against a fake.
 abstract class SyncApi {
-  /// Push [changes], pull everything since [since]. Returns the server's
-  /// `{cursor, changes}`, or null if the call failed.
-  Future<Map<String, dynamic>?> sync({
+  /// Push [changes], pull everything since [since].
+  Future<SyncResult> sync({
     required String token,
     required int since,
     required Map<String, List<Map<String, dynamic>>> changes,
@@ -29,7 +50,7 @@ class ApiClient implements SyncApi {
   }
 
   @override
-  Future<Map<String, dynamic>?> sync({
+  Future<SyncResult> sync({
     required String token,
     required int since,
     required Map<String, List<Map<String, dynamic>>> changes,
@@ -39,8 +60,10 @@ class ApiClient implements SyncApi {
       headers: {'authorization': 'Bearer $token'},
       body: {'since': since, 'changes': changes},
     );
-    if (res.status != 200) return null;
-    return _decode(res.body);
+    if (res.status == 401 || res.status == 403) return const SyncAuthExpired();
+    if (res.status != 200) return const SyncFailed();
+    final data = _decode(res.body);
+    return data == null ? const SyncFailed() : SyncOk(data);
   }
 
   Map<String, dynamic>? _decode(String body) {
