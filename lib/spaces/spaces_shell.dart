@@ -1,9 +1,12 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
+import '../config.dart';
 import '../screens/brain/brain_shell.dart';
 import '../screens/home_shell.dart';
+import '../state/auth_state.dart';
 import '../theme.dart';
 import 'app_space.dart';
 import 'route_sync.dart';
@@ -361,6 +364,9 @@ class _SpacesShellState extends State<SpacesShell>
     final bottom = dark ? const Color(0xFF0B0B10) : const Color(0xFF0E141B);
     final topInset = MediaQuery.of(context).padding.top;
     final wide = size.width >= 900;
+    // Only reach for the session when a backend is wired up; a local-only build
+    // (and the widget tests) has no AuthState provider above this shell.
+    final auth = Config.authEnabled ? context.watch<AuthState>() : null;
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -373,111 +379,199 @@ class _SpacesShellState extends State<SpacesShell>
         opacity: z,
         child: Padding(
           padding: EdgeInsets.only(top: topInset + 22, left: 24, right: 24),
-          child: Align(
-            alignment: Alignment.topLeft,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Spaces',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 30,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    PopupMenuButton<int>(
-                      initialValue: _activeIndex,
-                      tooltip: 'Switch app',
-                      position: PopupMenuPosition.under,
-                      color: Colors.white.withValues(alpha: 0.12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                        side: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.14),
-                        ),
-                      ),
-                      onSelected: (index) {
-                        if (index != _activeIndex) {
-                          setState(() => _activeIndex = index);
-                          _zoom.animateTo(0, curve: Curves.easeOutCubic);
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.14),
+                    Row(
+                      children: [
+                        const Text(
+                          'Spaces',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 30,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _apps[_activeIndex].icon,
-                              color: Colors.white,
-                              size: 15,
+                        const SizedBox(width: 10),
+                        PopupMenuButton<int>(
+                          initialValue: _activeIndex,
+                          tooltip: 'Switch app',
+                          position: PopupMenuPosition.under,
+                          color: Colors.white.withValues(alpha: 0.12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            side: BorderSide(
+                              color: Colors.white.withValues(alpha: 0.14),
                             ),
-                            const SizedBox(width: 6),
-                            Text(
-                              _apps[_activeIndex].name,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
+                          ),
+                          onSelected: (index) {
+                            if (index != _activeIndex) {
+                              setState(() => _activeIndex = index);
+                              _zoom.animateTo(0, curve: Curves.easeOutCubic);
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.14),
                               ),
                             ),
-                            const SizedBox(width: 4),
-                            const Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              color: Colors.white70,
-                              size: 18,
-                            ),
-                          ],
-                        ),
-                      ),
-                      itemBuilder: (context) => [
-                        for (var i = 0; i < _apps.length; i++)
-                          PopupMenuItem<int>(
-                            value: i,
                             child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  _apps[i].icon,
+                                  _apps[_activeIndex].icon,
                                   color: Colors.white,
-                                  size: 18,
+                                  size: 15,
                                 ),
-                                const SizedBox(width: 10),
+                                const SizedBox(width: 6),
                                 Text(
-                                  _apps[i].name,
-                                  style: const TextStyle(color: Colors.white),
+                                  _apps[_activeIndex].name,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Icons.keyboard_arrow_down_rounded,
+                                  color: Colors.white70,
+                                  size: 18,
                                 ),
                               ],
                             ),
                           ),
+                          itemBuilder: (context) => [
+                            for (var i = 0; i < _apps.length; i++)
+                              PopupMenuItem<int>(
+                                value: i,
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      _apps[i].icon,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      _apps[i].name,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
                       ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      wide
+                          ? 'Click a space to open it'
+                          : 'Pinch to switch apps',
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 14,
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  wide ? 'Click a space to open it' : 'Pinch to switch apps',
-                  style: const TextStyle(color: Colors.white54, fontSize: 14),
-                ),
-              ],
-            ),
+              ),
+              if (auth != null && auth.isSignedIn) _accountMenu(context, auth),
+            ],
           ),
         ),
       ),
+    );
+  }
+
+  /// The signed-in badge in the Spaces header: a round avatar that drops a menu
+  /// with who you are and a way out. Only shown when a server session is live —
+  /// signing out bubbles up to the [SignInGate], which shows the sign-in screen.
+  Widget _accountMenu(BuildContext context, AuthState auth) {
+    final name = auth.name?.trim();
+    final label = (name != null && name.isNotEmpty)
+        ? name
+        : (auth.email ?? 'Signed in');
+    final initial = label.isNotEmpty ? label[0].toUpperCase() : '?';
+    return PopupMenuButton<String>(
+      tooltip: 'Account',
+      position: PopupMenuPosition.under,
+      color: Colors.white.withValues(alpha: 0.12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.14)),
+      ),
+      onSelected: (value) {
+        if (value == 'signout') context.read<AuthState>().signOut();
+      },
+      child: Container(
+        width: 42,
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+        ),
+        child: Text(
+          initial,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      itemBuilder: (context) => [
+        PopupMenuItem<String>(
+          enabled: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (name != null && name.isNotEmpty)
+                Text(
+                  name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              if (auth.email != null)
+                Text(
+                  auth.email!,
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem<String>(
+          value: 'signout',
+          child: Row(
+            children: [
+              Icon(Icons.logout_rounded, color: Colors.white, size: 18),
+              SizedBox(width: 10),
+              Text('Sign out', style: TextStyle(color: Colors.white)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
