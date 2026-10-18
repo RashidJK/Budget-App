@@ -466,6 +466,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                   children: [
                     total,
                     stat('Spent', state.spentThisMonth),
+                    // Run-rate forecast for month end — only once there's spend
+                    // to project from, so a fresh month doesn't show a flat 0.
+                    if (state.spentThisMonth > 0)
+                      stat('Projected', state.projectedThisMonth),
                     stat('Income', state.incomeThisMonth),
                   ],
                 ),
@@ -577,7 +581,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             accounts: state.accountBalances,
             onAdd: () => CommandBar.show(context),
             onIncome: () => CommandBar.show(context, initialText: 'Received '),
-            onTransfer: () => CommandBar.show(context, initialText: 'Transfer '),
+            onTransfer: () =>
+                CommandBar.show(context, initialText: 'Transfer '),
             onHistory: () => _openHistory(context),
             onManageAccounts: () => AccountsScreen.open(context),
             onOpenAccount: (id) => AccountDetailScreen.open(context, id),

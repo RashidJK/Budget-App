@@ -8,6 +8,7 @@ import '../../widgets/app_background.dart';
 import '../../widgets/badge_icon.dart';
 import '../../widgets/charts.dart';
 import '../../widgets/inputs.dart';
+import '../../widgets/page_band_header.dart';
 import '../../widgets/stat.dart';
 
 /// Where the money actually went — the "understand, don't just record" half of
@@ -19,6 +20,7 @@ class AnalyticsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
+    final wide = MediaQuery.sizeOf(context).width >= 900;
     final now = DateTime.now();
     final months = state.monthlyTotals();
     final categories = state.categoryTotals(now);
@@ -119,7 +121,9 @@ class AnalyticsScreen extends StatelessWidget {
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        title: const Text('Analytics'),
+        // On desktop the gradient band carries the title, so drop the app-bar
+        // copy to avoid showing "Analytics" twice.
+        title: wide ? null : const Text('Analytics'),
         actions: [
           if (state.profiles.length > 1)
             Padding(
@@ -177,40 +181,50 @@ class AnalyticsScreen extends StatelessWidget {
                       constraints: const BoxConstraints(maxWidth: 1100),
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
-                        child: Row(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              flex: 4,
-                              child: Column(
-                                children: [
-                                  monthCard,
-                                  const SizedBox(height: 16),
-                                  _StatRow(
-                                    daily: state.dailyAverageThisMonth,
-                                    transactions: txnCount,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  insightCard,
-                                  if (biggestCard != null) ...[
-                                    const SizedBox(height: 16),
-                                    biggestCard,
-                                  ],
-                                ],
-                              ),
+                            const PageBandHeader(
+                              title: 'Analytics',
+                              subtitle: 'Where your money actually went.',
                             ),
-                            const SizedBox(width: 24),
-                            Expanded(
-                              flex: 6,
-                              child: Column(
-                                children: [
-                                  trendCard,
-                                  if (categoryCard != null) ...[
-                                    const SizedBox(height: 16),
-                                    categoryCard,
-                                  ],
-                                ],
-                              ),
+                            const SizedBox(height: 20),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 4,
+                                  child: Column(
+                                    children: [
+                                      monthCard,
+                                      const SizedBox(height: 16),
+                                      _StatRow(
+                                        daily: state.dailyAverageThisMonth,
+                                        transactions: txnCount,
+                                      ),
+                                      const SizedBox(height: 16),
+                                      insightCard,
+                                      if (biggestCard != null) ...[
+                                        const SizedBox(height: 16),
+                                        biggestCard,
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 24),
+                                Expanded(
+                                  flex: 6,
+                                  child: Column(
+                                    children: [
+                                      trendCard,
+                                      if (categoryCard != null) ...[
+                                        const SizedBox(height: 16),
+                                        categoryCard,
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),

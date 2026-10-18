@@ -4,6 +4,7 @@ import '../../models/phosphor.dart';
 import '../../models/scenario.dart';
 import '../../theme.dart';
 import '../../widgets/app_background.dart';
+import '../../widgets/page_band_header.dart';
 import '../scenarios/scenario_list.dart';
 import 'business.dart';
 import 'daily_habit.dart';
@@ -106,12 +107,14 @@ class PlannerHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // On desktop the gradient band carries the title; drop the app-bar copy.
+    final wideTitle = MediaQuery.sizeOf(context).width >= 900;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        title: const Text('Planner'),
+        title: wideTitle ? null : const Text('Planner'),
         actions: [
           // Saved scenarios live with the Planner now, reached from here rather
           // than a bottom-nav tab of their own.
@@ -162,6 +165,12 @@ class PlannerHomeScreen extends StatelessWidget {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
                   children: [
+                    const PageBandHeader(
+                      title: 'Planner',
+                      subtitle:
+                          'Plan what something costs before you spend it.',
+                    ),
+                    const SizedBox(height: 20),
                     description,
                     const SizedBox(height: 20),
                     GridView.count(
