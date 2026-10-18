@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/brain_item.dart';
+import '../../services/link_launcher.dart';
 import '../../state/brain_state.dart';
 import '../../theme.dart';
 import 'brain_command_bar.dart' show brainKindColor, brainKindIcon;
@@ -273,12 +274,7 @@ class _BrainModal extends StatelessWidget {
           const SizedBox(height: 16),
         ],
         FilledButton.icon(
-          onPressed: () {
-            Clipboard.setData(ClipboardData(text: item.url!));
-            ScaffoldMessenger.of(context)
-              ..hideCurrentSnackBar()
-              ..showSnackBar(const SnackBar(content: Text('Link copied')));
-          },
+          onPressed: () => openLink(context, item.url!),
           style: FilledButton.styleFrom(
             backgroundColor: color,
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
