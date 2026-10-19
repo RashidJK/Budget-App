@@ -107,14 +107,25 @@ In the [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
 
 ## Frontend on Cloudflare Pages (spenda.flow-hq.com)
 
+Use the deploy script — it bakes the config in and refuses to ship a build that
+lost it:
+
 ```sh
 cd ..                                  # repo root
+./scripts/deploy_web.sh
+```
+
+> ⚠️ The `--dart-define` flags are not optional. A plain `flutter build web`
+> (or a Pages "connect the repo" build that can't run Flutter) ships a
+> **local-only** site: it loads fine but has no sign-in and no sync, so each
+> device keeps its own data. Symptom: "I signed in on another laptop and my
+> data isn't there." Always build via the script, or by hand with the flags:
+
+```sh
 flutter build web --release \
   --dart-define=API_BASE=https://api.spenda.flow-hq.com \
   --dart-define=GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
-# Deploy build/web — via the Pages dashboard (connect the repo, build command
-# above, output dir build/web) or Wrangler:
-npx wrangler pages deploy build/web --project-name spenda
+npx wrangler pages deploy build/web --project-name spenda   # Direct Upload only
 ```
 
 Add `spenda.flow-hq.com` as the Pages project's custom domain. `CORS_ORIGIN` in

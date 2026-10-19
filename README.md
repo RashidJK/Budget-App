@@ -48,8 +48,24 @@ flutter pub get
 flutter run                 # debug, on a connected device or simulator
 flutter run --release       # release build (survives unplugging)
 flutter run -d chrome       # run the web version in Chrome
-flutter build web           # build static files in build/web
+flutter build web           # LOCAL-ONLY build (no sign-in / no sync)
 ```
+
+### Deploying the web app
+
+A bare `flutter build web` has **no sign-in and no cloud sync** — it needs the
+backend config passed at build time via `--dart-define`. Omitting it produces a
+site that looks fine but keeps each device's data to itself (symptom: "I signed
+in on another laptop and my data isn't there"). Always deploy with:
+
+```bash
+./scripts/deploy_web.sh      # builds with the config baked in, verifies it,
+                             # then `wrangler pages deploy` to Cloudflare Pages
+```
+
+The script refuses to deploy a bundle whose API base didn't compile in, so a
+config-less build can't reach production. See [backend/README.md](backend/README.md)
+for the full backend + Pages deployment guide.
 
 Run the tests:
 
