@@ -48,7 +48,8 @@ class AppState extends ChangeNotifier {
   /// The profile the dashboard and lists are scoped to. Null means all.
   String? _activeProfileId;
 
-  List<Expense> get expenses => List.unmodifiable(_expenses);
+  List<Expense> get expenses =>
+      List.unmodifiable(_expenses.where((e) => !e.isDeleted));
   List<Scenario> get scenarios => List.unmodifiable(_scenarios);
   List<ExpenseCategory> get categories => List.unmodifiable(_categories);
   List<Profile> get profiles => List.unmodifiable(_profiles);
@@ -59,9 +60,8 @@ class AppState extends ChangeNotifier {
       ..sort((a, b) => b.date.compareTo(a.date)),
   );
 
-  List<Person> get people => List.unmodifiable(
-    _people.where((p) => !p.isDeleted).toList(),
-  );
+  List<Person> get people =>
+      List.unmodifiable(_people.where((p) => !p.isDeleted).toList());
 
   String? get activeProfileId => _activeProfileId;
 
@@ -471,11 +471,13 @@ class AppState extends ChangeNotifier {
   }
 
   /// How many expenses would be reassigned if [id] were deleted.
-  int expenseCountForCategory(String id) =>
-      _expenses.where((expense) => expense.categoryId == id).length;
+  int expenseCountForCategory(String id) => _expenses
+      .where((expense) => !expense.isDeleted && expense.categoryId == id)
+      .length;
 
-  int expenseCountForProfile(String id) =>
-      _expenses.where((expense) => expense.profileId == id).length;
+  int expenseCountForProfile(String id) => _expenses
+      .where((expense) => !expense.isDeleted && expense.profileId == id)
+      .length;
 
   Future<void> _persistCategories({bool notify = true}) async {
     if (notify) notifyListeners();
@@ -534,25 +536,37 @@ class AppState extends ChangeNotifier {
     String id, {
     bool discardAttachments = true,
   }) async {
-    final matches = _expenses.where((item) => item.id == id);
-    final expense = matches.isEmpty ? null : matches.first;
+    final index = _expenses.indexWhere((item) => item.id == id);
+    if (index == -1) return;
+    final expense = _expenses[index];
 
-    _expenses = _expenses.where((item) => item.id != id).toList();
+    // Tombstone rather than drop: a record that simply vanishes can't tell the
+    // server it was deleted, so the delete would never reach other devices (and
+    // the expense would reappear on the next pull). The tombstone replicates.
+    _expenses = [..._expenses]..[index] = expense.tombstone();
     await _persistExpenses();
 
     // Orphaned receipts would otherwise sit in the documents directory for
     // good. Skipped when the deletion is undoable, so Undo can restore them.
-    if (discardAttachments && expense != null) {
+    if (discardAttachments) {
       for (final path in expense.attachments) {
         unawaited(AttachmentStore.discard(path));
       }
     }
   }
 
-  /// Re-inserts a deleted expense, preserving its original id and receipts.
+  /// Undo a delete: revive the tombstone in place (a fresh updatedAt so it wins
+  /// over its deleted twin when it syncs), preserving the original id/receipts.
   Future<void> restoreExpense(Expense expense) async {
-    _expenses = [expense, ..._expenses]
-      ..sort((a, b) => b.date.compareTo(a.date));
+    final revived = expense.revive();
+    final index = _expenses.indexWhere((item) => item.id == expense.id);
+    _expenses = [..._expenses];
+    if (index == -1) {
+      _expenses.insert(0, revived);
+    } else {
+      _expenses[index] = revived;
+    }
+    _expenses.sort((a, b) => b.date.compareTo(a.date));
     await _persistExpenses();
   }
 
@@ -570,14 +584,15 @@ class AppState extends ChangeNotifier {
   /// Expenses in the active profile. Everything on the dashboard reads from
   /// here, so switching profile rescopes the whole screen.
   List<Expense> get scopedExpenses {
-    if (_activeProfileId == null) return _expenses;
-    return _expenses
+    final live = _expenses.where((e) => !e.isDeleted);
+    if (_activeProfileId == null) return live.toList();
+    return live
         .where((expense) => expense.profileId == _activeProfileId)
         .toList();
   }
 
   List<Expense> search(ExpenseFilter filter) =>
-      _expenses.where(filter.matches).toList();
+      _expenses.where((e) => !e.isDeleted && filter.matches(e)).toList();
 
   List<Expense> expensesInMonth(DateTime month) {
     return scopedExpenses
@@ -619,7 +634,6 @@ class AppState extends ChangeNotifier {
       ..sort((a, b) => b.total.compareTo(a.total));
   }
 
-
   /// Total spend per calendar month for the last [months] months, oldest
   /// first, empty months included so the trend chart keeps an even axis.
   List<MonthTotal> monthlyTotals({int months = 6}) {
@@ -648,17 +662,18 @@ class AppState extends ChangeNotifier {
           (spentByCategory[expense.categoryId] ?? 0) + expense.amount;
     }
 
-    final result = _categories
-        .where((category) => category.hasBudget)
-        .map(
-          (category) => BudgetProgress(
-            category: category,
-            spent: spentByCategory[category.id] ?? 0,
-            budget: category.monthlyBudget!,
-          ),
-        )
-        .toList()
-      ..sort((a, b) => b.fraction.compareTo(a.fraction));
+    final result =
+        _categories
+            .where((category) => category.hasBudget)
+            .map(
+              (category) => BudgetProgress(
+                category: category,
+                spent: spentByCategory[category.id] ?? 0,
+                budget: category.monthlyBudget!,
+              ),
+            )
+            .toList()
+          ..sort((a, b) => b.fraction.compareTo(a.fraction));
 
     return result;
   }
@@ -1123,9 +1138,7 @@ class AppState extends ChangeNotifier {
   /// separately by the existing expense list; this is the non-expense stream.
   List<Activity> get scopedActivities {
     if (_activeProfileId == null) return activities;
-    return activities
-        .where((a) => a.profileId == _activeProfileId)
-        .toList();
+    return activities.where((a) => a.profileId == _activeProfileId).toList();
   }
 }
 
