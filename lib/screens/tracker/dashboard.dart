@@ -12,6 +12,7 @@ import '../../state/app_state.dart';
 import '../../theme.dart';
 import '../../widgets/badge_icon.dart';
 import '../../widgets/card_stack.dart';
+import '../../widgets/charts.dart';
 import '../../widgets/frosted_card.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/stat.dart';
@@ -376,15 +377,32 @@ class _DashboardScreenState extends State<DashboardScreen>
   // ---- Web/desktop home: a full-width hero band over a card grid ----------
 
   Widget _desktopHome(BuildContext context, AppState state) {
+    final dark = context.isDark;
+    // A faint green ground, deepest at the top under the hero, easing to a quiet
+    // base. It gives the frosted cards something to sit on so they read as
+    // raised glass rather than floating on flat black.
+    final ground = dark
+        ? const [Color(0xFF111E16), Color(0xFF0C100E)]
+        : const [Color(0xFFEAF3ED), Color(0xFFF3F6F4)];
     return Scaffold(
-      backgroundColor: context.scheme.surface,
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 48),
-        children: [
-          _heroBand(context, state),
-          const SizedBox(height: 24),
-          _dashboardGrid(context, state),
-        ],
+      backgroundColor: ground.last,
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: ground,
+            stops: const [0.0, 0.55],
+          ),
+        ),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 48),
+          children: [
+            _heroBand(context, state),
+            const SizedBox(height: 24),
+            _dashboardGrid(context, state),
+          ],
+        ),
       ),
     );
   }
@@ -549,6 +567,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     final budgets = state.budgetProgress();
     final hasActivity =
         state.scopedExpenses.isNotEmpty || state.scopedActivities.isNotEmpty;
+    final months = state.monthlyTotals();
+    final categories = state.categoryTotals(DateTime.now());
+    final hasTrend = months.where((m) => m.total > 0).length >= 2;
+    final biggest = state.biggestExpenseThisMonth;
 
     Widget titled(String title, Widget body) => Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -566,16 +588,21 @@ class _DashboardScreenState extends State<DashboardScreen>
         titled('This month', _MonthSummaryCard(state: state)),
       budgets.isNotEmpty
           ? _BudgetSection(budgets: budgets, daysLeft: state.daysLeftThisMonth)
-          : _BudgetEmpty(
-              hasExpenses: state.spentThisMonth > 0,
-              onManage: () => ManageScreen.open(context),
+          // A header here too, so the card starts level with its neighbours
+          // instead of floating up where the others sit under their titles.
+          : titled(
+              'Your budgets',
+              _BudgetEmpty(
+                hasExpenses: state.spentThisMonth > 0,
+                onManage: () => ManageScreen.open(context),
+              ),
             ),
       titled(
         'Accounts',
         // _BalanceCard is a deck card (it expands to a fixed height), so give
         // it one in the flowing grid.
         SizedBox(
-          height: 250,
+          height: 260,
           child: _BalanceCard(
             total: state.totalBalance,
             accounts: state.accountBalances,
@@ -590,14 +617,52 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
       ),
       if (hasActivity) _RecentSection(onSeeAll: () => _openHistory(context)),
+      if (hasTrend)
+        titled(
+          'Spending trend',
+          FrostedCard(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: MonthlyTrendChart(months: months),
+          ),
+        ),
+      if (categories.isNotEmpty)
+        titled(
+          'Top categories',
+          FrostedCard(
+            padding: const EdgeInsets.all(16),
+            child: CategoryBreakdown(totals: categories, maxRows: 5),
+          ),
+        ),
+      if (biggest != null)
+        titled(
+          'Biggest this month',
+          _BiggestCard(
+            title: biggest.title.isEmpty
+                ? state.categoryById(biggest.categoryId).name
+                : biggest.title,
+            amount: biggest.amount,
+            date: biggest.date,
+            categoryName: state.categoryById(biggest.categoryId).name,
+            icon: state.categoryById(biggest.categoryId).icon,
+            color: state.categoryById(biggest.categoryId).of(context),
+          ),
+        ),
       if (state.outstandingBalances.isNotEmpty)
         _BalancesSection(balances: state.outstandingBalances),
-      _PlannerSection(onSeeAll: widget.onSeePlanner),
     ];
 
-    return LayoutBuilder(
+    final grid = LayoutBuilder(
       builder: (context, c) {
-        final cols = c.maxWidth >= 1200 ? 3 : 2;
+        // Thresholds keep each card comfortably wide (the balance card needs
+        // room for its fixed height), so columns only multiply once there's
+        // real width to spend.
+        final cols = c.maxWidth >= 1760
+            ? 4
+            : c.maxWidth >= 1320
+            ? 3
+            : c.maxWidth >= 680
+            ? 2
+            : 1;
         final columns = List.generate(cols, (_) => <Widget>[]);
         for (var i = 0; i < cards.length; i++) {
           columns[i % cols].add(
@@ -622,6 +687,17 @@ class _DashboardScreenState extends State<DashboardScreen>
           ],
         );
       },
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        grid,
+        const SizedBox(height: 24),
+        // Plan ahead is a horizontal scroller — span it full-width at the bottom
+        // instead of dropping it into one column and leaving the other short.
+        _PlannerSection(onSeeAll: widget.onSeePlanner),
+      ],
     );
   }
 }
@@ -750,6 +826,71 @@ class _RecentSection extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// A highlight card: the single largest expense logged this month.
+class _BiggestCard extends StatelessWidget {
+  const _BiggestCard({
+    required this.title,
+    required this.amount,
+    required this.date,
+    required this.categoryName,
+    required this.icon,
+    required this.color,
+  });
+
+  final String title;
+  final double amount;
+  final DateTime date;
+  final String categoryName;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return FrostedCard(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          BadgeIcon(icon: icon, accent: color, size: BadgeSize.lg),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$categoryName · ${Dates.short(date)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: context.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            Money.format(amount),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

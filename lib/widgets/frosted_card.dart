@@ -12,7 +12,7 @@ class FrostedCard extends StatelessWidget {
   const FrostedCard({
     super.key,
     required this.child,
-    this.radius = 20,
+    this.radius = 22,
     this.padding,
     this.width,
   });
@@ -26,6 +26,11 @@ class FrostedCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = context.isDark;
     final r = BorderRadius.circular(radius);
+    // A lit rim so the glass reads as a raised edge catching light, not a flat
+    // fill — brighter on dark, a soft white hairline on light.
+    final rim = dark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.white.withValues(alpha: 0.55);
     return DecoratedBox(
       // The shadow lives on an outer box so the glass clip doesn't crop it.
       decoration: BoxDecoration(
@@ -35,29 +40,30 @@ class FrostedCard extends StatelessWidget {
             color: dark
                 ? Colors.black.withValues(alpha: 0.30)
                 : const Color(0xFF0E5A3C).withValues(alpha: 0.12),
-            blurRadius: 22,
-            offset: const Offset(0, 10),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
       child: ClipRRect(
         borderRadius: r,
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
           child: Container(
             width: width,
             padding: padding,
             decoration: BoxDecoration(
-              // Translucent green glass — light enough to keep dark text legible,
-              // sheer enough to let the blur read.
+              // Translucent green glass — a touch brighter at the top-left so it
+              // reads as lit, sheer enough to let the blur through.
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: dark
-                    ? const [Color(0x8C213E2E), Color(0x73101E16)]
-                    : const [Color(0xA6E9F5EE), Color(0x8CD6ECDE)],
+                    ? const [Color(0x99243F2F), Color(0x73101E16)]
+                    : const [Color(0xB3ECF6F0), Color(0x8CD6ECDE)],
               ),
               borderRadius: r,
+              border: Border.all(color: rim),
             ),
             child: child,
           ),
