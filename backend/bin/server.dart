@@ -14,6 +14,7 @@ import 'package:shelf_router/shelf_router.dart';
 /// The Budget/Spaces product API.
 ///
 ///   POST /auth/google  { idToken }        → { token, email, name }
+///   POST /auth/focus   { token }          → { token, email } (Focus link)
 ///   POST /sync         (Bearer token)     → push local changes, pull remote
 ///   GET  /transactions (Airtel proxy, unchanged)
 ///   GET  /health
@@ -77,6 +78,9 @@ Future<void> main() async {
     );
   }
   final proxyApiKey = env['PROXY_API_KEY'];
+  // Focus's link tokens (lib/auth.dart): off unless the shared secret is set.
+  final focusLinkSecret = env['FOCUS_LINK_SECRET'];
+  final focusAliases = parseEmailAliases(env['FOCUS_EMAIL_ALIASES']);
 
   String? userFor(Request r) {
     final auth = r.headers['authorization'];
@@ -111,6 +115,30 @@ Future<void> main() async {
           'email': identity.email,
           'name': identity.name,
         }),
+        headers: {'content-type': 'application/json'},
+      );
+    })
+    ..post('/auth/focus', (Request request) async {
+      final secret = focusLinkSecret;
+      if (secret == null || secret.length < 32) {
+        return Response.notFound('Not found.');
+      }
+      Map<String, dynamic> body;
+      try {
+        body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+      } catch (_) {
+        return Response(400, body: 'Invalid JSON.');
+      }
+      final email = verifyFocusLink(body['token']?.toString() ?? '', secret);
+      if (email == null) return Response.forbidden('Invalid link token.');
+      final account = focusAliases[email] ?? email;
+      final userId = await db.userIdByEmail(account);
+      if (userId == null) {
+        // Accounts are made by signing in with Google, in the app itself.
+        return Response.notFound('No Budget account for $account yet.');
+      }
+      return Response.ok(
+        jsonEncode({'token': issueSession(userId, sessionSecret), 'email': account}),
         headers: {'content-type': 'application/json'},
       );
     })

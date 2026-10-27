@@ -61,6 +61,16 @@ class Db {
     return result.first.first.toString();
   }
 
+  /// The user who signed in with this email, if any (oldest first, should two
+  /// Google accounts ever share one).
+  Future<String?> userIdByEmail(String email) async {
+    final result = await _pool.execute(
+      Sql.named('select id from users where lower(email) = lower(@email) order by created_at limit 1'),
+      parameters: {'email': email},
+    );
+    return result.isEmpty ? null : result.first.first.toString();
+  }
+
   /// Upsert one record into a collection, keeping whichever copy is newer.
   Future<void> applyChange(
     String userId,

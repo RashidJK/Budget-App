@@ -22,6 +22,7 @@ Flutter web (Cloudflare Pages)  ──►  this API (Contabo VPS, Docker)  ─�
 | Method + path | Auth | Body → result |
 | --- | --- | --- |
 | `POST /auth/google` | — | `{idToken}` → `{token, email, name}` |
+| `POST /auth/focus` | — | `{token}` (a Focus link token) → `{token, email}` |
 | `POST /sync` | `Bearer <token>` | `{since, changes}` → `{cursor, changes}` |
 | `GET /transactions` | `Bearer <PROXY_API_KEY>` | Airtel summary JSON (optional) |
 | `GET /health` | — | `ok` |
@@ -29,6 +30,17 @@ Flutter web (Cloudflare Pages)  ──►  this API (Contabo VPS, Docker)  ─�
 `changes` is `{ "expenses": [ {record}, … ], "brain": [ … ], … }`; each record
 is a model's JSON, already carrying `id` / `updatedAt` / `deletedAt`. `since` /
 `cursor` are integers — send back the `cursor` you last received.
+
+## Opening Budget from Focus
+
+Focus (the desktop app) can show Budget as one of its private Spaces. Its
+server gives the accounts it allows a five-minute HS256 token naming their
+email, signed with a secret both servers share; `POST /auth/focus` checks it
+and returns a session for the user who signed in here with that email
+(`FOCUS_EMAIL_ALIASES` maps a different Focus email to the Google one).
+Accounts are still only created by Google sign-in in the app. Set
+`FOCUS_LINK_SECRET` here and `BUDGET_LINK_SECRET` on Focus's server to the
+same value; leave it blank and the endpoint is off.
 
 ## Configure
 
