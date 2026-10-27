@@ -90,3 +90,43 @@ bool _constantTimeEquals(List<int> a, List<int> b) {
   }
   return diff == 0;
 }
+
+// --- Focus link tokens --------------------------------------------------------
+//
+// Focus (the desktop app) can open this product as one of its private Spaces.
+// For an account it allows in, Focus's server signs a five-minute HS256 token
+// with a secret the two servers share (FOCUS_LINK_SECRET here,
+// BUDGET_LINK_SECRET there): {"email": ..., "app": "budget", "exp": ...}.
+// POST /auth/focus trades it for one of our sessions, so Focus never needs
+// Google sign-in and its own tokens never reach this server.
+
+/// The email a valid, unexpired Focus link token names, else null.
+String? verifyFocusLink(String token, String secret) {
+  final parts = token.split('.');
+  if (parts.length != 3) return null;
+  try {
+    final header = jsonDecode(utf8.decode(_b64uDecode(parts[0]))) as Map<String, dynamic>;
+    if (header['alg'] != 'HS256') return null;
+    final signingInput = '${parts[0]}.${parts[1]}';
+    final expected = Hmac(sha256, utf8.encode(secret)).convert(utf8.encode(signingInput)).bytes;
+    if (!_constantTimeEquals(expected, _b64uDecode(parts[2]))) return null;
+    final payload = jsonDecode(utf8.decode(_b64uDecode(parts[1]))) as Map<String, dynamic>;
+    final exp = int.tryParse(payload['exp']?.toString() ?? '');
+    final now = DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+    if (exp == null || now >= exp) return null;
+    if (payload['app'] != 'budget') return null;
+    final email = payload['email']?.toString().trim().toLowerCase();
+    return (email == null || email.isEmpty) ? null : email;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// `FOCUS_EMAIL_ALIASES`: "focus@x.com=google@y.com,…", for an owner whose
+/// Focus account uses a different email from the Google account they sign in
+/// to Budget with.
+Map<String, String> parseEmailAliases(String? raw) => {
+      for (final pair in (raw ?? '').split(','))
+        if (pair.contains('='))
+          pair.split('=')[0].trim().toLowerCase(): pair.split('=')[1].trim().toLowerCase(),
+    };
