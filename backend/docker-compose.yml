@@ -38,6 +38,9 @@ services:
       AIRTEL_COUNTRY: ${AIRTEL_COUNTRY:-TZ}
       AIRTEL_CURRENCY: ${AIRTEL_CURRENCY:-TZS}
       PROXY_API_KEY: ${PROXY_API_KEY:-}
+      # Focus opening Budget as a private Space (POST /auth/focus); off when blank.
+      FOCUS_LINK_SECRET: ${FOCUS_LINK_SECRET:-}
+      FOCUS_EMAIL_ALIASES: ${FOCUS_EMAIL_ALIASES:-}
       PORT: 8080
     ports:
       # Bind to localhost only; the box's existing reverse proxy routes
